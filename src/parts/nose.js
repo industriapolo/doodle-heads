@@ -18,6 +18,9 @@ export const PARAMS = {
   hookSide: { options: ['left', 'right'], pool: { left: 1, right: 1 }, label: 'Lado del gancho' },
   curlRadius: { min: 0, max: 0.7, range: [0.28, 0.45], step: 0.01, label: 'Radio del rizo (aleta)' },
   curlSweep: { min: 120, max: 260, range: [170, 215], step: 5, unit: '°', label: 'Vuelta del rizo' },
+  // 0° = el rizo entra en tangente y la esquina desaparece. Es el error que había que
+  // corregir: la horizontal tiene que QUEBRAR antes de subir.
+  curlCorner: { min: 0, max: 80, range: [32, 52], step: 2, unit: '°', label: 'Ángulo de la esquina' },
   shadowSize: { min: 0, max: 1.2, range: [0.28, 0.5], step: 0.05, label: 'Sombra bajo la horizontal' },
   offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
   tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
@@ -53,18 +56,21 @@ export function draw(ctx, faceBox, p, palette, rng) {
   path.moveTo(nx, y0)
   path.lineTo(bx, y1 - corner)
   path.quadraticCurveTo(bx, y1, bx + dir * corner, y1)
-  path.lineTo(bx + dir * (hw - r), y1)
+  const px = bx + dir * hw // la esquina: punto más bajo y más externo del gancho
+  path.lineTo(px, y1)
 
-  // --- aleta: la línea SE ENROSCA sobre sí misma --------------------------
-  // No es un bulto apoyado encima de la horizontal ni un pico recto: el trazo sigue,
-  // sube y da la vuelta hacia dentro, y el remate queda suelto arriba.
-  // El arco es tangente a la horizontal, así que el centro cae justo encima del punto
-  // donde acaba: girar más de 180° es lo que mete la punta hacia el puente.
+  // --- aleta: la línea QUIEBRA y se enrosca sobre sí misma ----------------
+  // La clave es que el arco NO entra en tangente. Si el centro cae justo encima de la
+  // esquina, el arco sale horizontal, la esquina se redondea y se pierde el quiebre.
+  // Girando el centro `curlCorner` grados alrededor de la esquina, el arco arranca ya
+  // inclinado y el ángulo vivo aparece solo.
   if (r > 0.5) {
-    const ccx = bx + dir * (hw - r)
+    const th = (p.curlCorner * Math.PI) / 180
+    const ccx = px - dir * r * Math.sin(th)
+    const ccy = y1 - r * Math.cos(th)
+    const start = Math.atan2(Math.cos(th), dir * Math.sin(th))
     const sweep = (p.curlSweep * Math.PI) / 180
-    const start = Math.PI / 2 // el punto de tangencia queda debajo del centro
-    path.arc(ccx, y1 - r, r, start, start + (dir < 0 ? sweep : -sweep), dir > 0)
+    path.arc(ccx, ccy, r, start, start + (dir < 0 ? sweep : -sweep), dir > 0)
   }
 
   interior(ctx, palette)
