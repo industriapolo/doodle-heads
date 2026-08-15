@@ -78,14 +78,11 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    línea por encima que en las referencias no existe.
   head.restroke(ctx, geo, palette, headP.lineWeight)
 
-  // 5. cejas, con su sombra recortada a la silueta
-  brows.draw(ctx, faceBox, browsP, palette, rng.fork(4), geo.path)
+  // 5. SOMBRA de las cejas. Está sobre la piel, así que el pelo tiene que taparla —
+  //    si no, desborda por los lados de la ceja y se ve encima del pelo.
+  brows.drawShadow(ctx, faceBox, browsP, palette, geo.path)
 
-  // 6. masa de pelo, DESPUÉS de las cejas.
-  //    El pelo está delante de la piel, así que tapa lo que haya en ella. Con las cejas
-  //    encima, su sombra proyectada desbordaba por los lados y se veía sobre el pelo.
-  //    Que la masa cubra los extremos de la ceja es correcto y además no se nota: son
-  //    la misma tinta.
+  // 6. masa de pelo: tapa la sombra de la ceja, pero no la ceja
   hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
 
   // 7. ojos, colgados de la ceja.
@@ -127,6 +124,9 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
 
   // 10. hoyuelo de la barbilla, en la punta del mentón
   chin.draw(ctx, faceBox, p('chin'), palette, rng.fork(9))
+
+  // 11. las CEJAS macizas, lo último de todo: nada se dibuja por encima de una ceja
+  brows.drawSlabs(ctx, faceBox, browsP, palette)
 
   return { geo, browGeo, noseGeo, mouthGeo }
 }

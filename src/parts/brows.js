@@ -58,36 +58,50 @@ export function build(faceBox, p) {
   }
 }
 
+// La ceja se dibuja en DOS pasadas separadas a propósito, porque cada mitad va en una
+// capa distinta: la sombra está sobre la piel y el pelo la tapa; el slab macizo es
+// siempre lo más alto del dibujo y no lo tapa nada.
+
+const tilts = (g, p) => [g.tilt + p.asymmetry, -g.tilt]
+
 /**
- * @param clip Path2D opcional — la silueta de la cabeza. La sombra se recorta a ella
- *             para que no se salga por el contorno.
+ * Sombra proyectada. Es la propia ceja desplazada hacia abajo, así que sigue sola la
+ * inclinación y la asimetría de cada una sin duplicar geometría.
+ *
+ * @param clip Path2D opcional — la silueta de la cabeza, para que no se salga.
  */
-export function draw(ctx, faceBox, p, palette, rng, clip = null) {
+export function drawShadow(ctx, faceBox, p, palette, clip = null) {
   const g = build(faceBox, p)
-  const left = g.tilt + p.asymmetry
-  const right = -g.tilt
-
-  // La sombra proyectada es la propia ceja desplazada hacia abajo: se dibuja primero y
-  // la ceja maciza la tapa, así que solo asoma la banda de debajo — y sigue sola la
-  // inclinación de cada ceja, incluida la asimetría.
   const off = g.bh * p.shadow
-  if (off > 0.5) {
-    ctx.save()
-    if (clip) ctx.clip(clip)
-    // skinDeep y no skinShadow: sobre el lado ya sombreado de la cara, skinShadow
-    // sería invisible
-    ctx.fillStyle = palette.skinDeep
-    slab(ctx, g.innerLeft - g.bw, g.top + off, g.bw, g.bh, left)
-    slab(ctx, g.innerRight, g.top + off, g.bw, g.bh, right)
-    ctx.restore()
-  }
+  if (off <= 0.5) return g
 
+  const [left, right] = tilts(g, p)
+  ctx.save()
+  if (clip) ctx.clip(clip)
+  // skinDeep y no skinShadow: sobre el lado ya sombreado de la cara, skinShadow
+  // sería invisible
+  ctx.fillStyle = palette.skinDeep
+  slab(ctx, g.innerLeft - g.bw, g.top + off, g.bw, g.bh, left)
+  slab(ctx, g.innerRight, g.top + off, g.bw, g.bh, right)
+  ctx.restore()
+  return g
+}
+
+/** El slab macizo. Va el último de la cara: nada se dibuja por encima de una ceja. */
+export function drawSlabs(ctx, faceBox, p, palette) {
+  const g = build(faceBox, p)
+  const [left, right] = tilts(g, p)
   ctx.fillStyle = palette.solid
   // izquierda: rotación positiva baja su extremo derecho, que es el interior
   slab(ctx, g.innerLeft - g.bw, g.top, g.bw, g.bh, left)
   slab(ctx, g.innerRight, g.top, g.bw, g.bh, right)
-
   return g
+}
+
+/** Las dos pasadas seguidas, para usar el módulo suelto en su preview. */
+export function draw(ctx, faceBox, p, palette, rng, clip = null) {
+  drawShadow(ctx, faceBox, p, palette, clip)
+  return drawSlabs(ctx, faceBox, p, palette)
 }
 
 function slab(ctx, x, y, w, h, deg) {
