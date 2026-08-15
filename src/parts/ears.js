@@ -4,25 +4,18 @@
 
 import { outline } from '../style/stroke.js'
 import { hatch } from '../style/hatching.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  size: { min: 0.04, max: 0.18, default: 0.10, step: 0.005, label: 'Tamaño' },
-  offsetY: { min: 0.26, max: 0.68, default: 0.46, step: 0.01, label: 'Altura' },
-  stretch: { min: 0.7, max: 1.8, default: 1.15, step: 0.05, label: 'Alargamiento' },
-  hatchDensity: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Densidad de rayas' },
-  hatchAngle: { min: -80, max: 80, default: 35, step: 1, unit: '°', label: 'Ángulo de rayas' },
+  // pequeñas: en las referencias la oreja asoma, no se impone
+  size: { min: 0.04, max: 0.18, range: [0.05, 0.10], step: 0.005, label: 'Tamaño' },
+  offsetY: { min: 0.26, max: 0.68, range: [0.34, 0.52], step: 0.01, label: 'Altura' },
+  stretch: { min: 0.7, max: 1.8, range: [1.0, 1.7], step: 0.05, label: 'Alargamiento' },
+  hatchDensity: { min: 0, max: 1, range: [0.25, 0.7], step: 0.01, label: 'Densidad de rayas' },
+  hatchAngle: { min: -80, max: 80, range: [-60, 60], step: 1, unit: '°', label: 'Ángulo de rayas' },
 }
 
-export function randomize(rng) {
-  return {
-    // pequeñas: en las referencias la oreja asoma, no se impone
-    size: rng.range(0.05, 0.10),
-    offsetY: rng.range(0.34, 0.52),
-    stretch: rng.range(1.0, 1.7),
-    hatchDensity: rng.range(0.25, 0.7),
-    hatchAngle: rng.range(-60, 60),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 export function draw(ctx, geo, p, palette, rng) {
   const { headBox, faceBox } = geo

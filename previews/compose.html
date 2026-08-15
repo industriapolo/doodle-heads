@@ -3,26 +3,29 @@
 <script type="module">
 import { mountPreview } from './_template.js'
 import { makeCharacter, draw } from '../src/core/character.js'
+import * as head from '../src/parts/head.js'
+import * as ears from '../src/parts/ears.js'
+import * as hair from '../src/parts/hair.js'
+import * as brows from '../src/parts/brows.js'
+import * as eyes from '../src/parts/eyes.js'
+import * as nose from '../src/parts/nose.js'
+import * as mouth from '../src/parts/mouth.js'
 
-// Aquí no hay sliders de parte: lo que se juzga es el conjunto y la variedad.
-// Los overrides globales sirven para ver un canal concreto en las 30 caras a la vez.
-const params = {
-  lidCoverage: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Párpado (todos)' },
-  beardDensity: { min: 0, max: 1, default: 0.45, step: 0.01, label: 'Densidad barba (todos)' },
-  hairDensity: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Densidad pelo (todos)' },
-}
-
+// Todas las variables del personaje en un panel, agrupadas por parte.
+// El orden es el de las capas, para que el panel se lea como se dibuja.
 mountPreview({
   title: 'compose',
-  params,
-  randomize: () => ({}),   // los personajes salen de su seed, no de los sliders
-  draw(ctx, frame, p, palette, rng, seed) {
-    const character = makeCharacter(seed)
-    const overrides = {}
-    if ('lidCoverage' in p) overrides.eyes = { lidCoverage: p.lidCoverage }
-    if ('beardDensity' in p) overrides.hair = { ...(overrides.hair || {}), beardDensity: p.beardDensity }
-    if ('hairDensity' in p) overrides.hair = { ...(overrides.hair || {}), hairDensity: p.hairDensity }
-    draw(ctx, frame, character, palette, overrides)
+  groups: [
+    { name: 'head',  label: 'Cabeza', params: head.PARAMS },
+    { name: 'hair',  label: 'Pelo y barba', params: hair.PARAMS },
+    { name: 'brows', label: 'Cejas', params: brows.PARAMS },
+    { name: 'eyes',  label: 'Ojos', params: eyes.PARAMS },
+    { name: 'nose',  label: 'Nariz', params: nose.PARAMS },
+    { name: 'mouth', label: 'Boca', params: mouth.PARAMS },
+    { name: 'ears',  label: 'Orejas', params: ears.PARAMS },
+  ],
+  draw(ctx, frame, bands, palette, rng, seed) {
+    draw(ctx, frame, makeCharacter(seed, bands), palette)
   },
   inset: 0.06,
   refs: [

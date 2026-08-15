@@ -2,30 +2,21 @@
 // Es la parte más barata del set y sin embargo la que más "cara" añade.
 
 import { interior } from '../style/stroke.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  type: { options: ['line', 'bridge'], default: 'line', label: 'Tipo' },
-  startY: { min: 0.14, max: 0.44, default: 0.26, step: 0.01, label: 'Arranque' },
-  length: { min: 0.20, max: 0.56, default: 0.38, step: 0.01, label: 'Largo' },
-  hookWidth: { min: 0.02, max: 0.18, default: 0.075, step: 0.005, label: 'Ancho del gancho' },
-  hookSide: { options: ['left', 'right'], default: 'left', label: 'Lado del gancho' },
-  offsetX: { min: -0.08, max: 0.08, default: 0, step: 0.005, label: 'Desplazamiento X' },
-  tilt: { min: -8, max: 8, default: 0, step: 0.5, unit: '°', label: 'Inclinación' },
+  type: { options: ['line', 'bridge'], pool: { line: 3, bridge: 1 }, label: 'Tipo' },
+  startY: { min: 0.14, max: 0.44, range: [0.18, 0.36], step: 0.01, label: 'Arranque' },
+  // arranca en el entrecejo (~23%) y en las refs llega casi a la boca: por debajo
+  // de 0.32 se queda flotando en mitad de la cara
+  length: { min: 0.20, max: 0.56, range: [0.34, 0.54], step: 0.01, label: 'Largo' },
+  hookWidth: { min: 0.02, max: 0.18, range: [0.04, 0.13], step: 0.005, label: 'Ancho del gancho' },
+  hookSide: { options: ['left', 'right'], pool: { left: 1, right: 1 }, label: 'Lado del gancho' },
+  offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
+  tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
 }
 
-export function randomize(rng) {
-  return {
-    type: rng.weighted({ line: 3, bridge: 1 }),
-    startY: rng.range(0.18, 0.36),
-    // arranca en el entrecejo (~23%) y en las refs llega casi a la boca: por debajo
-    // de 0.32 se queda flotando en mitad de la cara
-    length: rng.range(0.34, 0.54),
-    hookWidth: rng.range(0.04, 0.13),
-    hookSide: rng.pick(['left', 'right']),
-    offsetX: rng.range(-0.05, 0.05),
-    tilt: rng.range(-5, 5),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 export function draw(ctx, faceBox, p, palette, rng) {
   const nx = faceBox.cx + faceBox.w * p.offsetX

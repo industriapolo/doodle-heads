@@ -13,7 +13,7 @@ import * as eyes from '../parts/eyes.js'
 import * as nose from '../parts/nose.js'
 import * as mouth from '../parts/mouth.js'
 import { makeRng } from './prng.js'
-import { pickPalette, getPalette } from '../style/palettes.js'
+import { getPalette } from '../style/palettes.js'
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -21,19 +21,18 @@ import { pickPalette, getPalette } from '../style/palettes.js'
  * Cada parte recibe un `fork` propio del PRNG en vez de consumir la secuencia compartida:
  * así añadir un parámetro a la boca no cambia la cara de todos los personajes ya guardados.
  */
-export function makeCharacter(seed, paletteName) {
+export function makeCharacter(seed, bands = {}, paletteName = null) {
   const rng = makeRng(seed)
   return {
     seed,
-    palette: paletteName || pickPalette(rng).label,
-    paletteName: paletteName || null,
-    head: head.randomize(rng.fork(1)),
-    ears: ears.randomize(rng.fork(2)),
-    hair: hair.randomize(rng.fork(3)),
-    brows: brows.randomize(rng.fork(4)),
-    eyes: eyes.randomize(rng.fork(5)),
-    nose: nose.randomize(rng.fork(6)),
-    mouth: mouth.randomize(rng.fork(7)),
+    paletteName,
+    head: head.randomize(rng.fork(1), bands.head),
+    ears: ears.randomize(rng.fork(2), bands.ears),
+    hair: hair.randomize(rng.fork(3), bands.hair),
+    brows: brows.randomize(rng.fork(4), bands.brows),
+    eyes: eyes.randomize(rng.fork(5), bands.eyes),
+    nose: nose.randomize(rng.fork(6), bands.nose),
+    mouth: mouth.randomize(rng.fork(7), bands.mouth),
   }
 }
 
@@ -72,7 +71,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   eyes.draw(
     ctx,
     faceBox,
-    { ...eyesP, offsetY: clamp(browBottom + eyesP.browGap + eyesP.eyeHeight / 2, 0.24, 0.64) },
+    { ...eyesP, offsetY: clamp(browBottom + eyesP.browGap + eyesP.depth * 0.5, 0.24, 0.64) },
     palette,
     rng.fork(5)
   )

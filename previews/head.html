@@ -4,27 +4,27 @@
 import { mountPreview } from './_template.js'
 import * as head from '../src/parts/head.js'
 
-const params = {
-  showFaceBox: { type: 'bool', default: true, label: 'Ver faceBox' },
+const PARAMS = {
+  showFaceBox: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Ver faceBox' },
   ...head.PARAMS,
 }
 
 mountPreview({
   title: 'head',
-  params,
-  randomize: (rng) => ({ showFaceBox: true, ...head.randomize(rng) }),
-  draw(ctx, box, p, palette, rng) {
-    const g = head.draw(ctx, box, p, palette, rng)
+  groups: [{ name: 'head', params: PARAMS }],
+  draw(ctx, frame, bands, palette, rng, seed) {
+    const p = head.randomize(rng.fork(1), bands.head)
+    const g = head.draw(ctx, frame, p, palette, rng)
 
     // El faceBox es lo que hay que validar aquí: tiene que caer justo bajo la cúpula
-    // en cabezas de radio muy distinto, o los rasgos migrarán en el paso de composición.
-    if (p.showFaceBox) {
+    // en cabezas de radio muy distinto, o los rasgos migrarán al componer.
+    if (p.showFaceBox === 'si') {
       ctx.save()
       ctx.strokeStyle = palette.accent
       ctx.lineWidth = 2
       ctx.setLineDash([8, 6])
       ctx.strokeRect(g.faceBox.x, g.faceBox.y, g.faceBox.w, g.faceBox.h)
-      // franjas de referencia: cejas 8–22%, ojos 38–52%, boca 80–88%
+      // franjas: cejas 8–22%, ojos 38–52%, boca 80–88%
       ctx.setLineDash([3, 5])
       for (const f of [0.08, 0.22, 0.38, 0.52, 0.80, 0.88]) {
         const y = g.faceBox.y + g.faceBox.h * f

@@ -8,11 +8,10 @@ import * as eyes from '../src/parts/eyes.js'
 
 mountPreview({
   title: 'eyes',
-  params: eyes.PARAMS,
-  randomize: eyes.randomize,
-  draw(ctx, frame, p, palette, rng) {
+  groups: [{ name: 'eyes', params: eyes.PARAMS }],
+  draw(ctx, frame, bands, palette, rng, seed) {
     const g = drawHead(ctx, frame, palette, rng)
-    eyes.draw(ctx, g.faceBox, p, palette, rng)
+    eyes.draw(ctx, g.faceBox, eyes.randomize(rng.fork(5), bands.eyes), palette, rng)
     // ceja encima: el peso del slab es lo que hace leer la mirada como caída
     brows.draw(ctx, g.faceBox, brows.randomize(rng.fork(3)), palette, rng)
   },

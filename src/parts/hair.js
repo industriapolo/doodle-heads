@@ -6,28 +6,23 @@
 
 import { hatch } from '../style/hatching.js'
 import { roundedRectPath } from '../style/stroke.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  mode: { options: ['radial', 'directional', 'bald'], default: 'radial', label: 'Pelo' },
-  hairline: { min: 0, max: 0.55, default: 0.16, step: 0.01, label: 'Línea del pelo' },
-  hairDensity: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Densidad de pelo' },
-  hairAngle: { min: -60, max: 60, default: 10, step: 1, unit: '°', label: 'Ángulo del pelo' },
-  beardCoverage: { min: 0, max: 1, default: 0.55, step: 0.01, label: 'Barba' },
-  beardTop: { min: 0.45, max: 0.95, default: 0.62, step: 0.01, label: 'Arranque de barba' },
-  beardDensity: { min: 0, max: 1, default: 0.45, step: 0.01, label: 'Densidad de barba' },
+  mode: {
+    options: ['radial', 'directional', 'bald'],
+    pool: { radial: 2, directional: 2, bald: 1 },
+    label: 'Pelo',
+  },
+  hairline: { min: 0, max: 0.55, range: [0.02, 0.26], step: 0.01, label: 'Línea del pelo' },
+  hairDensity: { min: 0, max: 1, range: [0.3, 0.65], step: 0.01, label: 'Densidad de pelo' },
+  hairAngle: { min: -60, max: 60, range: [-35, 35], step: 1, unit: '°', label: 'Ángulo del pelo' },
+  beardCoverage: { min: 0, max: 1, range: [0, 0.95], step: 0.01, label: 'Barba' },
+  beardTop: { min: 0.45, max: 0.95, range: [0.52, 0.82], step: 0.01, label: 'Arranque de barba' },
+  beardDensity: { min: 0, max: 1, range: [0.28, 0.58], step: 0.01, label: 'Densidad de barba' },
 }
 
-export function randomize(rng) {
-  return {
-    mode: rng.weighted({ radial: 2, directional: 2, bald: 1 }),
-    hairline: rng.range(0.02, 0.26),
-    hairDensity: rng.range(0.3, 0.65),
-    hairAngle: rng.range(-35, 35),
-    beardCoverage: rng.range(0, 0.95),
-    beardTop: rng.range(0.52, 0.82),
-    beardDensity: rng.range(0.28, 0.58),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 /**
  * @param geo geometría devuelta por head.build() — se usa su `path` como recorte exterior,

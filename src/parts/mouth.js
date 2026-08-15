@@ -3,29 +3,24 @@
 // emisor para las partículas de humo de rig.js.
 
 import { interior, outline } from '../style/stroke.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  type: { options: ['line', 'frown', 'tiny-o', 'stitch'], default: 'line', label: 'Tipo' },
-  width: { min: 0.03, max: 0.24, default: 0.10, step: 0.005, label: 'Ancho' },
-  offsetY: { min: 0.68, max: 0.96, default: 0.84, step: 0.01, label: 'Altura' },
-  offsetX: { min: -0.14, max: 0.14, default: 0, step: 0.01, label: 'Descentrado' },
-  cigarette: { type: 'bool', default: false, label: 'Cigarrillo' },
-  cigAngle: { min: -10, max: 55, default: 28, step: 1, unit: '°', label: 'Ángulo del cigarro' },
-  cigLength: { min: 0.08, max: 0.30, default: 0.18, step: 0.01, label: 'Largo del cigarro' },
+  type: {
+    options: ['line', 'frown', 'tiny-o', 'stitch'],
+    pool: { line: 3, frown: 2, 'tiny-o': 1, stitch: 2 },
+    label: 'Tipo',
+  },
+  width: { min: 0.03, max: 0.24, range: [0.05, 0.18], step: 0.005, label: 'Ancho' },
+  offsetY: { min: 0.68, max: 0.96, range: [0.76, 0.92], step: 0.01, label: 'Altura' },
+  offsetX: { min: -0.14, max: 0.14, range: [-0.10, 0.10], step: 0.01, label: 'Descentrado' },
+  // firma de estilo, no excepción: sale en 2 de las 3 cabezas de referencia
+  cigarette: { type: 'bool', p: 0.45, label: 'Probabilidad de cigarrillo' },
+  cigAngle: { min: -10, max: 55, range: [8, 45], step: 1, unit: '°', label: 'Ángulo del cigarro' },
+  cigLength: { min: 0.08, max: 0.30, range: [0.11, 0.26], step: 0.01, label: 'Largo del cigarro' },
 }
 
-export function randomize(rng) {
-  return {
-    type: rng.weighted({ line: 3, frown: 2, 'tiny-o': 1, stitch: 2 }),
-    width: rng.range(0.05, 0.18),
-    offsetY: rng.range(0.76, 0.92),
-    offsetX: rng.range(-0.10, 0.10),
-    cigarette: rng.chance(0.45), // firma de estilo, no excepción
-    cigAngle: rng.range(8, 45),
-    cigLength: rng.range(0.11, 0.26),
-    stitchCount: rng.int(1, 2),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 export function draw(ctx, faceBox, p, palette, rng) {
   const mx = faceBox.cx + faceBox.w * p.offsetX

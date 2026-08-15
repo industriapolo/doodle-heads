@@ -5,7 +5,7 @@ import { mountPreview } from './_template.js'
 import * as hatching from '../src/style/hatching.js'
 import { roundedPolyPath } from '../src/style/stroke.js'
 
-// Formas de prueba: las tres situaciones reales donde se va a usar el motor.
+// Formas de prueba: las tres situaciones reales donde se usa el motor.
 const SHAPES = {
   mancha: (b) => roundedPolyPath(
     [{x:b.x,y:b.y},{x:b.right,y:b.y},{x:b.right,y:b.bottom},{x:b.x,y:b.bottom}],
@@ -36,21 +36,25 @@ const SHAPES = {
   },
 }
 
-const params = {
-  shape: { options: Object.keys(SHAPES), default: 'barba', label: 'Forma de prueba' },
+const PARAMS = {
+  shape: {
+    options: Object.keys(SHAPES),
+    pool: { mancha: 0, barba: 1, cupula: 1 },
+    label: 'Forma de prueba',
+  },
   ...hatching.PARAMS,
 }
 
 mountPreview({
   title: 'hatching',
-  params,
-  randomize: (rng) => ({ shape: rng.pick(Object.keys(SHAPES)), ...hatching.randomize(rng) }),
-  draw(ctx, box, p, palette, rng) {
-    const mask = SHAPES[p.shape](box)
-    // relleno de piel + contorno tenue, para juzgar el hatching sobre su fondo real
+  groups: [{ name: 'hatching', params: PARAMS }],
+  draw(ctx, frame, bands, palette, rng, seed) {
+    const p = hatching.randomize(rng, bands.hatching)
+    const mask = SHAPES[p.shape](frame)
+    // relleno de piel + contorno, para juzgar el hatching sobre su fondo real
     ctx.fillStyle = palette.skin
     ctx.fill(mask)
-    hatching.hatch(ctx, mask, hatching.boundsOf(box, 4), p, palette, rng)
+    hatching.hatch(ctx, mask, hatching.boundsOf(frame, 4), p, palette, rng)
     ctx.strokeStyle = palette.line
     ctx.lineWidth = 6
     ctx.lineJoin = 'round'

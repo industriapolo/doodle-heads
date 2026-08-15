@@ -9,34 +9,27 @@
 // limpio (wobble = 0) y el temblor se concentra en el jitter de ángulo y largo de cada raya.
 
 import { fine } from './stroke.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  mode: { options: ['directional', 'radial'], default: 'directional', label: 'Modo' },
-  angle: { min: -90, max: 90, default: 15, step: 1, unit: '°', label: 'Ángulo' },
-  density: { min: 0, max: 1, default: 0.45, step: 0.01, label: 'Densidad' },
-  length: { min: 3, max: 40, default: 14, step: 0.5, label: 'Largo' },
-  lengthJitter: { min: 0, max: 1, default: 0.35, step: 0.01, label: 'Jitter largo' },
-  angleJitter: { min: 0, max: 45, default: 8, step: 1, unit: '°', label: 'Jitter ángulo' },
-  edgeFade: { min: 0, max: 1, default: 0.45, step: 0.01, label: 'Edge fade' },
-  weight: { min: 0.5, max: 5, default: 2.2, step: 0.1, label: 'Grosor' },
-  radialOriginY: { min: -1, max: 2, default: 1.15, step: 0.05, label: 'Origen radial Y' },
+  mode: {
+    options: ['directional', 'radial'],
+    pool: { directional: 3, radial: 1 },
+    label: 'Modo',
+  },
+  angle: { min: -90, max: 90, range: [-20, 25], step: 1, unit: '°', label: 'Ángulo' },
+  // por encima de ~0.65 las rayas se tocan y la textura se convierte en fieltro:
+  // deja de leerse como trazo suelto, que es lo que la hace tuya
+  density: { min: 0, max: 1, range: [0.28, 0.6], step: 0.01, label: 'Densidad' },
+  length: { min: 3, max: 40, range: [9, 18], step: 0.5, label: 'Largo' },
+  lengthJitter: { min: 0, max: 1, range: [0.2, 0.5], step: 0.01, label: 'Jitter largo' },
+  angleJitter: { min: 0, max: 45, range: [4, 14], step: 1, unit: '°', label: 'Jitter ángulo' },
+  edgeFade: { min: 0, max: 1, range: [0.2, 0.75], step: 0.01, label: 'Edge fade' },
+  weight: { min: 0.5, max: 5, range: [1.8, 2.6], step: 0.1, label: 'Grosor' },
+  radialOriginY: { min: -1, max: 2, range: [0.95, 1.35], step: 0.05, label: 'Origen radial Y' },
 }
 
-export function randomize(rng) {
-  return {
-    mode: rng.weighted({ directional: 3, radial: 1 }),
-    angle: rng.range(-20, 25),
-    // por encima de ~0.65 las rayas se tocan y la textura se convierte en fieltro:
-    // deja de leerse como trazo suelto, que es lo que la hace tuya
-    density: rng.range(0.28, 0.6),
-    length: rng.range(9, 18),
-    lengthJitter: rng.range(0.2, 0.5),
-    angleJitter: rng.range(4, 14),
-    edgeFade: rng.range(0.2, 0.75),
-    weight: rng.range(1.8, 2.6),
-    radialOriginY: rng.range(0.95, 1.35),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 const SPACING_MAX = 18
 const SPACING_MIN = 5

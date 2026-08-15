@@ -4,18 +4,20 @@
 //
 // Todas las medidas son fracciones del `faceBox` (ancho = ancho de cabeza).
 
+import { randomizerFor } from '../core/params.js'
+
 export const PARAMS = {
   preset: {
-    options: ['auto', 'neutral', 'cansado', 'molesto', 'sorpresa'],
-    default: 'auto',
+    options: ['neutral', 'cansado', 'molesto', 'sorpresa'],
+    pool: { neutral: 3, cansado: 3, molesto: 2, sorpresa: 1 },
     label: 'Expresión',
   },
-  width: { min: 0.20, max: 0.50, default: 0.38, step: 0.01, label: 'Ancho de ceja' },
-  thickness: { min: 0.05, max: 0.20, default: 0.12, step: 0.005, label: 'Grosor' },
-  gap: { min: 0, max: 0.18, default: 0.05, step: 0.005, label: 'Separación' },
-  offsetY: { min: 0.02, max: 0.32, default: 0.11, step: 0.01, label: 'Altura' },
-  tilt: { min: -20, max: 20, default: 0, step: 1, unit: '°', label: 'Inclinación' },
-  asymmetry: { min: 0, max: 12, default: 2, step: 0.5, unit: '°', label: 'Asimetría' },
+  width: { min: 0.20, max: 0.50, range: [0.26, 0.47], step: 0.01, label: 'Ancho de ceja' },
+  thickness: { min: 0.05, max: 0.20, range: [0.08, 0.17], step: 0.005, label: 'Grosor' },
+  gap: { min: 0, max: 0.18, range: [0.015, 0.13], step: 0.005, label: 'Separación' },
+  offsetY: { min: 0.02, max: 0.32, range: [0.05, 0.24], step: 0.01, label: 'Altura' },
+  tilt: { min: -20, max: 20, range: [-6, 6], step: 1, unit: '°', label: 'Inclinación extra' },
+  asymmetry: { min: 0, max: 12, range: [0, 6], step: 0.5, unit: '°', label: 'Asimetría' },
 }
 
 // Convención: tilt positivo = extremo INTERIOR hacia abajo (cara de cabreo).
@@ -26,22 +28,12 @@ export const PRESETS = {
   sorpresa: { tilt: -4, offsetY: 0.04 }, // cejas arriba del todo
 }
 
-export function randomize(rng) {
-  const preset = rng.weighted({ neutral: 3, cansado: 3, molesto: 2, sorpresa: 1 })
-  return {
-    preset,
-    width: rng.range(0.26, 0.47),
-    thickness: rng.range(0.08, 0.17),
-    gap: rng.range(0.015, 0.13),
-    offsetY: rng.range(0.05, 0.24),
-    tilt: rng.range(-6, 6), // se suma al del preset
-    asymmetry: rng.range(0, 6),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 /** Geometría sin dibujar. El pelo la necesita para saber dónde parar. */
 export function build(faceBox, p) {
-  const preset = p.preset === 'auto' ? null : PRESETS[p.preset]
+  const preset = PRESETS[p.preset] || null
+  // el tilt del preset marca la expresión; `tilt` es la variación individual encima
   const tilt = (preset?.tilt ?? 0) + p.tilt
   const offsetY = preset?.offsetY ?? p.offsetY
 

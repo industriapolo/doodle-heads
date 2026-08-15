@@ -5,32 +5,25 @@
 
 import { roundedPolyPath, outline } from '../style/stroke.js'
 import { box } from '../core/canvas.js'
+import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  ratio: { min: 0.58, max: 0.82, default: 0.70, step: 0.01, label: 'Ratio ancho/alto' },
-  topRadius: { min: 0.05, max: 0.5, default: 0.28, step: 0.01, label: 'Radio cúpula' },
-  bottomRadius: { min: 0.02, max: 0.35, default: 0.12, step: 0.01, label: 'Radio barbilla' },
-  jawInset: { min: 0, max: 0.22, default: 0.10, step: 0.01, label: 'Estrechamiento mandíbula' },
-  chinHeight: { min: 0.06, max: 0.28, default: 0.14, step: 0.01, label: 'Altura del chaflán' },
-  asymmetry: { min: 0, max: 0.06, default: 0.02, step: 0.005, label: 'Asimetría' },
-  shadowSide: { options: ['none', 'left', 'right'], default: 'right', label: 'Sombra plana' },
-  shadowWidth: { min: 0.08, max: 0.45, default: 0.22, step: 0.01, label: 'Ancho de sombra' },
-  fill: { min: 0.82, max: 0.98, default: 0.92, step: 0.01, label: 'Ocupación del marco' },
+  ratio: { min: 0.58, max: 0.82, range: [0.62, 0.78], step: 0.01, label: 'Ratio ancho/alto' },
+  topRadius: { min: 0.05, max: 0.5, range: [0.14, 0.46], step: 0.01, label: 'Radio cúpula' },
+  bottomRadius: { min: 0.02, max: 0.35, range: [0.04, 0.24], step: 0.01, label: 'Radio barbilla' },
+  jawInset: { min: 0, max: 0.22, range: [0, 0.18], step: 0.01, label: 'Estrechamiento mandíbula' },
+  chinHeight: { min: 0.06, max: 0.28, range: [0.08, 0.22], step: 0.01, label: 'Altura del chaflán' },
+  asymmetry: { min: 0, max: 0.06, range: [0, 0.045], step: 0.005, label: 'Asimetría' },
+  shadowSide: {
+    options: ['none', 'left', 'right'],
+    pool: { none: 2, left: 1, right: 2 },
+    label: 'Sombra plana',
+  },
+  shadowWidth: { min: 0.08, max: 0.45, range: [0.14, 0.34], step: 0.01, label: 'Ancho de sombra' },
+  fill: { min: 0.82, max: 0.98, range: [0.88, 0.95], step: 0.01, label: 'Ocupación del marco' },
 }
 
-export function randomize(rng) {
-  return {
-    ratio: rng.range(0.62, 0.78),
-    topRadius: rng.range(0.14, 0.46),
-    bottomRadius: rng.range(0.04, 0.24),
-    jawInset: rng.range(0, 0.18),
-    chinHeight: rng.range(0.08, 0.22),
-    asymmetry: rng.range(0, 0.045),
-    shadowSide: rng.weighted({ none: 2, left: 1, right: 2 }),
-    shadowWidth: rng.range(0.14, 0.34),
-    fill: rng.range(0.88, 0.95),
-  }
-}
+export const randomize = randomizerFor(PARAMS)
 
 /**
  * Geometría sin dibujar. character.js la necesita antes de pintar nada: el faceBox

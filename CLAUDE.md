@@ -26,17 +26,41 @@ en Fase 1** (blink/gaze/float/smoke son 2D triviales). Se sirve con un servidor 
 
 ### Contrato de módulo
 
-Cada parte exporta tres cosas:
+Los rangos de sorteo son **datos declarados**, no código. Eso es lo que permite que la UI
+los lea y los edite: dirigir el generador es mover una banda, no editar un fichero.
 
 ```js
-export const PARAMS = {                  // schema → sliders autogenerados
-  width: { min: 0.30, max: 0.48, default: 0.38, step: 0.01, label: 'Ancho' },
+export const PARAMS = {
+  // numérico: min/max son los topes del slider, range es la banda de sorteo
+  width: { min: 0.20, max: 0.50, range: [0.26, 0.47], step: 0.01, label: 'Ancho' },
+  // de lista: pesos por opción
+  type:  { options: ['line', 'stitch'], pool: { line: 3, stitch: 2 }, label: 'Tipo' },
+  // booleano: probabilidad, no un sí/no fijo
+  cigarette: { type: 'bool', p: 0.45, label: 'Probabilidad de cigarrillo' },
 }
-export function randomize(rng) { ... }   // el módulo es dueño de sus rangos
-export function draw(ctx, box, params, palette) { ... }
+export const randomize = randomizerFor(PARAMS)   // src/core/params.js
+export function draw(ctx, box, params, palette, rng) { ... }
 ```
 
+`randomize(rng, bands)` acepta bandas que sobreescriben las declaradas — así el panel de
+previews dirige las 30 celdas sin tocar el código. El botón **copiar rangos** escupe las
+bandas afinadas para fijarlas aquí.
+
 `character.js` solo pide `randomize()` a cada parte y compone. No conoce los rangos.
+
+### Construcción del ojo
+
+No es una almendra. Sale de mirar las referencias:
+
+- el blanco es un **segmento circular**: recta arriba, arco de círculo abajo, donde la
+  recta es la **cuerda** de ese círculo
+- la **pupila se apoya en la recta**, no flota en el centro
+- por encima, y separada por piel, va otra **línea arqueada**: no es el borde del blanco,
+  es el pliegue del párpado, y su trabajo es insinuar que el globo sigue redondo por detrás
+
+El parpadeo cae solo de esta geometría: la cuerda baja hacia el arco y el blanco se cierra
+a cero. `lidCoverage` (0 = abierto, 1 = cerrado) es ese único número, y el pliegue lo
+acompaña a mitad de recorrido.
 
 ### Layout: `faceBox`, no la caja de cabeza
 

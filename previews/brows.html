@@ -8,13 +8,12 @@ import * as eyes from '../src/parts/eyes.js'
 
 mountPreview({
   title: 'brows',
-  params: brows.PARAMS,
-  randomize: brows.randomize,
-  draw(ctx, frame, p, palette, rng) {
+  groups: [{ name: 'brows', params: brows.PARAMS }],
+  draw(ctx, frame, bands, palette, rng, seed) {
     const g = drawHead(ctx, frame, palette, rng)
     // los ojos van de acompañamiento: una ceja sin ojo debajo no dice nada
     eyes.draw(ctx, g.faceBox, eyes.randomize(rng.fork(2)), palette, rng)
-    brows.draw(ctx, g.faceBox, p, palette, rng)
+    brows.draw(ctx, g.faceBox, brows.randomize(rng.fork(4), bands.brows), palette, rng)
   },
   inset: 0.06,
   refs: [
