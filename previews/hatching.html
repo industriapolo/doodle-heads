@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import * as hatching from '../src/style/hatching.js'
+import { roundedPolyPath } from '../src/style/stroke.js'
+
+// Formas de prueba: las tres situaciones reales donde se va a usar el motor.
+const SHAPES = {
+  mancha: (b) => roundedPolyPath(
+    [{x:b.x,y:b.y},{x:b.right,y:b.y},{x:b.right,y:b.bottom},{x:b.x,y:b.bottom}],
+    Math.min(b.w, b.h) * 0.22
+  ),
+  // mandíbula: la zona de barba de la referencia magenta
+  barba: (b) => {
+    const t = b.y + b.h * 0.30
+    const inset = b.w * 0.10
+    return roundedPolyPath([
+      { x: b.x, y: t },
+      { x: b.right, y: t },
+      { x: b.right, y: b.bottom - b.h * 0.16 },
+      { x: b.right - inset, y: b.bottom },
+      { x: b.x + inset, y: b.bottom },
+      { x: b.x, y: b.bottom - b.h * 0.16 },
+    ], [b.w*0.04, b.w*0.04, b.w*0.10, b.w*0.10, b.w*0.10, b.w*0.10])
+  },
+  // cúpula: el pelo radial de la referencia magenta
+  cupula: (b) => {
+    const h = b.h * 0.52
+    return roundedPolyPath([
+      { x: b.x, y: b.y + h },
+      { x: b.x, y: b.y },
+      { x: b.right, y: b.y },
+      { x: b.right, y: b.y + h },
+    ], [4, b.w * 0.48, b.w * 0.48, 4])
+  },
+}
+
+const params = {
+  shape: { options: Object.keys(SHAPES), default: 'barba', label: 'Forma de prueba' },
+  ...hatching.PARAMS,
+}
+
+mountPreview({
+  title: 'hatching',
+  params,
+  randomize: (rng) => ({ shape: rng.pick(Object.keys(SHAPES)), ...hatching.randomize(rng) }),
+  draw(ctx, box, p, palette, rng) {
+    const mask = SHAPES[p.shape](box)
+    // relleno de piel + contorno tenue, para juzgar el hatching sobre su fondo real
+    ctx.fillStyle = palette.skin
+    ctx.fill(mask)
+    hatching.hatch(ctx, mask, hatching.boundsOf(box, 4), p, palette, rng)
+    ctx.strokeStyle = palette.line
+    ctx.lineWidth = 6
+    ctx.lineJoin = 'round'
+    ctx.stroke(mask)
+  },
+  // La forma de prueba tiene que medir lo que mide una cabeza real (~480 de 800), no llenar
+  // el canvas: el hatching es una textura de tamaño absoluto y sobre una forma 1.4× más
+  // grande se lee sobre-densa aunque los parámetros sean correctos.
+  inset: 0.2,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+  ],
+})
+</script>
