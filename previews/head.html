@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import * as head from '../src/parts/head.js'
+
+const params = {
+  showFaceBox: { type: 'bool', default: true, label: 'Ver faceBox' },
+  ...head.PARAMS,
+}
+
+mountPreview({
+  title: 'head',
+  params,
+  randomize: (rng) => ({ showFaceBox: true, ...head.randomize(rng) }),
+  draw(ctx, box, p, palette, rng) {
+    const g = head.draw(ctx, box, p, palette, rng)
+
+    // El faceBox es lo que hay que validar aquí: tiene que caer justo bajo la cúpula
+    // en cabezas de radio muy distinto, o los rasgos migrarán en el paso de composición.
+    if (p.showFaceBox) {
+      ctx.save()
+      ctx.strokeStyle = palette.accent
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 6])
+      ctx.strokeRect(g.faceBox.x, g.faceBox.y, g.faceBox.w, g.faceBox.h)
+      // franjas de referencia: cejas 8–22%, ojos 38–52%, boca 80–88%
+      ctx.setLineDash([3, 5])
+      for (const f of [0.08, 0.22, 0.38, 0.52, 0.80, 0.88]) {
+        const y = g.faceBox.y + g.faceBox.h * f
+        ctx.beginPath()
+        ctx.moveTo(g.faceBox.x, y)
+        ctx.lineTo(g.faceBox.right, y)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>

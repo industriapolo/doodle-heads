@@ -45,7 +45,12 @@ posicionan como % de `faceBox`, nunca de la altura total de cabeza: las cúpulas
 con `cornerRadius` y los rasgos migrarían solos al variar la silueta.
 
 Proporciones medidas sobre las refs (% de `faceBox`):
-cejas 18–34% · ojos 40–52% · nariz hasta 72–80% · boca 80–88%.
+cejas 8–22% · ojos 38–52% · nariz hasta 72–80% · boca 80–88%.
+
+`faceBox` arranca en `y + topRadius * 0.75`. La altura sobrante de la cúpula es espacio de
+frente/pelo — que es exactamente para lo que la usan las referencias (ciudad, cerebro, parque
+encima de la cabeza). Por eso los rasgos cuelgan del `faceBox` y no de la caja de cabeza:
+así una cúpula alta añade frente en vez de empujar la cara hacia abajo.
 
 ### Orden de capas
 
