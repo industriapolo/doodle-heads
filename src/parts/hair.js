@@ -145,7 +145,9 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // El flequillo no puede llegar a la ceja. La masa y las cejas son la MISMA tinta, así
   // que en cuanto se tocan se funden en un solo borrón y se pierden las dos. En las
   // referencias siempre queda una banda de frente entre el pelo y la ceja.
-  const deepest = faceBox.h * p.fringeDepth
+  // La sombra cuenta para el tope: como ahora la masa se pinta DESPUÉS de las cejas,
+  // una sombra que bajara de más se pintaría encima de la ceja en vez de sobre la frente.
+  const deepest = faceBox.h * (p.fringeDepth + p.fringeShadow)
   const maxFringeY = (limits.hairBottom ?? Infinity) - deepest - faceBox.h * 0.02
   const fringeY = Math.min(faceBox.y + faceBox.h * p.fringeY, maxFringeY)
   const sideY = fringeY + faceBox.h * p.sideDrop

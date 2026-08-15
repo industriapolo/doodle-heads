@@ -78,11 +78,15 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    línea por encima que en las referencias no existe.
   head.restroke(ctx, geo, palette, headP.lineWeight)
 
-  // 5. masa de pelo: tinta plana por encima de todo el cráneo, topada por la ceja
-  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
-
-  // 6. cejas, con su sombra recortada a la silueta
+  // 5. cejas, con su sombra recortada a la silueta
   brows.draw(ctx, faceBox, browsP, palette, rng.fork(4), geo.path)
+
+  // 6. masa de pelo, DESPUÉS de las cejas.
+  //    El pelo está delante de la piel, así que tapa lo que haya en ella. Con las cejas
+  //    encima, su sombra proyectada desbordaba por los lados y se veía sobre el pelo.
+  //    Que la masa cubra los extremos de la ceja es correcto y además no se nota: son
+  //    la misma tinta.
+  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
 
   // 7. ojos, colgados de la ceja.
   //
