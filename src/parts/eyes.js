@@ -37,6 +37,11 @@ export const PARAMS = {
 
   // Canal de animación. 0 = como está dibujado, 1 = cerrado del todo.
   lidCoverage: { min: 0, max: 1, range: [0, 0.07], step: 0.01, label: 'Cierre del párpado' },
+
+  // Dos multiplicadores porque el borde del párpado es la línea expresiva del ojo y
+  // pide otro peso que el arco y las bolsas.
+  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor arco y bolsas (×)' },
+  lidWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor del párpado (×)' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -115,14 +120,14 @@ function eye(ctx, side, w, depth, p, palette) {
   const lower = new Path2D()
   lower.moveTo(-w / 2, 0)
   segmentArc(lower, w, depth, 1)
-  interior(ctx, palette, 0.85)
+  interior(ctx, palette, 0.85 * p.lineWeight)
   ctx.stroke(lower)
 
   // --- la recta de arriba: es el borde del párpado, va más gruesa ----------
   const chord = new Path2D()
   chord.moveTo(-w / 2, lidY)
   chord.lineTo(w / 2, lidY)
-  interior(ctx, palette, 1.15)
+  interior(ctx, palette, 1.15 * p.lidWeight)
   ctx.stroke(chord)
 
   // --- pliegue del párpado: la línea que redondea el globo -----------------
@@ -136,12 +141,12 @@ function eye(ctx, side, w, depth, p, palette) {
   const crease = new Path2D()
   crease.moveTo(-lw / 2, 0)
   segmentArc(crease, lw, rise, -1)
-  interior(ctx, palette, 0.9)
+  interior(ctx, palette, 0.9 * p.lidWeight)
   ctx.stroke(crease)
   ctx.restore()
 
   // --- bolsas -------------------------------------------------------------
-  interior(ctx, palette, 0.7)
+  interior(ctx, palette, 0.7 * p.lineWeight)
   for (let i = 0; i < p.bagLines; i++) {
     const by = depth * (1.35 + i * 0.75)
     const bw = w * (0.8 - i * 0.14)

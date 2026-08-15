@@ -18,6 +18,7 @@ export const PARAMS = {
   offsetY: { min: 0.80, max: 1.0, range: [0.9, 1], step: 0.005, label: 'Altura (punta)' },
   offsetX: { min: -0.08, max: 0.08, range: [-0.02, 0.02], step: 0.005, label: 'Descentrado' },
   rotation: { min: -45, max: 45, range: [-12, 12], step: 1, unit: '°', label: 'Giro' },
+  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor de línea (×)' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -44,7 +45,7 @@ export function draw(ctx, faceBox, p, palette, rng) {
     path.lineTo(0, s)
   }
 
-  interior(ctx, palette, 0.8)
+  interior(ctx, palette, 0.8 * p.lineWeight)
   ctx.stroke(path)
   ctx.restore()
 }

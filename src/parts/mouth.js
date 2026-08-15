@@ -20,6 +20,7 @@ export const PARAMS = {
   cigarette: { type: 'bool', p: 0.45, label: 'Probabilidad de cigarrillo' },
   cigAngle: { min: -10, max: 55, range: [8, 45], step: 1, unit: '°', label: 'Ángulo del cigarro' },
   cigLength: { min: 0.08, max: 0.30, range: [0.22, 0.27], step: 0.01, label: 'Largo del cigarro' },
+  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor de línea (×)' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -29,7 +30,7 @@ export function draw(ctx, faceBox, p, palette, rng) {
   const my = faceBox.y + faceBox.h * p.offsetY
   const w = faceBox.w * p.width
 
-  interior(ctx, palette)
+  interior(ctx, palette, p.lineWeight)
 
   const path = new Path2D()
   switch (p.type) {
@@ -62,7 +63,7 @@ export function draw(ctx, faceBox, p, palette, rng) {
 
   ctx.save()
   ctx.lineCap = 'butt'
-  outline(ctx, palette, 1)
+  outline(ctx, palette, p.lineWeight)
   ctx.strokeStyle = palette.line
   ctx.lineWidth = thick + 4
   strokeSeg(ctx, x0, y0, x1, y1)

@@ -4,18 +4,41 @@
 // `wobble` está cerrado en 0 — los contornos de las referencias son vector limpio.
 // El aire de "hecho a mano" vive entero en el jitter de hatching.js, no aquí.
 
-export const WEIGHT = {
-  outline: 6, // contorno principal
-  interior: 3.6, // líneas interiores: 60% del contorno (§4)
-  fine: 2.2, // rayitas de hatching, arrugas finas
-}
+import { randomizerFor } from '../core/params.js'
 
 export const WOBBLE = 0
+
+// Los tres pesos base del dibujo. Son estilo, no geometría, así que se declaran aquí y
+// no dentro de ninguna parte — pero son ajustables: `character.draw` los fija al empezar
+// cada personaje a partir de sus params, de modo que no queda estado colgando entre uno
+// y otro. Cada parte lleva encima su propio multiplicador para afinar por elemento.
+export const PARAMS = {
+  // min y step tienen que dejar caer el valor por defecto justo: con min 1.5 y paso 0.2
+  // el 6 no es alcanzable y el slider lo redondeaba a 6.1
+  outline: { min: 1, max: 16, range: [6, 6], step: 0.1, label: 'Contorno principal' },
+  interior: { min: 0.8, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Líneas interiores' },
+  fine: { min: 0.4, max: 8, range: [2.2, 2.2], step: 0.1, label: 'Rayitas (hatching)' },
+}
+
+export const DEFAULT_WEIGHTS = { outline: 6, interior: 3.6, fine: 2.2 }
+
+let active = { ...DEFAULT_WEIGHTS }
+
+/** Fija los pesos base. character.draw lo llama antes de dibujar nada. */
+export function setWeights(w) {
+  active = { ...DEFAULT_WEIGHTS, ...w }
+}
+
+export function weights() {
+  return active
+}
+
+export const randomize = randomizerFor(PARAMS)
 
 /** Estilo de contorno principal. */
 export function outline(ctx, palette, scale = 1) {
   ctx.strokeStyle = palette.line
-  ctx.lineWidth = WEIGHT.outline * scale
+  ctx.lineWidth = active.outline * scale
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }
@@ -23,7 +46,7 @@ export function outline(ctx, palette, scale = 1) {
 /** Estilo de línea interior (párpados, nariz, arrugas). */
 export function interior(ctx, palette, scale = 1) {
   ctx.strokeStyle = palette.line
-  ctx.lineWidth = WEIGHT.interior * scale
+  ctx.lineWidth = active.interior * scale
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }
@@ -31,7 +54,7 @@ export function interior(ctx, palette, scale = 1) {
 /** Estilo de rayita fina (hatching). */
 export function fine(ctx, palette, scale = 1) {
   ctx.strokeStyle = palette.hatch
-  ctx.lineWidth = WEIGHT.fine * scale
+  ctx.lineWidth = active.fine * scale
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }

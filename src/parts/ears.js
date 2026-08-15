@@ -17,6 +17,7 @@ export const PARAMS = {
   innerSweep: { min: 140, max: 360, range: [140, 360], step: 5, unit: '°', label: 'Cierre del oído' },
   innerRotation: { min: -180, max: 180, range: [-180, -180], step: 5, unit: '°', label: 'Giro del oído' },
   innerRise: { min: -0.5, max: 0.5, range: [-0.28, 0.06], step: 0.01, label: 'Altura del oído' },
+  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor de línea (×)' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -34,7 +35,7 @@ export function draw(ctx, geo, p, palette, rng) {
     shell.ellipse(cx, cy, r, ry, 0, 0, Math.PI * 2)
     ctx.fillStyle = palette.skin
     ctx.fill(shell)
-    outline(ctx, palette)
+    outline(ctx, palette, p.lineWeight)
     ctx.stroke(shell)
 
     // la caracola, desplazada hacia fuera para que no la tape la cabeza
@@ -47,7 +48,7 @@ export function draw(ctx, geo, p, palette, rng) {
 
     const inner = new Path2D()
     inner.arc(ix, iy, ir, start, start + sweep)
-    interior(ctx, palette, 0.9)
+    interior(ctx, palette, 0.9 * p.lineWeight)
     ctx.stroke(inner)
   }
 }

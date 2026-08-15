@@ -21,6 +21,7 @@ export const PARAMS = {
   },
   shadowWidth: { min: 0.08, max: 0.45, range: [0.13, 0.45], step: 0.01, label: 'Ancho de sombra' },
   fill: { min: 0.82, max: 0.98, range: [0.92, 0.98], step: 0.01, label: 'Ocupación del marco' },
+  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor del contorno (×)' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -87,7 +88,7 @@ export function paint(ctx, g, p, palette) {
     ctx.restore()
   }
 
-  outline(ctx, palette)
+  outline(ctx, palette, p.lineWeight)
   ctx.stroke(path)
 
   return g
@@ -98,7 +99,7 @@ export function draw(ctx, frame, p, palette, rng) {
 }
 
 /** Re-traza el contorno por encima de todo, para que el hatching no se coma la silueta. */
-export function restroke(ctx, geometry, palette) {
-  outline(ctx, palette)
+export function restroke(ctx, geometry, palette, weight = 1) {
+  outline(ctx, palette, weight)
   ctx.stroke(geometry.path)
 }
