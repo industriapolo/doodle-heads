@@ -14,29 +14,29 @@ import { interior } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  eyeWidth: { min: 0.14, max: 0.44, range: [0.26, 0.38], step: 0.01, label: 'Ancho (cuerda)' },
-  depth: { min: 0.015, max: 0.12, range: [0.035, 0.075], step: 0.005, label: 'Apertura (flecha del arco)' },
-  tilt: { min: -18, max: 18, range: [-8, 8], step: 0.5, unit: '°', label: 'Inclinación' },
-  spacing: { min: 0.01, max: 0.24, range: [0.03, 0.11], step: 0.01, label: 'Separación' },
+  eyeWidth: { min: 0.14, max: 0.44, range: [0.25, 0.43], step: 0.01, label: 'Ancho (cuerda)' },
+  depth: { min: 0.015, max: 0.12, range: [0.025, 0.115], step: 0.005, label: 'Apertura (flecha del arco)' },
+  tilt: { min: -18, max: 18, range: [-2, 1], step: 0.5, unit: '°', label: 'Inclinación' },
+  spacing: { min: 0.01, max: 0.24, range: [0.1, 0.18], step: 0.01, label: 'Separación' },
   offsetY: { min: 0.24, max: 0.62, range: [0.34, 0.46], step: 0.01, label: 'Altura' },
-  browGap: { min: 0, max: 0.16, range: [0.01, 0.09], step: 0.005, label: 'Hueco bajo la ceja' },
+  browGap: { min: 0, max: 0.16, range: [0.01, 0.14], step: 0.005, label: 'Hueco bajo la ceja' },
 
-  lidGap: { min: 0.01, max: 0.34, range: [0.06, 0.20], step: 0.005, label: 'Separación del párpado' },
-  lidRise: { min: 0.03, max: 0.45, range: [0.10, 0.26], step: 0.005, label: 'Curvatura del párpado' },
+  lidGap: { min: 0.01, max: 0.34, range: [0.05, 0.325], step: 0.005, label: 'Separación del párpado' },
+  lidRise: { min: 0.03, max: 0.45, range: [0.115, 0.275], step: 0.005, label: 'Curvatura del párpado' },
   // El tope es 0.95 a propósito: el pliegue SIEMPRE tiene que ser más estrecho que el ojo.
   // En cuanto lo iguala o lo pasa, deja de leerse como párpado y se lee como una ceja.
-  lidSpan: { min: 0.35, max: 0.95, range: [0.55, 0.85], step: 0.01, label: 'Largo del párpado' },
+  lidSpan: { min: 0.35, max: 0.95, range: [0.74, 0.82], step: 0.01, label: 'Largo del párpado' },
 
-  pupilSize: { min: 0.03, max: 0.22, range: [0.06, 0.14], step: 0.005, label: 'Tamaño pupila' },
-  pupilX: { min: -1, max: 1, range: [-0.5, 0.5], step: 0.05, label: 'Mirada X' },
+  pupilSize: { min: 0.03, max: 0.22, range: [0.03, 0.17], step: 0.005, label: 'Tamaño pupila' },
+  pupilX: { min: -1, max: 1, range: [-0.75, 1], step: 0.05, label: 'Mirada X' },
 
-  bagLines: { min: 0, max: 3, range: [0, 2], step: 1, int: true, label: 'Líneas de bolsa' },
+  bagLines: { min: 0, max: 3, range: [0, 3], step: 1, int: true, label: 'Líneas de bolsa' },
   // `accent` queda apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
   // referencia del esqueleto sí lleva ojos de acento — se enciende desde el panel.
   sclera: { options: ['white', 'accent'], pool: { white: 1, accent: 0 }, label: 'Esclerótica' },
 
   // Canal de animación. 0 = como está dibujado, 1 = cerrado del todo.
-  lidCoverage: { min: 0, max: 1, range: [0, 0.2], step: 0.01, label: 'Cierre del párpado' },
+  lidCoverage: { min: 0, max: 1, range: [0, 0.07], step: 0.01, label: 'Cierre del párpado' },
 }
 
 export const randomize = randomizerFor(PARAMS)

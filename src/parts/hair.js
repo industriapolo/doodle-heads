@@ -17,36 +17,36 @@ import { randomizerFor } from '../core/params.js'
 export const HAIR_PARAMS = {
   mode: {
     options: ['solid', 'radial', 'directional', 'bald'],
-    pool: { solid: 3, radial: 2, directional: 2, bald: 1 },
+    pool: { solid: 3, radial: 2, directional: 0, bald: 1 },
     label: 'Modo',
   },
-  hairline: { min: 0, max: 0.55, range: [0.02, 0.26], step: 0.01, label: 'Línea del pelo' },
-  hairDensity: { min: 0, max: 1, range: [0.3, 0.65], step: 0.01, label: 'Densidad (rayitas)' },
-  hairAngle: { min: -60, max: 60, range: [-35, 35], step: 1, unit: '°', label: 'Ángulo (directional)' },
+  hairline: { min: 0, max: 0.55, range: [0.11, 0.35], step: 0.01, label: 'Línea del pelo' },
+  hairDensity: { min: 0, max: 1, range: [0, 0.29], step: 0.01, label: 'Densidad (rayitas)' },
+  hairAngle: { min: -60, max: 60, range: [15, 60], step: 1, unit: '°', label: 'Ángulo (directional)' },
   hairOriginY: { min: -2, max: 3, range: [0.95, 1.35], step: 0.05, label: 'Origen radial Y' },
 
   // --- masa (mode: solid) ---
-  overhang: { min: 0, max: 0.16, range: [0.02, 0.09], step: 0.005, label: 'Vuelo sobre el cráneo' },
-  fringeY: { min: -0.05, max: 0.42, range: [0.04, 0.24], step: 0.01, label: 'Altura del flequillo' },
-  sideDrop: { min: 0, max: 0.5, range: [0.04, 0.18], step: 0.01, label: 'Caída del flequillo a los lados' },
+  overhang: { min: 0, max: 0.16, range: [0.01, 0.035], step: 0.005, label: 'Vuelo sobre el cráneo' },
+  fringeY: { min: -0.05, max: 0.42, range: [-0.05, -0.05], step: 0.01, label: 'Altura del flequillo' },
+  sideDrop: { min: 0, max: 0.5, range: [0.07, 0.5], step: 0.01, label: 'Caída del flequillo a los lados' },
 
   // --- laterales: piezas INDEPENDIENTES de la masa -----------------------
   // Separados para poder ajustarlos sin tocar el casquete, y para poder bajarlos por
   // debajo de la oreja a modo de patilla.
-  sideWidth: { min: 0, max: 0.26, range: [0.05, 0.15], step: 0.005, label: 'Ancho del lateral' },
-  sideLength: { min: 0.05, max: 0.9, range: [0.30, 0.62], step: 0.01, label: 'Largo del lateral' },
-  sideTaper: { min: 0, max: 1, range: [0.2, 0.7], step: 0.05, label: 'Estrechamiento' },
-  sideburn: { min: 0, max: 0.45, range: [0, 0.18], step: 0.01, label: 'Patilla (bajo la oreja)' },
-  sideJag: { min: 0, max: 0.09, range: [0.012, 0.045], step: 0.002, label: 'Dentado del borde interior' },
-  fringeSpikes: { min: 3, max: 18, range: [5, 12], step: 1, int: true, label: 'Nº de púas del flequillo' },
-  fringeDepth: { min: 0, max: 0.22, range: [0.06, 0.16], step: 0.005, label: 'Profundidad de las púas' },
+  sideWidth: { min: 0, max: 0.26, range: [0.05, 0.205], step: 0.005, label: 'Ancho del lateral' },
+  sideLength: { min: 0.05, max: 0.9, range: [0.28, 0.75], step: 0.01, label: 'Largo del lateral' },
+  sideTaper: { min: 0, max: 1, range: [0.15, 0.8], step: 0.05, label: 'Estrechamiento' },
+  sideburn: { min: 0, max: 0.45, range: [0.03, 0.26], step: 0.01, label: 'Patilla (bajo la oreja)' },
+  sideJag: { min: 0, max: 0.09, range: [0, 0.008], step: 0.002, label: 'Dentado del borde interior' },
+  fringeSpikes: { min: 3, max: 18, range: [9, 16], step: 1, int: true, label: 'Nº de púas del flequillo' },
+  fringeDepth: { min: 0, max: 0.22, range: [0.015, 0.07], step: 0.005, label: 'Profundidad de las púas' },
   topSpikes: { min: 3, max: 20, range: [5, 12], step: 1, int: true, label: 'Nº de picos de la silueta' },
   // El tope llega a 0.20 para el caso cresta, pero la banda por defecto es corta:
   // en las referencias la silueta de arriba es casi lisa con algún mechón suelto, y el
   // zigzag de verdad está en el flequillo. Con picos largos por defecto sale un punk.
-  topSpikeDepth: { min: 0, max: 0.20, range: [0.006, 0.045], step: 0.002, label: 'Largo de los picos' },
-  parting: { min: 0, max: 0.35, range: [0.10, 0.22], step: 0.01, label: 'Fuerza de la raya' },
-  partingAngle: { min: -70, max: 70, range: [-45, 45], step: 5, unit: '°', label: 'Ángulo de la raya' },
+  topSpikeDepth: { min: 0, max: 0.20, range: [0, 0.046], step: 0.002, label: 'Largo de los picos' },
+  parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
+  partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
 }
 
 // La barba tiene su propio modo: es una superficie distinta del pelo y no tiene por qué
@@ -62,7 +62,7 @@ export const BEARD_PARAMS = {
   beardCoverage: { min: 0, max: 1, range: [0, 0.95], step: 0.01, label: 'Cobertura' },
   beardTop: { min: 0.45, max: 0.95, range: [0.52, 0.82], step: 0.01, label: 'Arranque' },
   beardDensity: { min: 0, max: 1, range: [0.28, 0.58], step: 0.01, label: 'Densidad' },
-  beardAngle: { min: -60, max: 60, range: [-6, 14], step: 1, unit: '°', label: 'Ángulo (directional)' },
+  beardAngle: { min: -60, max: 60, range: [-12, 10], step: 1, unit: '°', label: 'Ángulo (directional)' },
   beardOriginY: { min: -3, max: 2, range: [-1.3, -0.35], step: 0.05, label: 'Origen radial Y' },
 }
 

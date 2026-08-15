@@ -10,16 +10,16 @@ export const PARAMS = {
   // del mentón. Estaba aquí por una lectura mía equivocada de las referencias.
   type: {
     options: ['line', 'frown', 'tiny-o'],
-    pool: { line: 3, frown: 2, 'tiny-o': 2 },
+    pool: { line: 3, frown: 2, 'tiny-o': 1 },
     label: 'Tipo',
   },
   width: { min: 0.03, max: 0.24, range: [0.05, 0.18], step: 0.005, label: 'Ancho' },
   offsetY: { min: 0.68, max: 0.96, range: [0.76, 0.92], step: 0.01, label: 'Altura' },
-  offsetX: { min: -0.14, max: 0.14, range: [-0.10, 0.10], step: 0.01, label: 'Descentrado' },
+  offsetX: { min: -0.14, max: 0.14, range: [-0.1, 0.1], step: 0.01, label: 'Descentrado' },
   // firma de estilo, no excepción: sale en 2 de las 3 cabezas de referencia
   cigarette: { type: 'bool', p: 0.45, label: 'Probabilidad de cigarrillo' },
   cigAngle: { min: -10, max: 55, range: [8, 45], step: 1, unit: '°', label: 'Ángulo del cigarro' },
-  cigLength: { min: 0.08, max: 0.30, range: [0.11, 0.26], step: 0.01, label: 'Largo del cigarro' },
+  cigLength: { min: 0.08, max: 0.30, range: [0.22, 0.27], step: 0.01, label: 'Largo del cigarro' },
 }
 
 export const randomize = randomizerFor(PARAMS)

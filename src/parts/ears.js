@@ -10,13 +10,13 @@ import { outline, interior } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  size: { min: 0.04, max: 0.18, range: [0.05, 0.10], step: 0.005, label: 'Tamaño' },
-  offsetY: { min: 0.26, max: 0.68, range: [0.34, 0.52], step: 0.01, label: 'Altura' },
-  stretch: { min: 0.7, max: 1.8, range: [1.0, 1.7], step: 0.05, label: 'Alargamiento' },
-  innerSize: { min: 0.2, max: 0.8, range: [0.38, 0.62], step: 0.01, label: 'Tamaño del oído' },
-  innerSweep: { min: 140, max: 360, range: [230, 330], step: 5, unit: '°', label: 'Cierre del oído' },
-  innerRotation: { min: -180, max: 180, range: [-30, 70], step: 5, unit: '°', label: 'Giro del oído' },
-  innerRise: { min: -0.5, max: 0.5, range: [-0.28, -0.05], step: 0.01, label: 'Altura del oído' },
+  size: { min: 0.04, max: 0.18, range: [0.05, 0.1], step: 0.005, label: 'Tamaño' },
+  offsetY: { min: 0.26, max: 0.68, range: [0.3, 0.59], step: 0.01, label: 'Altura' },
+  stretch: { min: 0.7, max: 1.8, range: [1, 1.6], step: 0.05, label: 'Alargamiento' },
+  innerSize: { min: 0.2, max: 0.8, range: [0.2, 0.43], step: 0.01, label: 'Tamaño del oído' },
+  innerSweep: { min: 140, max: 360, range: [140, 360], step: 5, unit: '°', label: 'Cierre del oído' },
+  innerRotation: { min: -180, max: 180, range: [-180, -180], step: 5, unit: '°', label: 'Giro del oído' },
+  innerRise: { min: -0.5, max: 0.5, range: [-0.28, 0.06], step: 0.01, label: 'Altura del oído' },
 }
 
 export const randomize = randomizerFor(PARAMS)

@@ -8,19 +8,19 @@ import { box } from '../core/canvas.js'
 import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
-  ratio: { min: 0.58, max: 0.82, range: [0.62, 0.78], step: 0.01, label: 'Ratio ancho/alto' },
-  topRadius: { min: 0.05, max: 0.5, range: [0.14, 0.46], step: 0.01, label: 'Radio cúpula' },
-  bottomRadius: { min: 0.02, max: 0.35, range: [0.04, 0.24], step: 0.01, label: 'Radio barbilla' },
-  jawInset: { min: 0, max: 0.22, range: [0, 0.18], step: 0.01, label: 'Estrechamiento mandíbula' },
-  chinHeight: { min: 0.06, max: 0.28, range: [0.08, 0.22], step: 0.01, label: 'Altura del chaflán' },
-  asymmetry: { min: 0, max: 0.06, range: [0, 0.045], step: 0.005, label: 'Asimetría' },
+  ratio: { min: 0.58, max: 0.82, range: [0.58, 0.82], step: 0.01, label: 'Ratio ancho/alto' },
+  topRadius: { min: 0.05, max: 0.5, range: [0.36, 0.5], step: 0.01, label: 'Radio cúpula' },
+  bottomRadius: { min: 0.02, max: 0.35, range: [0.02, 0.04], step: 0.01, label: 'Radio barbilla' },
+  jawInset: { min: 0, max: 0.22, range: [0, 0.22], step: 0.01, label: 'Estrechamiento mandíbula' },
+  chinHeight: { min: 0.06, max: 0.28, range: [0.11, 0.21], step: 0.01, label: 'Altura del chaflán' },
+  asymmetry: { min: 0, max: 0.06, range: [0, 0.015], step: 0.005, label: 'Asimetría' },
   shadowSide: {
     options: ['none', 'left', 'right'],
-    pool: { none: 2, left: 1, right: 2 },
+    pool: { none: 0, left: 1, right: 0 },
     label: 'Sombra plana',
   },
-  shadowWidth: { min: 0.08, max: 0.45, range: [0.14, 0.34], step: 0.01, label: 'Ancho de sombra' },
-  fill: { min: 0.82, max: 0.98, range: [0.88, 0.95], step: 0.01, label: 'Ocupación del marco' },
+  shadowWidth: { min: 0.08, max: 0.45, range: [0.13, 0.45], step: 0.01, label: 'Ancho de sombra' },
+  fill: { min: 0.82, max: 0.98, range: [0.92, 0.98], step: 0.01, label: 'Ocupación del marco' },
 }
 
 export const randomize = randomizerFor(PARAMS)
