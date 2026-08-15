@@ -23,13 +23,17 @@ export const PARAMS = {
 
   lidGap: { min: 0.01, max: 0.34, range: [0.06, 0.20], step: 0.005, label: 'Separación del párpado' },
   lidRise: { min: 0.03, max: 0.45, range: [0.10, 0.26], step: 0.005, label: 'Curvatura del párpado' },
-  lidSpan: { min: 0.8, max: 1.5, range: [0.95, 1.25], step: 0.01, label: 'Largo del párpado' },
+  // El tope es 0.95 a propósito: el pliegue SIEMPRE tiene que ser más estrecho que el ojo.
+  // En cuanto lo iguala o lo pasa, deja de leerse como párpado y se lee como una ceja.
+  lidSpan: { min: 0.35, max: 0.95, range: [0.55, 0.85], step: 0.01, label: 'Largo del párpado' },
 
   pupilSize: { min: 0.03, max: 0.22, range: [0.06, 0.14], step: 0.005, label: 'Tamaño pupila' },
   pupilX: { min: -1, max: 1, range: [-0.5, 0.5], step: 0.05, label: 'Mirada X' },
 
   bagLines: { min: 0, max: 3, range: [0, 2], step: 1, int: true, label: 'Líneas de bolsa' },
-  sclera: { options: ['white', 'accent'], pool: { white: 4, accent: 1 }, label: 'Esclerótica' },
+  // `accent` queda apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
+  // referencia del esqueleto sí lleva ojos de acento — se enciende desde el panel.
+  sclera: { options: ['white', 'accent'], pool: { white: 1, accent: 0 }, label: 'Esclerótica' },
 
   // Canal de animación. 0 = como está dibujado, 1 = cerrado del todo.
   lidCoverage: { min: 0, max: 1, range: [0, 0.2], step: 0.01, label: 'Cierre del párpado' },

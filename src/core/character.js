@@ -60,13 +60,23 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   const browGeo = brows.build(faceBox, browsP)
   const browBottom = (browGeo.bottom - faceBox.y) / faceBox.h
 
-  // 3. pelo y barba, recortados a la silueta y topados por la ceja
-  hair.draw(ctx, geo, p('hair'), palette, rng.fork(3), { hairBottom: browGeo.top })
+  // 3. pelo texturado y barba, recortados a la silueta y topados por la ceja
+  const hairP = p('hair')
+  hair.draw(ctx, geo, hairP, palette, rng.fork(3), { hairBottom: browGeo.top })
 
-  // 4. cejas
+  // 4. re-trazo del contorno: impide que el hatching se coma la silueta.
+  //    Va aquí y no al final porque todo el hatching ya está puesto, y porque la masa
+  //    de pelo sobresale del cráneo — si el contorno fuera después, le cruzaría una
+  //    línea por encima que en las referencias no existe.
+  head.restroke(ctx, geo, palette)
+
+  // 5. masa de pelo: tinta plana por encima de todo el cráneo
+  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8))
+
+  // 6. cejas
   brows.draw(ctx, faceBox, browsP, palette, rng.fork(4))
 
-  // 5. ojos, colgados de la ceja.
+  // 7. ojos, colgados de la ceja.
   //
   // Lo que hay que colgar de la ceja NO es la cuerda del ojo, es el punto más alto del
   // pliegue del párpado — que queda por encima de ella. Y ese saliente se mide en
@@ -82,7 +92,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     rng.fork(5)
   )
 
-  // 6. nariz, arrancando en el entrecejo
+  // 8. nariz, arrancando en el entrecejo
   const noseP = p('nose')
   const noseGeo = nose.draw(
     ctx,
@@ -92,7 +102,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     rng.fork(6)
   )
 
-  // 7. boca, siempre por debajo de donde acaba la nariz
+  // 9. boca, siempre por debajo de donde acaba la nariz
   const mouthP = p('mouth')
   const noseEnd = (noseGeo.endY - faceBox.y) / faceBox.h
   const mouthGeo = mouth.draw(
@@ -102,9 +112,6 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     palette,
     rng.fork(7)
   )
-
-  // 8. re-trazo del contorno: impide que el hatching se coma la silueta
-  head.restroke(ctx, geo, palette)
 
   return { geo, browGeo, noseGeo, mouthGeo }
 }

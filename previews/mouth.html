@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { drawHead } from './_scene.js'
+import * as mouth from '../src/parts/mouth.js'
+import * as nose from '../src/parts/nose.js'
+
+mountPreview({
+  title: 'mouth',
+  groups: [{ name: 'mouth', params: mouth.PARAMS }],
+  draw(ctx, frame, bands, palette, rng, seed) {
+    const g = drawHead(ctx, frame, palette, rng)
+    // la nariz de acompañamiento: la boca se lee en relación a dónde acaba
+    nose.draw(ctx, g.faceBox, nose.randomize(rng.fork(6)), palette, rng)
+    mouth.draw(ctx, g.faceBox, mouth.randomize(rng.fork(7), bands.mouth), palette, rng)
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>
