@@ -8,19 +8,36 @@ import { hatch } from '../style/hatching.js'
 import { roundedRectPath } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
-export const PARAMS = {
+export const HAIR_PARAMS = {
   mode: {
     options: ['radial', 'directional', 'bald'],
     pool: { radial: 2, directional: 2, bald: 1 },
-    label: 'Pelo',
+    label: 'Modo',
   },
   hairline: { min: 0, max: 0.55, range: [0.02, 0.26], step: 0.01, label: 'Línea del pelo' },
-  hairDensity: { min: 0, max: 1, range: [0.3, 0.65], step: 0.01, label: 'Densidad de pelo' },
-  hairAngle: { min: -60, max: 60, range: [-35, 35], step: 1, unit: '°', label: 'Ángulo del pelo' },
-  beardCoverage: { min: 0, max: 1, range: [0, 0.95], step: 0.01, label: 'Barba' },
-  beardTop: { min: 0.45, max: 0.95, range: [0.52, 0.82], step: 0.01, label: 'Arranque de barba' },
-  beardDensity: { min: 0, max: 1, range: [0.28, 0.58], step: 0.01, label: 'Densidad de barba' },
+  hairDensity: { min: 0, max: 1, range: [0.3, 0.65], step: 0.01, label: 'Densidad' },
+  hairAngle: { min: -60, max: 60, range: [-35, 35], step: 1, unit: '°', label: 'Ángulo (directional)' },
+  hairOriginY: { min: -2, max: 3, range: [0.95, 1.35], step: 0.05, label: 'Origen radial Y' },
 }
+
+// La barba tiene su propio modo: es una superficie distinta del pelo y no tiene por qué
+// compartir dirección con él. En radial, el origen por defecto queda POR ENCIMA de la zona
+// de barba (valores negativos), que es como crece de verdad — abriéndose desde la cara
+// hacia la mandíbula.
+export const BEARD_PARAMS = {
+  beardMode: {
+    options: ['radial', 'directional'],
+    pool: { radial: 1, directional: 2 },
+    label: 'Modo',
+  },
+  beardCoverage: { min: 0, max: 1, range: [0, 0.95], step: 0.01, label: 'Cobertura' },
+  beardTop: { min: 0.45, max: 0.95, range: [0.52, 0.82], step: 0.01, label: 'Arranque' },
+  beardDensity: { min: 0, max: 1, range: [0.28, 0.58], step: 0.01, label: 'Densidad' },
+  beardAngle: { min: -60, max: 60, range: [-6, 14], step: 1, unit: '°', label: 'Ángulo (directional)' },
+  beardOriginY: { min: -3, max: 2, range: [-1.3, -0.35], step: 0.05, label: 'Origen radial Y' },
+}
+
+export const PARAMS = { ...HAIR_PARAMS, ...BEARD_PARAMS }
 
 export const randomize = randomizerFor(PARAMS)
 
@@ -58,7 +75,7 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
           angleJitter: p.mode === 'radial' ? 5 : 10,
           edgeFade: 0.25,
           weight: 2.2,
-          radialOriginY: 1.15,
+          radialOriginY: p.hairOriginY,
         },
         palette,
         rng
@@ -82,14 +99,15 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
         mask,
         region,
         {
-          mode: 'directional',
-          angle: 8,
+          mode: p.beardMode,
+          angle: p.beardAngle,
           density: p.beardDensity,
           length: 12,
           lengthJitter: 0.4,
-          angleJitter: 12,
+          angleJitter: p.beardMode === 'radial' ? 7 : 12,
           edgeFade: 0.15,
           weight: 2.2,
+          radialOriginY: p.beardOriginY,
         },
         palette,
         rng,

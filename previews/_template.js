@@ -125,12 +125,21 @@ export function mountPreview(opts) {
 
   const STORE = `doodle-bands:${title}`
 
+  // Un grupo es un bloque del panel. Varios grupos pueden compartir `bandKey` y escribir
+  // en el mismo módulo — así "Pelo" y "Barba" se leen separados aunque los dos vivan
+  // en hair.js.
+  const keyOf = (g) => g.bandKey || g.name
+
   // --- bandas -------------------------------------------------------------
-  const declared = () => Object.fromEntries(groups.map((g) => [g.name, bandsOf(g.params)]))
+  const declared = () => {
+    const b = {}
+    for (const g of groups) b[keyOf(g)] = { ...(b[keyOf(g)] || {}), ...bandsOf(g.params) }
+    return b
+  }
   let bands = declared()
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null')
-    if (saved) for (const g of groups) if (saved[g.name]) Object.assign(bands[g.name], saved[g.name])
+    if (saved) for (const k of Object.keys(bands)) if (saved[k]) Object.assign(bands[k], saved[k])
   } catch {}
 
   const persist = () => {
@@ -176,7 +185,7 @@ export function mountPreview(opts) {
         box.append(h)
       }
       for (const [name, def] of Object.entries(g.params)) {
-        box.append(controlFor(g.name, name, def))
+        box.append(controlFor(keyOf(g), name, def))
       }
       controlsEl.append(box)
     }
@@ -326,7 +335,7 @@ export function mountPreview(opts) {
   const outEl = document.getElementById('out')
   document.getElementById('copy').addEventListener('click', () => {
     const code = groups
-      .map((g) => `// ── ${g.name} ──\n${exportBands(g.params, bands[g.name])}`)
+      .map((g) => `// ── ${g.label || g.name} (${keyOf(g)}.js) ──\n${exportBands(g.params, bands[keyOf(g)])}`)
       .join('\n\n')
     outEl.value = code
     outEl.style.display = 'block'

@@ -17,7 +17,9 @@ mountPreview({
   title: 'compose',
   groups: [
     { name: 'head',  label: 'Cabeza', params: head.PARAMS },
-    { name: 'hair',  label: 'Pelo y barba', params: hair.PARAMS },
+    // dos bloques, un solo módulo: el pelo y la barba se dirigen por separado
+    { name: 'hair',  label: 'Pelo', params: hair.HAIR_PARAMS },
+    { name: 'beard', label: 'Barba', params: hair.BEARD_PARAMS, bandKey: 'hair' },
     { name: 'brows', label: 'Cejas', params: brows.PARAMS },
     { name: 'eyes',  label: 'Ojos', params: eyes.PARAMS },
     { name: 'nose',  label: 'Nariz', params: nose.PARAMS },
