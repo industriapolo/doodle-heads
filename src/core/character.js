@@ -66,12 +66,18 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // 4. cejas
   brows.draw(ctx, faceBox, browsP, palette, rng.fork(4))
 
-  // 5. ojos, colgados de la ceja
+  // 5. ojos, colgados de la ceja.
+  //
+  // Lo que hay que colgar de la ceja NO es la cuerda del ojo, es el punto más alto del
+  // pliegue del párpado — que queda por encima de ella. Y ese saliente se mide en
+  // fracciones del ANCHO del ojo, así que en ojos anchos sube lo bastante como para
+  // meterse dentro de la ceja si no se cuenta.
   const eyesP = p('eyes')
+  const creaseAbove = ((eyesP.lidGap + eyesP.lidRise) * eyesP.eyeWidth * faceBox.w) / faceBox.h
   eyes.draw(
     ctx,
     faceBox,
-    { ...eyesP, offsetY: clamp(browBottom + eyesP.browGap + eyesP.depth * 0.5, 0.24, 0.64) },
+    { ...eyesP, offsetY: clamp(browBottom + eyesP.browGap + creaseAbove, 0.24, 0.64) },
     palette,
     rng.fork(5)
   )

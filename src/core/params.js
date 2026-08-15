@@ -14,6 +14,12 @@
 
 /** Banda de sorteo declarada por cada parámetro. Es lo que la UI edita. */
 export function bandsOf(PARAMS) {
+  if (!PARAMS || typeof PARAMS !== 'object') {
+    throw new TypeError(
+      'bandsOf() recibió ' + PARAMS + '. Suele ser un PARAMS que el módulo ya no exporta ' +
+      '(o un módulo viejo en la caché del navegador).'
+    )
+  }
   const bands = {}
   for (const [name, def] of Object.entries(PARAMS)) {
     if (def.options) bands[name] = { ...(def.pool || uniformPool(def.options)) }

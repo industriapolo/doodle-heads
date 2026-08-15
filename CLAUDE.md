@@ -11,9 +11,15 @@ Spec completa: `generador-personajes-kickoff.md`. Referencias visuales: `referen
 ## Stack
 
 ES modules nativos, sin bundler ni dependencias. Canvas 2D puro — **three.js está descartado
-en Fase 1** (blink/gaze/float/smoke son 2D triviales). Se sirve con un servidor estático:
+en Fase 1** (blink/gaze/float/smoke son 2D triviales). Se sirve con:
 
-    python3 -m http.server 8080
+    python3 serve.py
+
+**No usar `python3 -m http.server`**: no manda `Cache-Control`, así que Chrome aplica caché
+heurística y sirve los ES modules de memoria sin revalidar. Editas un módulo, recargas, y
+sigue corriendo el viejo — y con imports de namespace eso no da error de carga, da
+`undefined` en una propiedad y una página en blanco a medio arrancar. `serve.py` manda
+`no-store` y quita `Last-Modified`.
 
 ## Arquitectura
 

@@ -85,6 +85,29 @@ const CSS = `
  *                    al randomize del módulo.
  */
 export function mountPreview(opts) {
+  try {
+    mount(opts)
+  } catch (err) {
+    // Una preview que falla a medias deja la página muda: panel vacío, grid vacío, y a
+    // adivinar. Que se vea el error donde se está mirando.
+    showError(err)
+    throw err
+  }
+}
+
+function showError(err) {
+  const pre = document.createElement('pre')
+  pre.style.cssText =
+    'position:fixed;inset:0;z-index:99;margin:0;padding:24px;overflow:auto;' +
+    'background:#2a1218;color:#ff9db4;font:12px/1.6 ui-monospace,monospace;white-space:pre-wrap'
+  pre.textContent =
+    `La preview no arrancó.\n\n${err?.stack || err}\n\n` +
+    `Si acabas de cambiar un módulo, lo más probable es caché del navegador:\n` +
+    `arranca con  python3 serve.py  (no manda caché) o recarga con Cmd+Shift+R.`
+  document.body.append(pre)
+}
+
+function mount(opts) {
   const {
     title = 'preview',
     groups = [],
