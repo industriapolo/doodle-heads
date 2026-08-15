@@ -16,8 +16,9 @@ export const PARAMS = {
   // ganchos cortos la nariz se queda en una rayita con un pico
   hookWidth: { min: 0.02, max: 0.22, range: [0.08, 0.16], step: 0.005, label: 'Ancho del gancho' },
   hookSide: { options: ['left', 'right'], pool: { left: 1, right: 1 }, label: 'Lado del gancho' },
-  wingSize: { min: 0, max: 0.7, range: [0.22, 0.42], step: 0.01, label: 'Aleta' },
-  shadowSize: { min: 0, max: 1.2, range: [0.28, 0.55], step: 0.05, label: 'Sombra bajo la horizontal' },
+  curlRadius: { min: 0, max: 0.7, range: [0.28, 0.45], step: 0.01, label: 'Radio del rizo (aleta)' },
+  curlSweep: { min: 120, max: 260, range: [170, 215], step: 5, unit: '°', label: 'Vuelta del rizo' },
+  shadowSize: { min: 0, max: 1.2, range: [0.28, 0.5], step: 0.05, label: 'Sombra bajo la horizontal' },
   offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
   tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
 }
@@ -33,7 +34,7 @@ export function draw(ctx, faceBox, p, palette, rng) {
   const lean = Math.tan((p.tilt * Math.PI) / 180) * (y1 - y0)
   const bx = nx + lean // base de la vertical
 
-  const wr = hw * p.wingSize
+  const r = hw * p.curlRadius
   const corner = Math.min(hw * 0.45, faceBox.h * 0.02)
 
   // --- sombra plana bajo la horizontal, antes que la línea -----------------
@@ -47,19 +48,23 @@ export function draw(ctx, faceBox, p, palette, rng) {
     ctx.fill(shadow)
   }
 
-  // --- la C: vertical, esquina redondeada, horizontal ---------------------
+  // --- vertical, esquina redondeada, horizontal ---------------------------
   const path = new Path2D()
   path.moveTo(nx, y0)
   path.lineTo(bx, y1 - corner)
   path.quadraticCurveTo(bx, y1, bx + dir * corner, y1)
-  path.lineTo(bx + dir * (hw - wr * 2), y1)
+  path.lineTo(bx + dir * (hw - r), y1)
 
-  // --- aleta: semicírculo que remata el gancho ----------------------------
-  if (wr > 0.5) {
-    const wcx = bx + dir * (hw - wr)
-    // de π a 0 en sentido horario de pantalla pasa por arriba: la aleta abomba hacia
-    // el puente, que es como remata en las referencias
-    path.arc(wcx, y1, wr, dir < 0 ? 0 : Math.PI, dir < 0 ? Math.PI : 0, dir < 0)
+  // --- aleta: la línea SE ENROSCA sobre sí misma --------------------------
+  // No es un bulto apoyado encima de la horizontal ni un pico recto: el trazo sigue,
+  // sube y da la vuelta hacia dentro, y el remate queda suelto arriba.
+  // El arco es tangente a la horizontal, así que el centro cae justo encima del punto
+  // donde acaba: girar más de 180° es lo que mete la punta hacia el puente.
+  if (r > 0.5) {
+    const ccx = bx + dir * (hw - r)
+    const sweep = (p.curlSweep * Math.PI) / 180
+    const start = Math.PI / 2 // el punto de tangencia queda debajo del centro
+    path.arc(ccx, y1 - r, r, start, start + (dir < 0 ? sweep : -sweep), dir > 0)
   }
 
   interior(ctx, palette)
