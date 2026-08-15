@@ -18,6 +18,8 @@ export const PARAMS = {
   offsetY: { min: 0.02, max: 0.32, range: [0.04, 0.27], step: 0.01, label: 'Altura' },
   tilt: { min: -20, max: 20, range: [-14, 15], step: 1, unit: '°', label: 'Inclinación extra' },
   asymmetry: { min: 0, max: 12, range: [0.5, 9], step: 0.5, unit: '°', label: 'Asimetría' },
+  // Fracción del grosor de la ceja, para que escale con ella. 0 la quita.
+  shadow: { min: 0, max: 1.2, range: [0.25, 0.5], step: 0.05, label: 'Sombra proyectada (× grosor)' },
 }
 
 // Convención: tilt positivo = extremo INTERIOR hacia abajo (cara de cabreo).
@@ -56,13 +58,34 @@ export function build(faceBox, p) {
   }
 }
 
-export function draw(ctx, faceBox, p, palette, rng) {
+/**
+ * @param clip Path2D opcional — la silueta de la cabeza. La sombra se recorta a ella
+ *             para que no se salga por el contorno.
+ */
+export function draw(ctx, faceBox, p, palette, rng, clip = null) {
   const g = build(faceBox, p)
+  const left = g.tilt + p.asymmetry
+  const right = -g.tilt
+
+  // La sombra proyectada es la propia ceja desplazada hacia abajo: se dibuja primero y
+  // la ceja maciza la tapa, así que solo asoma la banda de debajo — y sigue sola la
+  // inclinación de cada ceja, incluida la asimetría.
+  const off = g.bh * p.shadow
+  if (off > 0.5) {
+    ctx.save()
+    if (clip) ctx.clip(clip)
+    // skinDeep y no skinShadow: sobre el lado ya sombreado de la cara, skinShadow
+    // sería invisible
+    ctx.fillStyle = palette.skinDeep
+    slab(ctx, g.innerLeft - g.bw, g.top + off, g.bw, g.bh, left)
+    slab(ctx, g.innerRight, g.top + off, g.bw, g.bh, right)
+    ctx.restore()
+  }
 
   ctx.fillStyle = palette.solid
   // izquierda: rotación positiva baja su extremo derecho, que es el interior
-  slab(ctx, g.innerLeft - g.bw, g.top, g.bw, g.bh, g.tilt + p.asymmetry)
-  slab(ctx, g.innerRight, g.top, g.bw, g.bh, -g.tilt)
+  slab(ctx, g.innerLeft - g.bw, g.top, g.bw, g.bh, left)
+  slab(ctx, g.innerRight, g.top, g.bw, g.bh, right)
 
   return g
 }

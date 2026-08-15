@@ -45,6 +45,7 @@ export const HAIR_PARAMS = {
   // en las referencias la silueta de arriba es casi lisa con algún mechón suelto, y el
   // zigzag de verdad está en el flequillo. Con picos largos por defecto sale un punk.
   topSpikeDepth: { min: 0, max: 0.20, range: [0, 0.046], step: 0.002, label: 'Largo de los picos' },
+  fringeShadow: { min: 0, max: 0.09, range: [0.015, 0.035], step: 0.002, label: 'Sombra proyectada' },
   parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
   partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
 }
@@ -188,6 +189,20 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     sidePath(headBox, faceBox, p, -1, fringeY, rng),
     sidePath(headBox, faceBox, p, 1, fringeY, rng),
   ]
+
+  // Sombra proyectada: la propia masa desplazada hacia abajo. Como el borde de abajo es
+  // el zigzag del flequillo, la sombra sale dentada sola, siguiendo diente a diente.
+  // Recortada a la cabeza porque la masa vuela por fuera del cráneo y su sombra no puede.
+  const shOff = faceBox.h * p.fringeShadow
+  if (shOff > 0.5) {
+    ctx.save()
+    ctx.clip(geo.path)
+    ctx.translate(0, shOff)
+    ctx.fillStyle = palette.skinDeep
+    ctx.fill(path)
+    for (const s of sides) if (s) ctx.fill(s)
+    ctx.restore()
+  }
 
   ctx.fillStyle = palette.solid
   ctx.fill(path)

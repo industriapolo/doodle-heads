@@ -81,8 +81,8 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // 5. masa de pelo: tinta plana por encima de todo el cráneo, topada por la ceja
   hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
 
-  // 6. cejas
-  brows.draw(ctx, faceBox, browsP, palette, rng.fork(4))
+  // 6. cejas, con su sombra recortada a la silueta
+  brows.draw(ctx, faceBox, browsP, palette, rng.fork(4), geo.path)
 
   // 7. ojos, colgados de la ceja.
   //
