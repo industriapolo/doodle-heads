@@ -406,5 +406,7 @@ const el = (tag, cls) => {
 
 function fmt(v) {
   if (Number.isInteger(v)) return String(v)
-  return v.toFixed(Math.abs(v) < 1 ? 3 : 1).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  // Un decimal para valores ≥1 mentía: 1.05 se mostraba como "1.1" y no cuadraba con
+  // lo que el slider estaba mandando de verdad.
+  return v.toFixed(3).replace(/\.?0+$/, '')
 }

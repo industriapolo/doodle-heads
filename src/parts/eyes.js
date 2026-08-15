@@ -31,6 +31,10 @@ export const PARAMS = {
   pupilX: { min: -1, max: 1, range: [-0.75, 1], step: 0.05, label: 'Mirada X' },
 
   bagLines: { min: 0, max: 3, range: [0, 3], step: 1, int: true, label: 'Líneas de bolsa' },
+  // Múltiplo de la apertura del ojo. Estaba clavado en 0.75 y las bolsas se desparramaban
+  // por media mejilla en vez de leerse como un grupo.
+  bagSpacing: { min: 0.06, max: 0.8, range: [0.16, 0.28], step: 0.01, label: 'Separación entre bolsas' },
+  bagTop: { min: 0.6, max: 2.2, range: [1.05, 1.3], step: 0.05, label: 'Distancia al ojo' },
   // `accent` queda apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
   // referencia del esqueleto sí lleva ojos de acento — se enciende desde el panel.
   sclera: { options: ['white', 'accent'], pool: { white: 1, accent: 0 }, label: 'Esclerótica' },
@@ -147,12 +151,16 @@ function eye(ctx, side, w, depth, p, palette) {
 
   // --- bolsas -------------------------------------------------------------
   interior(ctx, palette, 0.7 * p.lineWeight)
+  const spacing = depth * p.bagSpacing
+  // La curva no puede hundirse más que la separación o las bolsas se cruzan entre sí:
+  // el vértice de una quedaría por debajo de los extremos de la siguiente.
+  const bulge = Math.min(depth * 1.2, spacing * 1.6)
   for (let i = 0; i < p.bagLines; i++) {
-    const by = depth * (1.35 + i * 0.75)
-    const bw = w * (0.8 - i * 0.14)
+    const by = depth * p.bagTop + i * spacing
+    const bw = w * (0.8 - i * 0.12)
     const bag = new Path2D()
     bag.moveTo(-bw / 2, by)
-    bag.quadraticCurveTo(0, by + depth * 0.7, bw / 2, by)
+    bag.quadraticCurveTo(0, by + bulge, bw / 2, by)
     ctx.stroke(bag)
   }
 
