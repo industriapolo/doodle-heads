@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { drawHead } from './_scene.js'
+import * as brows from '../src/parts/brows.js'
+import * as eyes from '../src/parts/eyes.js'
+
+mountPreview({
+  title: 'eyes',
+  params: eyes.PARAMS,
+  randomize: eyes.randomize,
+  draw(ctx, frame, p, palette, rng) {
+    const g = drawHead(ctx, frame, palette, rng)
+    eyes.draw(ctx, g.faceBox, p, palette, rng)
+    // ceja encima: el peso del slab es lo que hace leer la mirada como caída
+    brows.draw(ctx, g.faceBox, brows.randomize(rng.fork(3)), palette, rng)
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>

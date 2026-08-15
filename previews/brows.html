@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { drawHead } from './_scene.js'
+import * as brows from '../src/parts/brows.js'
+import * as eyes from '../src/parts/eyes.js'
+
+mountPreview({
+  title: 'brows',
+  params: brows.PARAMS,
+  randomize: brows.randomize,
+  draw(ctx, frame, p, palette, rng) {
+    const g = drawHead(ctx, frame, palette, rng)
+    // los ojos van de acompañamiento: una ceja sin ojo debajo no dice nada
+    eyes.draw(ctx, g.faceBox, eyes.randomize(rng.fork(2)), palette, rng)
+    brows.draw(ctx, g.faceBox, p, palette, rng)
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>

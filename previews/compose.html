@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { makeCharacter, draw } from '../src/core/character.js'
+
+// Aquí no hay sliders de parte: lo que se juzga es el conjunto y la variedad.
+// Los overrides globales sirven para ver un canal concreto en las 30 caras a la vez.
+const params = {
+  lidCoverage: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Párpado (todos)' },
+  beardDensity: { min: 0, max: 1, default: 0.45, step: 0.01, label: 'Densidad barba (todos)' },
+  hairDensity: { min: 0, max: 1, default: 0.5, step: 0.01, label: 'Densidad pelo (todos)' },
+}
+
+mountPreview({
+  title: 'compose',
+  params,
+  randomize: () => ({}),   // los personajes salen de su seed, no de los sliders
+  draw(ctx, frame, p, palette, rng, seed) {
+    const character = makeCharacter(seed)
+    const overrides = {}
+    if ('lidCoverage' in p) overrides.eyes = { lidCoverage: p.lidCoverage }
+    if ('beardDensity' in p) overrides.hair = { ...(overrides.hair || {}), beardDensity: p.beardDensity }
+    if ('hairDensity' in p) overrides.hair = { ...(overrides.hair || {}), hairDensity: p.hairDensity }
+    draw(ctx, frame, character, palette, overrides)
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_n5m7rycInM1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>

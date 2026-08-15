@@ -76,8 +76,8 @@ export function build(frame, p) {
   return { path, headBox, faceBox, pts }
 }
 
-export function draw(ctx, frame, p, palette, rng) {
-  const g = build(frame, p)
+/** Pinta a partir de geometría ya calculada. character.js la necesita antes de dibujar. */
+export function paint(ctx, g, p, palette) {
   const { path, headBox } = g
 
   ctx.fillStyle = palette.skin
@@ -98,6 +98,10 @@ export function draw(ctx, frame, p, palette, rng) {
   ctx.stroke(path)
 
   return g
+}
+
+export function draw(ctx, frame, p, palette, rng) {
+  return paint(ctx, build(frame, p), p, palette)
 }
 
 /** Re-traza el contorno por encima de todo, para que el hatching no se coma la silueta. */

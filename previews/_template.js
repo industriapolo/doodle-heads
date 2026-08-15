@@ -252,7 +252,7 @@ export function mountPreview(opts) {
     const rng = makeRng(entry.seed)
     const p = resolveParams(rng)
     clear(entry.ctx, palette.bg)
-    draw(entry.ctx, drawBox, p, palette, rng.fork(99))
+    draw(entry.ctx, drawBox, p, palette, rng.fork(99), entry.seed)
     entry.seedEl.textContent = entry.seed.toString(16)
   }
 
