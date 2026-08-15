@@ -28,7 +28,16 @@ export const HAIR_PARAMS = {
   // --- masa (mode: solid) ---
   overhang: { min: 0, max: 0.16, range: [0.02, 0.09], step: 0.005, label: 'Vuelo sobre el cráneo' },
   fringeY: { min: -0.05, max: 0.42, range: [0.04, 0.24], step: 0.01, label: 'Altura del flequillo' },
-  sideDrop: { min: 0, max: 0.5, range: [0.12, 0.36], step: 0.01, label: 'Caída por los lados' },
+  sideDrop: { min: 0, max: 0.5, range: [0.04, 0.18], step: 0.01, label: 'Caída del flequillo a los lados' },
+
+  // --- laterales: piezas INDEPENDIENTES de la masa -----------------------
+  // Separados para poder ajustarlos sin tocar el casquete, y para poder bajarlos por
+  // debajo de la oreja a modo de patilla.
+  sideWidth: { min: 0, max: 0.26, range: [0.05, 0.15], step: 0.005, label: 'Ancho del lateral' },
+  sideLength: { min: 0.05, max: 0.9, range: [0.30, 0.62], step: 0.01, label: 'Largo del lateral' },
+  sideTaper: { min: 0, max: 1, range: [0.2, 0.7], step: 0.05, label: 'Estrechamiento' },
+  sideburn: { min: 0, max: 0.45, range: [0, 0.18], step: 0.01, label: 'Patilla (bajo la oreja)' },
+  sideJag: { min: 0, max: 0.09, range: [0.012, 0.045], step: 0.002, label: 'Dentado del borde interior' },
   fringeSpikes: { min: 3, max: 18, range: [5, 12], step: 1, int: true, label: 'Nº de púas del flequillo' },
   fringeDepth: { min: 0, max: 0.22, range: [0.06, 0.16], step: 0.005, label: 'Profundidad de las púas' },
   topSpikes: { min: 3, max: 20, range: [5, 12], step: 1, int: true, label: 'Nº de picos de la silueta' },
@@ -123,7 +132,7 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
  *
  * Sin contorno propio, como las cejas: es tinta plana.
  */
-export function drawMass(ctx, geo, p, palette, rng) {
+export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   if (p.mode !== 'solid') return null
   const { headBox, faceBox } = geo
 
@@ -131,7 +140,13 @@ export function drawMass(ctx, geo, p, palette, rng) {
   const cx = headBox.cx
   const halfW = headBox.w / 2 + o
   const topY = headBox.y - o
-  const fringeY = faceBox.y + faceBox.h * p.fringeY
+
+  // El flequillo no puede llegar a la ceja. La masa y las cejas son la MISMA tinta, así
+  // que en cuanto se tocan se funden en un solo borrón y se pierden las dos. En las
+  // referencias siempre queda una banda de frente entre el pelo y la ceja.
+  const deepest = faceBox.h * p.fringeDepth
+  const maxFringeY = (limits.hairBottom ?? Infinity) - deepest - faceBox.h * 0.02
+  const fringeY = Math.min(faceBox.y + faceBox.h * p.fringeY, maxFringeY)
   const sideY = fringeY + faceBox.h * p.sideDrop
   const domeH = fringeY - topY
   if (domeH <= 2) return null
@@ -167,8 +182,16 @@ export function drawMass(ctx, geo, p, palette, rng) {
 
   path.closePath()
 
+  // Los laterales son piezas aparte, no parte del casquete: así se ajustan solos y
+  // pueden pasar de la oreja hacia abajo como patilla.
+  const sides = [
+    sidePath(headBox, faceBox, p, -1, fringeY, rng),
+    sidePath(headBox, faceBox, p, 1, fringeY, rng),
+  ]
+
   ctx.fillStyle = palette.solid
   ctx.fill(path)
+  for (const s of sides) if (s) ctx.fill(s)
 
   // --- raya: división diagonal plana, más clara. No es un degradado ------
   if (p.parting > 0.01) {
@@ -188,7 +211,47 @@ export function drawMass(ctx, geo, p, palette, rng) {
     ctx.restore()
   }
 
-  return { path, fringeY, sideY }
+  return { path, sides, fringeY, sideY }
+}
+
+/**
+ * Una pieza lateral. El truco de la patilla es que el borde EXTERIOR baja más que el
+ * interior: la diagonal que los une hace sola la punta que cae por delante de la oreja.
+ *
+ * @param dir -1 izquierda, +1 derecha
+ */
+function sidePath(headBox, faceBox, p, dir, fringeY, rng) {
+  const w = headBox.w * p.sideWidth
+  if (w < 1) return null
+
+  // Pegado al borde del cráneo, SIN el vuelo del casquete: con vuelo la pieza tapaba la
+  // oreja entera. Así el lateral cae por delante y la oreja sigue asomando por fuera.
+  const outerX = dir < 0 ? headBox.x : headBox.right
+  const inward = -dir // hacia el centro de la cara
+
+  const top = fringeY - faceBox.h * 0.08
+  const inner = faceBox.y + faceBox.h * p.sideLength
+  const outer = inner + faceBox.h * p.sideburn
+  const wBottom = w * (1 - p.sideTaper)
+
+  const path = new Path2D()
+  path.moveTo(outerX, top)
+  path.lineTo(outerX, outer) // borde exterior, el que baja del todo
+  path.lineTo(outerX + inward * wBottom, inner) // diagonal: la punta de la patilla
+
+  // borde interior dentado de abajo a arriba, como el flequillo
+  const jag = headBox.w * p.sideJag
+  const steps = 6
+  for (let i = steps; i >= 1; i--) {
+    const t = i / steps
+    const y = inner + (top - inner) * (1 - t)
+    const bite = i % 2 === 1 ? jag * (0.5 + rng.next()) : 0
+    const width = wBottom + (w - wBottom) * (1 - t)
+    path.lineTo(outerX + inward * (width - bite), y)
+  }
+  path.lineTo(outerX + inward * w, top)
+  path.closePath()
+  return path
 }
 
 function smoothstep(t) {

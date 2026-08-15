@@ -6,9 +6,11 @@ import { interior, outline } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
+  // La × NO es una boca: es el hoyuelo de la barbilla, y vive en chin.js, en la punta
+  // del mentón. Estaba aquí por una lectura mía equivocada de las referencias.
   type: {
-    options: ['line', 'frown', 'tiny-o', 'stitch'],
-    pool: { line: 3, frown: 2, 'tiny-o': 1, stitch: 2 },
+    options: ['line', 'frown', 'tiny-o'],
+    pool: { line: 3, frown: 2, 'tiny-o': 2 },
     label: 'Tipo',
   },
   width: { min: 0.03, max: 0.24, range: [0.05, 0.18], step: 0.005, label: 'Ancho' },
@@ -37,16 +39,10 @@ export function draw(ctx, faceBox, p, palette, rng) {
       break
     case 'tiny-o':
       path.ellipse(mx, my, w * 0.36, w * 0.44, 0, 0, Math.PI * 2)
+      // relleno: es una boca abierta, no un aro
+      ctx.fillStyle = palette.line
+      ctx.fill(path)
       break
-    case 'stitch': {
-      // la x cosida de las imágenes 2 y 3
-      const s = w * 0.36
-      path.moveTo(mx - s, my - s)
-      path.lineTo(mx + s, my + s)
-      path.moveTo(mx + s, my - s)
-      path.lineTo(mx - s, my + s)
-      break
-    }
     default:
       path.moveTo(mx - w / 2, my)
       path.lineTo(mx + w / 2, my)

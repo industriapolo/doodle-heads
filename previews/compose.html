@@ -10,6 +10,7 @@ import * as brows from '../src/parts/brows.js'
 import * as eyes from '../src/parts/eyes.js'
 import * as nose from '../src/parts/nose.js'
 import * as mouth from '../src/parts/mouth.js'
+import * as chin from '../src/parts/chin.js'
 
 // Todas las variables del personaje en un panel, agrupadas por parte.
 // El orden es el de las capas, para que el panel se lea como se dibuja.
@@ -24,6 +25,7 @@ mountPreview({
     { name: 'eyes',  label: 'Ojos', params: eyes.PARAMS },
     { name: 'nose',  label: 'Nariz', params: nose.PARAMS },
     { name: 'mouth', label: 'Boca', params: mouth.PARAMS },
+    { name: 'chin',  label: 'Hoyuelo de barbilla', params: chin.PARAMS },
     { name: 'ears',  label: 'Orejas', params: ears.PARAMS },
   ],
   draw(ctx, frame, bands, palette, rng, seed) {

@@ -12,6 +12,7 @@ import * as brows from '../parts/brows.js'
 import * as eyes from '../parts/eyes.js'
 import * as nose from '../parts/nose.js'
 import * as mouth from '../parts/mouth.js'
+import * as chin from '../parts/chin.js'
 import { makeRng } from './prng.js'
 import { getPalette } from '../style/palettes.js'
 
@@ -33,6 +34,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     eyes: eyes.randomize(rng.fork(5), bands.eyes),
     nose: nose.randomize(rng.fork(6), bands.nose),
     mouth: mouth.randomize(rng.fork(7), bands.mouth),
+    chin: chin.randomize(rng.fork(9), bands.chin),
   }
 }
 
@@ -70,8 +72,8 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    línea por encima que en las referencias no existe.
   head.restroke(ctx, geo, palette)
 
-  // 5. masa de pelo: tinta plana por encima de todo el cráneo
-  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8))
+  // 5. masa de pelo: tinta plana por encima de todo el cráneo, topada por la ceja
+  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
 
   // 6. cejas
   brows.draw(ctx, faceBox, browsP, palette, rng.fork(4))
@@ -112,6 +114,9 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     palette,
     rng.fork(7)
   )
+
+  // 10. hoyuelo de la barbilla, en la punta del mentón
+  chin.draw(ctx, faceBox, p('chin'), palette, rng.fork(9))
 
   return { geo, browGeo, noseGeo, mouthGeo }
 }
