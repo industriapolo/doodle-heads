@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>doodle-heads</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #17191c; color: #d6d9dc;
+  }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  h1 { font-size: 14px; font-weight: 600; margin: 0 8px 0 0; letter-spacing: .05em; text-transform: uppercase; }
+  button {
+    background: #2c3036; color: #d6d9dc; border: 1px solid #3b4149; border-radius: 4px;
+    padding: 6px 11px; font: inherit; font-size: 11px; cursor: pointer;
+  }
+  button:hover { background: #363b42; }
+  #fps { margin-left: auto; color: #6d7379; font-size: 11px; font-variant-numeric: tabular-nums; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .cell { position: relative; cursor: pointer; aspect-ratio: 1; }
+  .cell canvas { display: block; width: 100%; height: 100%; border-radius: 4px; will-change: transform; }
+  .cell b {
+    position: absolute; left: 5px; bottom: 5px; font-size: 9px; font-weight: 400;
+    color: #fff; background: rgba(0,0,0,.5); padding: 2px 5px; border-radius: 2px;
+    opacity: 0; transition: opacity .12s; pointer-events: none;
+  }
+  .cell:hover b { opacity: 1; }
+  .hint { color: #6d7379; font-size: 11px; margin: 14px 0 0; }
+</style>
+
+<header>
+  <h1>doodle-heads</h1>
+  <button id="regen">regenerar todos</button>
+  <button id="pause">pausar</button>
+  <span id="fps"></span>
+</header>
+<div id="grid"></div>
+<p class="hint">Click en un personaje = seed nueva solo para él. Pasa el ratón para ver su seed.</p>
+
+<script type="module">
+import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
+import { randomSeed } from './src/core/prng.js'
+import { makeCharacter, draw, paletteFor } from './src/core/character.js'
+import { getPalette } from './src/style/palettes.js'
+import { makeActor, startRig, overridesFor } from './src/anim/rig.js'
+
+const COUNT = 30
+const CELL = 260 // resolución de dibujo; el CSS lo escala al hueco del grid
+
+// Si has estado afinando en compose, el grid final usa TUS bandas. Si no, las
+// declaradas en cada módulo.
+let bands = {}
+try {
+  bands = JSON.parse(localStorage.getItem('doodle-bands:compose') || '{}') || {}
+} catch {}
+
+const fallback = getPalette('magenta')
+const frame = box(LOGICAL * 0.06, LOGICAL * 0.06, LOGICAL * 0.88, LOGICAL * 0.88)
+const gridEl = document.getElementById('grid')
+const actors = []
+
+for (let i = 0; i < COUNT; i++) {
+  const cell = document.createElement('div')
+  cell.className = 'cell'
+  const canvas = document.createElement('canvas')
+  const tag = document.createElement('b')
+  cell.append(canvas, tag)
+  gridEl.append(cell)
+
+  const a = makeActor(randomSeed(), { canvas, tag, ctx: setupCanvas(canvas, CELL) })
+  reseed(a, a.seed)
+  cell.addEventListener('click', () => reseed(a, randomSeed()))
+  actors.push(a)
+}
+
+function reseed(a, seed) {
+  a.seed = seed
+  a.character = makeCharacter(seed, bands)
+  a.palette = paletteFor(a.character, fallback)
+  a.tag.textContent = seed.toString(16)
+  a.drawn = null // fuerza el repintado en el próximo frame
+}
+
+let repaints = 0
+
+function redraw(a) {
+  repaints++
+  clear(a.ctx, a.palette.bg)
+  draw(a.ctx, frame, a.character, a.palette, overridesFor(a))
+}
+
+let stop = startRig(actors, redraw)
+
+// para poder inspeccionar y gobernar la animación desde consola
+window.__rig = { actors, redraw, frame }
+
+document.getElementById('regen').addEventListener('click', () => {
+  for (const a of actors) reseed(a, randomSeed())
+})
+
+const pauseBtn = document.getElementById('pause')
+pauseBtn.addEventListener('click', () => {
+  if (stop) {
+    stop()
+    stop = null
+    pauseBtn.textContent = 'reanudar'
+  } else {
+    stop = startRig(actors, redraw)
+    pauseBtn.textContent = 'pausar'
+  }
+})
+
+// --- fps + cuántas caras se repintan por frame --------------------------
+// El segundo número es el que importa: si sube a 30, el ahorro de no repintar lo
+// que no cambia se ha perdido.
+const fpsEl = document.getElementById('fps')
+let frames = 0
+setInterval(() => {
+  fpsEl.textContent = `${frames} fps · ${(repaints / Math.max(1, frames)).toFixed(1)} caras repintadas por frame`
+  frames = 0
+  repaints = 0
+}, 1000)
+;(function tickFps() {
+  frames++
+  requestAnimationFrame(tickFps)
+})()
+</script>
