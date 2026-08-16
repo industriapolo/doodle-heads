@@ -39,7 +39,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
 }
 
 /**
- * @param overrides  parches por parte, p.ej. { eyes: { lidCoverage: 1 } } para el parpadeo.
+ * @param overrides  parches por parte, p.ej. { eyes: { blink: 1 } } para el parpadeo.
  *                   rig.js anima exclusivamente por aquí: no hay estado oculto.
  */
 export function draw(ctx, frame, character, palette, overrides = {}) {
@@ -81,16 +81,17 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
 
   // 7. ojos, colgados de la ceja.
   //
-  // Lo que hay que colgar de la ceja NO es la cuerda del ojo, es el punto más alto del
-  // pliegue del párpado — que queda por encima de ella. Y ese saliente se mide en
-  // fracciones del ANCHO del ojo, así que en ojos anchos sube lo bastante como para
-  // meterse dentro de la ceja si no se cuenta.
+  // Lo que se cuelga de la ceja NO es la cuerda del ojo: es el punto más alto del
+  // pliegue, que queda por encima. Lo calcula el propio módulo, que es quien sabe cómo
+  // está construido.
   const eyesP = p('eyes')
-  const creaseAbove = ((eyesP.lidGap + eyesP.lidRise) * eyesP.eyeWidth * faceBox.w) / faceBox.h
   eyes.draw(
     ctx,
     faceBox,
-    { ...eyesP, offsetY: clamp(browBottom + eyesP.browGap + creaseAbove, 0.24, 0.64) },
+    {
+      ...eyesP,
+      offsetY: clamp(browBottom + eyesP.browGap + eyes.topExtent(faceBox, eyesP), 0.24, 0.64),
+    },
     palette,
     rng.fork(5)
   )

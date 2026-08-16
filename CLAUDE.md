@@ -56,17 +56,32 @@ bandas afinadas para fijarlas aquí.
 
 ### Construcción del ojo
 
-No es una almendra. Sale de mirar las referencias:
+No es una almendra. Es un segmento circular con una elipse recortada encima:
 
-- el blanco es un **segmento circular**: recta arriba, arco de círculo abajo, donde la
-  recta es la **cuerda** de ese círculo
-- la **pupila se apoya en la recta**, no flota en el centro
-- por encima, y separada por piel, va otra **línea arqueada**: no es el borde del blanco,
-  es el pliegue del párpado, y su trabajo es insinuar que el globo sigue redondo por detrás
+1. el blanco es un **segmento circular** — recta arriba (la **cuerda**), arco de círculo
+   abajo, y la **pupila se apoya en la recta**, no flota en el centro
+2. encima se superpone una **elipse más estrecha que la cuerda**
+3. **copia A**, recortada *contra* el ojo → pliegue arriba y ojera abajo
+4. **copia B**, la *misma* elipse recortada *con* el ojo → los trozos de dentro, que
+   cierran las comisuras
 
-El parpadeo cae solo de esta geometría: la cuerda baja hacia el arco y el blanco se cierra
-a cero. `lidCoverage` (0 = abierto, 1 = cerrado) es ese único número, y el pliegue lo
-acompaña a mitad de recorrido.
+El pliegue y la ojera **no son curvas sueltas**: comparten centro y radios por definición,
+y eso es lo que hace que se lean como un mismo globo. Los piquitos de las comisuras salen
+solos de la intersección — no se dibujan.
+
+Dos recortes se suman en la copia A: el **angular** (`gapAngle`) decide el hueco entre los
+dos arcos y es un número que se pide; el de **intersección** garantiza que nada cruce por
+dentro del blanco. Sin el angular, el hueco depende de la geometría y los arcos tienden a
+soldarse en un aro.
+
+**Cierre: un solo canal.** `blink` (0–1) cierra y `blinkPivot` decide hacia dónde — 0 sube
+el arco y el ojo acaba en recta a lo ancho completo, 1 baja la cuerda y acaba en el arco
+curvo. `depth` es solo la apertura en reposo.
+
+Los recortes de la copia A y de la sombra van contra la forma **en reposo**, no la actual:
+contra la actual, al cerrarse no quedaría nada que recortar y saldría el aro entero
+rodeando un ojo cerrado. La copia B sí va contra el blanco **visible**, porque está sobre
+el globo y tiene que irse con el párpado.
 
 ### Layout: `faceBox`, no la caja de cabeza
 

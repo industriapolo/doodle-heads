@@ -1,14 +1,18 @@
-// Ojos. La construcción sale de mirar las referencias, no de un óvalo genérico:
+// Ojos. La construcción sale del esquema de Jorge, no de un óvalo genérico:
 //
-//   · el blanco es un SEGMENTO CIRCULAR — recta arriba, arco de círculo abajo,
-//     donde la recta es la cuerda de ese círculo
-//   · la pupila se apoya EN la recta, no flota en el centro
-//   · por encima, y separada, va otra línea arqueada: no es el borde del blanco,
-//     es el pliegue del párpado, y su trabajo es insinuar que el globo sigue
-//     redondo por detrás
+//   1. el blanco es un SEGMENTO CIRCULAR — recta arriba (la cuerda), arco de círculo
+//      abajo, y la pupila se apoya en la recta
+//   2. encima se superpone una ELIPSE más estrecha que la cuerda
+//   3. copia A, recortada CONTRA el ojo → pliegue arriba y ojera abajo
+//   4. copia B, la MISMA elipse recortada CON el ojo → los trozos de dentro, que
+//      cierran las comisuras
 //
-// El parpadeo cae solo de esta geometría: la cuerda baja hacia el arco y el blanco
-// se cierra a cero. `lidCoverage` es ese único número.
+// Lo que gana: el pliegue y la ojera no son curvas sueltas que puedan
+// desincronizarse — comparten centro y radios por definición. Eso es lo que hace que
+// se lean como un mismo globo ocular.
+//
+// Que la elipse sea más estrecha que la cuerda es lo que deja asomar los piquitos de
+// las comisuras: salen solos de la intersección, no se dibujan.
 
 import { interior } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
@@ -21,34 +25,72 @@ export const PARAMS = {
   offsetY: { min: 0.24, max: 0.62, range: [0.34, 0.46], step: 0.01, label: 'Altura' },
   browGap: { min: 0, max: 0.16, range: [0.01, 0.14], step: 0.005, label: 'Hueco bajo la ceja' },
 
-  lidGap: { min: 0.01, max: 0.34, range: [0.05, 0.325], step: 0.005, label: 'Separación del párpado' },
-  lidRise: { min: 0.03, max: 0.45, range: [0.115, 0.275], step: 0.005, label: 'Curvatura del párpado' },
-  // El tope es 0.95 a propósito: el pliegue SIEMPRE tiene que ser más estrecho que el ojo.
-  // En cuanto lo iguala o lo pasa, deja de leerse como párpado y se lee como una ceja.
-  lidSpan: { min: 0.35, max: 0.95, range: [0.74, 0.82], step: 0.01, label: 'Largo del párpado' },
+  // --- la elipse ---------------------------------------------------------
+  // CONDICIÓN DEL RECORTE LATERAL: su punto más ancho tiene que caer DENTRO del blanco,
+  // o sea por encima del arco. Si es muy ancha o su centro muy bajo, los costados se
+  // escapan por debajo, no hay nada que recortar y los dos arcos se sueldan en un aro.
+  // Con `gapAngle` por encima de unos pocos grados eso ya no puede pasar.
+  ringRx: { min: 0.4, max: 1.15, range: [0.68, 0.80], step: 0.01, label: 'Radio horizontal (× media cuerda)' },
+  ringRy: { min: 0.2, max: 1.6, range: [0.42, 0.56], step: 0.01, label: 'Radio vertical (× media cuerda)' },
+  ringCy: { min: -1.5, max: 3, range: [0.20, 0.36], step: 0.02, label: 'Centro Y (× flecha)' },
+  // El hueco entre los dos arcos. Con solo el recorte por intersección sería una
+  // consecuencia de la geometría y tendería a cerrarse; así es un número que se pide.
+  gapAngle: { min: 0, max: 70, range: [24, 38], step: 1, unit: '°', label: 'Apertura del hueco' },
+  innerCopy: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Copia interior' },
+
+  bagLines: { min: 0, max: 3, range: [0, 2], step: 1, int: true, label: 'Bolsas concéntricas extra' },
+  bagStep: { min: 0.02, max: 0.5, range: [0.10, 0.16], step: 0.01, label: 'Paso entre concéntricas' },
+
+  // La sombra usa las MISMAS elipses, rellenas. Ligada al resto: mover un radio la
+  // mueve. No sale siempre — es una probabilidad, como el cigarrillo.
+  shadow: { type: 'bool', p: 0.35, label: 'Probabilidad de sombra' },
+  shadowRing: { min: 0, max: 3, range: [1, 2], step: 1, int: true, label: 'Anillo que la limita' },
+  shadowTone: { options: ['media', 'fuerte'], pool: { media: 3, fuerte: 1 }, label: 'Tono de la sombra' },
 
   pupilSize: { min: 0.03, max: 0.22, range: [0.03, 0.17], step: 0.005, label: 'Tamaño pupila' },
   pupilX: { min: -1, max: 1, range: [-0.75, 1], step: 0.05, label: 'Mirada X' },
-
-  bagLines: { min: 0, max: 3, range: [0, 3], step: 1, int: true, label: 'Líneas de bolsa' },
-  // Múltiplo de la apertura del ojo. Estaba clavado en 0.75 y las bolsas se desparramaban
-  // por media mejilla en vez de leerse como un grupo.
-  bagSpacing: { min: 0.06, max: 0.8, range: [0.16, 0.28], step: 0.01, label: 'Separación entre bolsas' },
-  bagTop: { min: 0.6, max: 2.2, range: [1.05, 1.3], step: 0.05, label: 'Distancia al ojo' },
-  // `accent` queda apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
-  // referencia del esqueleto sí lleva ojos de acento — se enciende desde el panel.
+  // `accent` apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
+  // referencia del esqueleto sí los lleva — se enciende desde el panel.
   sclera: { options: ['white', 'accent'], pool: { white: 1, accent: 0 }, label: 'Esclerótica' },
 
-  // Canal de animación. 0 = como está dibujado, 1 = cerrado del todo.
-  lidCoverage: { min: 0, max: 1, range: [0, 0.07], step: 0.01, label: 'Cierre del párpado' },
+  // UN canal de cierre, no dos. Antes `lidCoverage` y `depth` colapsaban los dos el
+  // blanco a cero por caminos distintos. `blink` cierra y `blinkPivot` decide hacia
+  // dónde: 0 sube el arco y el ojo acaba en recta a lo ancho completo; 1 baja la
+  // cuerda y acaba en el arco curvo.
+  blink: { min: 0, max: 1, range: [0, 0], step: 0.01, label: 'Cierre' },
+  blinkPivot: { min: 0, max: 1, range: [0, 0.15], step: 0.05, label: 'Hacia dónde cierra' },
 
-  // Anchos absolutos e independientes entre sí: el ojo (arco inferior y borde del
-  // párpado) y sus detalles (pliegue y bolsas) se ajustan por separado.
   lineWeight: { min: 0.5, max: 12, range: [4.1, 4.1], step: 0.1, label: 'Grosor del ojo' },
-  detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los detalles' },
+  detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los arcos' },
 }
 
 export const randomize = randomizerFor(PARAMS)
+
+/** Segmento circular: cuerda en y=0 de largo w, arco de flecha `sag` hacia abajo. */
+function segment(w, sag) {
+  const half = w / 2
+  const R = (sag * sag + half * half) / (2 * sag)
+  const cy = -(R - sag)
+  const path = new Path2D()
+  path.moveTo(-half, 0)
+  path.arc(0, cy, R, Math.atan2(R - sag, -half), Math.atan2(R - sag, half), true)
+  return path
+}
+
+const sealed = (open) => {
+  const p = new Path2D()
+  p.addPath(open)
+  p.closePath()
+  return p
+}
+
+/** El complemento de un path: todo menos él. Con evenodd, un rect enorme + el path. */
+function outside(path) {
+  const o = new Path2D()
+  o.rect(-4000, -4000, 8000, 8000)
+  o.addPath(path)
+  return o
+}
 
 /** Geometría de los dos ojos, sin dibujar. rig.js la necesita para la mirada. */
 export function build(faceBox, p) {
@@ -64,105 +106,129 @@ export function build(faceBox, p) {
   }
 }
 
+/**
+ * Cuánto sobresale el ojo POR ENCIMA de la cuerda, en fracción de faceBox.h.
+ *
+ * Lo que hay que colgar de la ceja no es la cuerda: es el punto más alto del pliegue,
+ * que queda por encima. Y depende del ANCHO del ojo, porque los radios de la elipse se
+ * miden en media cuerda — en ojos anchos sube lo bastante como para meterse en la ceja.
+ */
+export function topExtent(faceBox, p) {
+  const ry = ((faceBox.w * p.eyeWidth) / 2) * p.ringRy
+  const ecy = faceBox.h * p.depth * p.ringCy
+  return Math.max(0, (ry - ecy) / faceBox.h)
+}
+
 export function draw(ctx, faceBox, p, palette, rng) {
   const g = build(faceBox, p)
   for (const side of [g.left, g.right]) eye(ctx, side, g.w, g.depth, p, palette)
   return g
 }
 
-/**
- * Segmento circular: cuerda horizontal de largo `w` en y=0, arco de flecha `sag`
- * bombeando hacia `sign` (+1 abajo, -1 arriba). Un arco de círculo de verdad, no
- * una bézier que se le parezca.
- */
-function segmentArc(path, w, sag, sign) {
-  const half = w / 2
-  const R = (sag * sag + half * half) / (2 * sag)
-  const cy = sign * -(R - sag) // centro del círculo, al otro lado de la cuerda
-  const a0 = Math.atan2(sign * (R - sag), -half)
-  const a1 = Math.atan2(sign * (R - sag), half)
-  path.arc(0, cy, R, a0, a1, sign > 0)
-  return { R, cy }
-}
-
-function eye(ctx, side, w, depth, p, palette) {
+function eye(ctx, side, w, sag, p, palette) {
   const { cx, cy } = side
-  const lidY = depth * p.lidCoverage // la cuerda baja al parpadear
+  const half = w / 2
+
+  // La cuerda y el arco convergen los dos hacia la misma altura `m`.
+  const t = p.blink
+  const m = sag * p.blinkPivot
+  const chordY = t * m
+  const sagNow = Math.max(0.6, sag * (1 - t)) // 0 exacto degenera el radio del arco
 
   ctx.save()
   ctx.translate(cx, cy)
   ctx.rotate((p.tilt * Math.PI) / 180)
 
-  // --- blanco: cuerda recta + arco de círculo -----------------------------
-  const white = new Path2D()
-  white.moveTo(-w / 2, 0)
-  segmentArc(white, w, depth, 1)
-  white.closePath()
+  const rest = sealed(segment(w, sag)) // forma en REPOSO: la que manda en el recorte
+  const nowOpen = segment(w, sagNow)
+  const now = sealed(nowOpen)
 
+  const rx = half * p.ringRx
+  const ry = half * p.ringRy
+  const ecy = sag * p.ringCy
+
+  // --- sombra: la misma elipse, rellena -----------------------------------
+  // Va la primera de todo, porque está sobre la piel. Solo por debajo de la cuerda: en
+  // las referencias la zona entre cuerda y pliegue queda limpia.
+  if (p.shadow) {
+    const k = 1 + p.shadowRing * p.bagStep
+    ctx.save()
+    ctx.clip(outside(rest), 'evenodd')
+    const debajo = new Path2D()
+    debajo.rect(-4000, 0, 8000, 4000)
+    ctx.clip(debajo)
+    const mancha = new Path2D()
+    mancha.ellipse(0, ecy, rx * k, ry * k, 0, 0, Math.PI * 2)
+    ctx.fillStyle = p.shadowTone === 'fuerte' ? palette.skinDeep : palette.skinShadow
+    ctx.fill(mancha)
+    ctx.restore()
+  }
+
+  // --- blanco + pupila ----------------------------------------------------
   ctx.save()
-  ctx.clip(white)
-
+  ctx.translate(0, chordY)
+  ctx.clip(now)
   ctx.fillStyle = p.sclera === 'accent' ? palette.accent : palette.accent2
-  ctx.fillRect(-w, -depth * 2, w * 2, depth * 4)
-
-  // pupila apoyada en la recta
+  ctx.fillRect(-w, -sag * 4, w * 2, sag * 8)
   const pr = (w * p.pupilSize) / 2
-  const px = p.pupilX * (w / 2 - pr * 2.2)
   ctx.fillStyle = palette.line
   ctx.beginPath()
-  ctx.arc(px, lidY + pr * 0.45, pr, 0, Math.PI * 2)
+  ctx.arc(p.pupilX * (half - pr * 2.2), pr * 0.45, pr, 0, Math.PI * 2)
   ctx.fill()
-
-  // al parpadear, la piel come el blanco desde arriba (y de paso la pupila)
-  if (lidY > 0.01) {
-    ctx.fillStyle = palette.skin
-    ctx.fillRect(-w, -depth * 3, w * 2, depth * 3 + lidY)
-  }
   ctx.restore()
 
-  // --- arco inferior ------------------------------------------------------
-  const lower = new Path2D()
-  lower.moveTo(-w / 2, 0)
-  segmentArc(lower, w, depth, 1)
-  interior(ctx, palette, p.lineWeight * 0.75)
-  ctx.stroke(lower)
-
-  // --- la recta de arriba: es el borde del párpado, va más gruesa ----------
-  const chord = new Path2D()
-  chord.moveTo(-w / 2, lidY)
-  chord.lineTo(w / 2, lidY)
-  interior(ctx, palette, p.lineWeight)
-  ctx.stroke(chord)
-
-  // --- pliegue del párpado: la línea que redondea el globo -----------------
-  // acompaña al parpadeo, pero a la mitad de recorrido — un párpado real no baja
-  // todo el pliegue con el borde
-  const lw = w * p.lidSpan
-  const rise = w * p.lidRise
-  const lidBaseY = -w * p.lidGap + lidY * 0.5
-  ctx.save()
-  ctx.translate(0, lidBaseY)
-  const crease = new Path2D()
-  crease.moveTo(-lw / 2, 0)
-  segmentArc(crease, lw, rise, -1)
+  // --- copia A: recortada CONTRA el ojo -----------------------------------
+  // Contra la forma en REPOSO, no la actual: si se recortara contra la actual, al
+  // cerrarse no quedaría nada que recortar y saldría el aro entero rodeando un ojo
+  // cerrado. Además el pliegue y la ojera no se mueven al parpadear.
+  const gap = (p.gapAngle * Math.PI) / 180
   interior(ctx, palette, p.detailWeight)
-  ctx.stroke(crease)
-  ctx.restore()
+  for (let i = 0; i <= p.bagLines; i++) {
+    const k = 1 + i * p.bagStep
+    ctx.save()
+    ctx.clip(outside(rest), 'evenodd')
 
-  // --- bolsas -------------------------------------------------------------
-  interior(ctx, palette, p.detailWeight * 0.8)
-  const spacing = depth * p.bagSpacing
-  // La curva no puede hundirse más que la separación o las bolsas se cruzan entre sí:
-  // el vértice de una quedaría por debajo de los extremos de la siguiente.
-  const bulge = Math.min(depth * 1.2, spacing * 1.6)
-  for (let i = 0; i < p.bagLines; i++) {
-    const by = depth * p.bagTop + i * spacing
-    const bw = w * (0.8 - i * 0.12)
-    const bag = new Path2D()
-    bag.moveTo(-bw / 2, by)
-    bag.quadraticCurveTo(0, by + bulge, bw / 2, by)
-    ctx.stroke(bag)
+    // Cada arco en su propio Path2D: en el mismo, el segundo arrastraría una recta
+    // desde donde acabó el primero.
+    const abajo = new Path2D()
+    abajo.ellipse(0, ecy, rx * k, ry * k, 0, gap, Math.PI - gap)
+    ctx.stroke(abajo)
+
+    if (i === 0) {
+      // el pliegue, solo en la primera: si no, se acumulan pliegues sobre el ojo
+      const arriba = new Path2D()
+      arriba.ellipse(0, ecy, rx * k, ry * k, 0, Math.PI + gap, Math.PI * 2 - gap)
+      ctx.stroke(arriba)
+    }
+    ctx.restore()
   }
+
+  // --- copia B: la MISMA elipse recortada CON el ojo ----------------------
+  // Cierra las comisuras por dentro. Sin recorte angular: aquí interesa justo lo que
+  // deje la intersección. Y contra el blanco VISIBLE, no el de reposo — es un rasgo
+  // sobre el globo, así que se va con el párpado.
+  if (p.innerCopy === 'si') {
+    ctx.save()
+    ctx.translate(0, chordY)
+    ctx.clip(now)
+    ctx.translate(0, -chordY)
+    const dentro = new Path2D()
+    dentro.ellipse(0, ecy, rx, ry, 0, 0, Math.PI * 2)
+    interior(ctx, palette, p.detailWeight)
+    ctx.stroke(dentro)
+    ctx.restore()
+  }
+
+  // --- las dos líneas del ojo, encima -------------------------------------
+  ctx.save()
+  ctx.translate(0, chordY)
+  interior(ctx, palette, p.lineWeight)
+  ctx.stroke(nowOpen)
+  const chord = new Path2D()
+  chord.moveTo(-half, 0)
+  chord.lineTo(half, 0)
+  ctx.stroke(chord)
+  ctx.restore()
 
   ctx.restore()
 }
