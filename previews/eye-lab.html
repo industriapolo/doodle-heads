@@ -1,0 +1,171 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+// LABORATORIO — construcción nueva del ojo, aislada. No toca eyes.js.
+//
+// El esquema:
+//   1. el blanco es el segmento circular de siempre (cuerda recta + arco)
+//   2. se le superpone una ELIPSE más estrecha que la cuerda
+//   3. se borra lo que de esa elipse cae DENTRO del blanco
+//   4. quedan dos arcos hermanos: pliegue arriba, ojera abajo
+//
+// Lo que gana: el pliegue y la ojera dejan de ser cinco números sueltos y pasan a
+// compartir centro y radios. Por eso se leen como un mismo globo.
+//
+// Las bolsas extra son elipses CONCÉNTRICAS de las que solo se enseña la mitad de
+// abajo, para no acumular pliegues sobre el ojo.
+
+import { mountPreview } from './_template.js'
+import { interior } from '../src/style/stroke.js'
+import { sample } from '../src/core/params.js'
+
+const PARAMS = {
+  construccion: { options: ['no', 'si'], pool: { no: 1, si: 0 }, label: 'Ver la elipse entera' },
+
+  eyeWidth:  { min: 0.10, max: 0.40, range: [0.30, 0.30], step: 0.005, label: 'Ancho (cuerda)' },
+  depth:     { min: 0.01, max: 0.14, range: [0.055, 0.055], step: 0.002, label: 'Apertura (flecha)' },
+  tilt:      { min: -18, max: 18, range: [0, 0], step: 0.5, unit: '°', label: 'Inclinación' },
+  spacing:   { min: 0.01, max: 0.30, range: [0.14, 0.14], step: 0.01, label: 'Separación' },
+
+  // La elipse. `ringRx` < 1 es lo que hace los piquitos de las comisuras: la cuerda
+  // asoma por fuera. Igualar ringRy a ringRx da la elipse regular (círculo).
+  ringRx: { min: 0.5, max: 1.15, range: [0.9, 0.9], step: 0.01, label: 'Radio horizontal (× media cuerda)' },
+  ringRy: { min: 0.2, max: 1.6, range: [0.62, 0.62], step: 0.01, label: 'Radio vertical (× media cuerda)' },
+  ringCy: { min: -1.5, max: 3, range: [0.5, 0.5], step: 0.05, label: 'Centro Y (× flecha)' },
+
+  bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
+  bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
+
+  pupilSize: { min: 0.02, max: 0.3, range: [0.12, 0.12], step: 0.005, label: 'Tamaño pupila' },
+  pupilX:    { min: -1, max: 1, range: [0, 0], step: 0.05, label: 'Mirada X' },
+  lidCoverage: { min: 0, max: 1, range: [0, 0], step: 0.01, label: 'Cierre del párpado' },
+
+  lineWeight:   { min: 0.5, max: 12, range: [4.1, 4.1], step: 0.1, label: 'Grosor del ojo' },
+  detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los arcos' },
+}
+
+/** Segmento circular: cuerda en y=0 de largo w, arco de flecha `sag` hacia abajo. */
+function segment(w, sag) {
+  const half = w / 2
+  const R = (sag * sag + half * half) / (2 * sag)
+  const cy = -(R - sag)
+  const path = new Path2D()
+  path.moveTo(-half, 0)
+  path.arc(0, cy, R, Math.atan2(R - sag, -half), Math.atan2(R - sag, half), true)
+  return path
+}
+
+/** El complemento de un path: todo menos él. Con evenodd, un rect enorme + el path. */
+function outside(path) {
+  const o = new Path2D()
+  o.rect(-4000, -4000, 8000, 8000)
+  o.addPath(path)
+  return o
+}
+
+function eye(ctx, cx, cy, p, palette, frame) {
+  const w = frame.w * p.eyeWidth
+  const sag = frame.h * p.depth
+  const half = w / 2
+  const lidY = sag * p.lidCoverage
+
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate((p.tilt * Math.PI) / 180)
+
+  const white = segment(w, sag)
+  const closed = new Path2D()
+  closed.addPath(white)
+  closed.closePath()
+
+  // --- blanco + pupila ----------------------------------------------------
+  ctx.save()
+  ctx.clip(closed)
+  ctx.fillStyle = palette.accent2
+  ctx.fillRect(-w, -sag * 3, w * 2, sag * 6)
+  const pr = (w * p.pupilSize) / 2
+  ctx.fillStyle = palette.line
+  ctx.beginPath()
+  ctx.arc(p.pupilX * (half - pr * 2.2), lidY + pr * 0.45, pr, 0, Math.PI * 2)
+  ctx.fill()
+  if (lidY > 0.01) {
+    ctx.fillStyle = palette.skin
+    ctx.fillRect(-w, -sag * 3, w * 2, sag * 3 + lidY)
+  }
+  ctx.restore()
+
+  // --- los arcos de la elipse ---------------------------------------------
+  const rx = half * p.ringRx
+  const ry = half * p.ringRy
+  const ecy = sag * p.ringCy
+
+  if (p.construccion === 'si') {
+    ctx.save()
+    ctx.strokeStyle = palette.accent
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([6, 5])
+    for (let i = 0; i <= p.bagLines; i++) {
+      const k = 1 + i * p.bagStep
+      const g = new Path2D()
+      g.ellipse(0, ecy, rx * k, ry * k, 0, 0, Math.PI * 2)
+      ctx.stroke(g)
+    }
+    ctx.restore()
+  }
+
+  // El recorte se hace contra el ojo ABIERTO (sag completo), no contra el estado
+  // actual: si no, al cerrarse el blanco no habría nada que recortar y saldría el aro
+  // entero rodeando un ojo cerrado. Además el pliegue y la ojera no se mueven al
+  // parpadear — solo baja el borde del párpado.
+  interior(ctx, palette, p.detailWeight)
+  for (let i = 0; i <= p.bagLines; i++) {
+    const k = 1 + i * p.bagStep
+    ctx.save()
+    ctx.clip(outside(closed), 'evenodd')
+    // de las concéntricas extra solo se enseña la mitad de abajo, o se acumularían
+    // pliegues sobre el ojo
+    if (i > 0) {
+      const belowChord = new Path2D()
+      belowChord.rect(-4000, 0, 8000, 4000)
+      ctx.clip(belowChord)
+    }
+    const ring = new Path2D()
+    ring.ellipse(0, ecy, rx * k, ry * k, 0, 0, Math.PI * 2)
+    ctx.stroke(ring)
+    ctx.restore()
+  }
+
+  // --- las dos líneas del ojo, encima ------------------------------------
+  interior(ctx, palette, p.lineWeight)
+  ctx.stroke(white) // arco inferior
+  const chord = new Path2D()
+  chord.moveTo(-half, lidY)
+  chord.lineTo(half, lidY)
+  ctx.stroke(chord)
+
+  ctx.restore()
+}
+
+mountPreview({
+  title: 'eye-lab',
+  groups: [{ name: 'eye', params: PARAMS }],
+  draw(ctx, frame, bands, palette, rng) {
+    const p = sample(PARAMS, rng, bands.eye)
+    // fondo de piel, para juzgar los arcos sobre su tono real
+    ctx.fillStyle = palette.skin
+    ctx.fillRect(frame.x, frame.y, frame.w, frame.h)
+    const gap = frame.w * p.spacing
+    const w = frame.w * p.eyeWidth
+    eye(ctx, frame.cx - gap / 2 - w / 2, frame.cy, p, palette, frame)
+    eye(ctx, frame.cx + gap / 2 + w / 2, frame.cy, p, palette, frame)
+  },
+  cols: 3,
+  rows: 2,
+  cell: 300,
+  inset: 0.02,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>
