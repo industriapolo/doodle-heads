@@ -38,6 +38,13 @@ const PARAMS = {
   bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
   bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
 
+  // La sombra usa las MISMAS elipses, rellenas en vez de trazadas: así queda ligada al
+  // resto de la construcción y no puede descuadrarse al mover un radio.
+  // No sale siempre — es una probabilidad, como el cigarrillo.
+  shadow:     { type: 'bool', p: 0.35, label: 'Probabilidad de sombra' },
+  shadowRing: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Anillo que la limita' },
+  shadowTone: { options: ['media', 'fuerte'], pool: { media: 1, fuerte: 0 }, label: 'Tono' },
+
   pupilSize: { min: 0.02, max: 0.3, range: [0.12, 0.12], step: 0.005, label: 'Tamaño pupila' },
   pupilX:    { min: -1, max: 1, range: [0, 0], step: 0.05, label: 'Mirada X' },
 
@@ -96,6 +103,28 @@ function eye(ctx, cx, cy, p, palette, frame) {
   const nowOpen = segment(w, sagNow)
   const now = sealed(nowOpen)
 
+  const rx = half * p.ringRx
+  const ry = half * p.ringRy
+  const ecy = sag * p.ringCy
+
+  // --- sombra: la misma elipse, rellena ------------------------------------
+  // Va la PRIMERA de todo, porque está sobre la piel y todo lo demás se pinta encima.
+  // Solo por debajo de la cuerda: en la referencia la zona entre cuerda y pliegue queda
+  // limpia. Y recortada contra la forma en REPOSO, así no se mueve al parpadear.
+  if (p.shadow) {
+    const k = 1 + p.shadowRing * p.bagStep
+    ctx.save()
+    ctx.clip(outside(rest), 'evenodd')
+    const debajo = new Path2D()
+    debajo.rect(-4000, 0, 8000, 4000)
+    ctx.clip(debajo)
+    const mancha = new Path2D()
+    mancha.ellipse(0, ecy, rx * k, ry * k, 0, 0, Math.PI * 2)
+    ctx.fillStyle = p.shadowTone === 'fuerte' ? palette.skinDeep : palette.skinShadow
+    ctx.fill(mancha)
+    ctx.restore()
+  }
+
   // --- blanco + pupila ----------------------------------------------------
   ctx.save()
   ctx.translate(0, chordY)
@@ -108,10 +137,6 @@ function eye(ctx, cx, cy, p, palette, frame) {
   ctx.arc(p.pupilX * (half - pr * 2.2), pr * 0.45, pr, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
-
-  const rx = half * p.ringRx
-  const ry = half * p.ringRy
-  const ecy = sag * p.ringCy
 
   if (p.construccion === 'si') {
     ctx.save()
