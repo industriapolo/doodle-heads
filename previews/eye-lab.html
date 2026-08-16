@@ -43,6 +43,11 @@ const PARAMS = {
   // los arcos tienden a cerrarse en huevo. Esto lo hace un número.
   gapAngle: { min: 0, max: 70, range: [30, 30], step: 1, unit: '°', label: 'Apertura del hueco' },
 
+  // La segunda copia de la MISMA elipse, recortada CON el ojo en vez de contra él:
+  // se queda con lo de dentro. Es la operación booleana complementaria, y por ser la
+  // misma elipse las dos van ligadas — mover una mueve las dos.
+  interior: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Copia interior' },
+
   bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
   bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
 
@@ -153,12 +158,38 @@ function eye(ctx, cx, cy, p, palette, frame) {
     ctx.restore()
   }
 
+  // --- la copia interior --------------------------------------------------
+  // La MISMA elipse, recortada CON el ojo en vez de contra él. Cierra las comisuras
+  // por dentro. No lleva recorte angular: aquí interesa justo lo que la intersección
+  // deje, que es lo que dibuja la esquina.
+  //
+  // Y se recorta contra el blanco VISIBLE, no contra el abierto: es un rasgo que está
+  // sobre el globo, así que al bajar el párpado tiene que irse desapareciendo con él.
+  if (p.interior === 'si') {
+    ctx.save()
+    ctx.clip(closed)
+    const visible = new Path2D()
+    visible.rect(-4000, lidY, 8000, 4000)
+    ctx.clip(visible)
+    const dentro = new Path2D()
+    dentro.ellipse(0, ecy, rx, ry, 0, 0, Math.PI * 2)
+    interior(ctx, palette, p.detailWeight)
+    ctx.stroke(dentro)
+    ctx.restore()
+  }
+
   // --- las dos líneas del ojo, encima ------------------------------------
   interior(ctx, palette, p.lineWeight)
   ctx.stroke(white) // arco inferior
+
+  // La cuerda se acorta al bajar. A media altura el ojo es más estrecho que arriba, así
+  // que dibujarla siempre a lo ancho completo la hacía sobresalir y flotar sobre la piel.
+  // El semiancho a la altura del párpado sale del propio círculo del arco.
+  const Rw = (sag * sag + half * half) / (2 * sag)
+  const halfAtLid = Math.sqrt(Math.max(0, Rw * Rw - (lidY + Rw - sag) ** 2))
   const chord = new Path2D()
-  chord.moveTo(-half, lidY)
-  chord.lineTo(half, lidY)
+  chord.moveTo(-halfAtLid, lidY)
+  chord.lineTo(halfAtLid, lidY)
   ctx.stroke(chord)
 
   ctx.restore()
