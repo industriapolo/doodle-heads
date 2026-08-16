@@ -148,17 +148,30 @@ function mount(opts) {
 
   const STORE = `doodle-bands:${title}`
 
-  // Un grupo es un bloque del panel. Varios grupos pueden compartir `bandKey` y escribir
-  // en el mismo módulo — así "Pelo" y "Barba" se leen separados aunque los dos vivan
-  // en hair.js.
+  // Un grupo es un bloque del PANEL; un módulo es dónde vive el parámetro. No tienen por
+  // qué coincidir, en los dos sentidos:
+  //   · varios bloques sobre un módulo → `bandKey` ("Pelo" y "Barba" salen de hair.js)
+  //   · un bloque sobre varios módulos → nombre cualificado "head.lineWeight"
+  //     (la sección de grosores junta el trazo de siete partes distintas)
   const keyOf = (g) => g.bandKey || g.name
+  const route = (g, name) => {
+    const i = name.indexOf('.')
+    return i < 0 ? [keyOf(g), name] : [name.slice(0, i), name.slice(i + 1)]
+  }
+
+  // Índice módulo → params, resuelto una sola vez. De aquí salen tanto las bandas
+  // iniciales como la exportación, así que las dos rutas ven exactamente lo mismo.
+  const defsByKey = {}
+  for (const g of groups) {
+    for (const [name, def] of Object.entries(g.params)) {
+      const [k, pname] = route(g, name)
+      ;(defsByKey[k] ||= {})[pname] = def
+    }
+  }
 
   // --- bandas -------------------------------------------------------------
-  const declared = () => {
-    const b = {}
-    for (const g of groups) b[keyOf(g)] = { ...(b[keyOf(g)] || {}), ...bandsOf(g.params) }
-    return b
-  }
+  const declared = () =>
+    Object.fromEntries(Object.entries(defsByKey).map(([k, defs]) => [k, bandsOf(defs)]))
   let bands = declared()
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null')
@@ -208,7 +221,8 @@ function mount(opts) {
         box.append(h)
       }
       for (const [name, def] of Object.entries(g.params)) {
-        box.append(controlFor(keyOf(g), name, def))
+        const [k, pname] = route(g, name)
+        box.append(controlFor(k, pname, def))
       }
       controlsEl.append(box)
     }
@@ -357,8 +371,9 @@ function mount(opts) {
 
   const outEl = document.getElementById('out')
   document.getElementById('copy').addEventListener('click', () => {
-    const code = groups
-      .map((g) => `// ── ${g.label || g.name} (${keyOf(g)}.js) ──\n${exportBands(g.params, bands[keyOf(g)])}`)
+    // se exporta por MÓDULO, no por bloque del panel: un bloque puede mezclar varios
+    const code = Object.entries(defsByKey)
+      .map(([k, defs]) => `// ── ${k}.js ──\n${exportBands(defs, bands[k])}`)
       .join('\n\n')
     outEl.value = code
     outEl.style.display = 'block'

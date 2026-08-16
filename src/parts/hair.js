@@ -24,6 +24,7 @@ export const HAIR_PARAMS = {
   hairDensity: { min: 0, max: 1, range: [0, 0.29], step: 0.01, label: 'Densidad (rayitas)' },
   hairAngle: { min: -60, max: 60, range: [15, 60], step: 1, unit: '°', label: 'Ángulo (directional)' },
   hairOriginY: { min: -2, max: 3, range: [0.95, 1.35], step: 0.05, label: 'Origen radial Y' },
+  hairWeight: { min: 0.4, max: 8, range: [2.2, 2.2], step: 0.1, label: 'Grosor de rayita' },
 
   // --- masa (mode: solid) ---
   overhang: { min: 0, max: 0.16, range: [0.01, 0.035], step: 0.005, label: 'Vuelo sobre el cráneo' },
@@ -65,6 +66,7 @@ export const BEARD_PARAMS = {
   beardDensity: { min: 0, max: 1, range: [0.28, 0.58], step: 0.01, label: 'Densidad' },
   beardAngle: { min: -60, max: 60, range: [-12, 10], step: 1, unit: '°', label: 'Ángulo (directional)' },
   beardOriginY: { min: -3, max: 2, range: [-1.3, -0.35], step: 0.05, label: 'Origen radial Y' },
+  beardWeight: { min: 0.4, max: 8, range: [2.2, 2.2], step: 0.1, label: 'Grosor de rayita' },
 }
 
 export const PARAMS = { ...HAIR_PARAMS, ...BEARD_PARAMS }
@@ -93,7 +95,7 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
         lengthJitter: 0.35,
         angleJitter: p.mode === 'radial' ? 5 : 10,
         edgeFade: 0.25,
-        weight: 2.2,
+        weight: p.hairWeight,
         radialOriginY: p.hairOriginY,
       }, palette, rng)
     }
@@ -117,7 +119,7 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
         lengthJitter: 0.4,
         angleJitter: p.beardMode === 'radial' ? 7 : 12,
         edgeFade: 0.15,
-        weight: 2.2,
+        weight: p.beardWeight,
         radialOriginY: p.beardOriginY,
       }, palette, rng, { densityAt })
     }

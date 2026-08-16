@@ -12,21 +12,42 @@ import * as nose from '../src/parts/nose.js'
 import * as mouth from '../src/parts/mouth.js'
 import * as chin from '../src/parts/chin.js'
 
+const without = (params, ...drop) =>
+  Object.fromEntries(Object.entries(params).filter(([k]) => !drop.includes(k)))
+
+// Los grosores de trazo se sacan de sus bloques y se juntan en una sección propia:
+// se ajustan comparándolos entre sí, no dentro de la parte a la que pertenecen.
+// El nombre cualificado "modulo.param" le dice al panel a qué módulo escribe cada uno.
+const pick = (mod, key, label) => ({ ...mod.PARAMS[key], label })
+
+const WEIGHTS = {
+  'head.lineWeight': pick(head, 'lineWeight', 'Contorno de la cabeza'),
+  'ears.lineWeight': pick(ears, 'lineWeight', 'Contorno de la oreja'),
+  'eyes.lineWeight': pick(eyes, 'lineWeight', 'Ojo'),
+  'eyes.detailWeight': pick(eyes, 'detailWeight', 'Detalles del ojo'),
+  'nose.lineWeight': pick(nose, 'lineWeight', 'Nariz'),
+  'mouth.lineWeight': pick(mouth, 'lineWeight', 'Boca'),
+  'chin.lineWeight': pick(chin, 'lineWeight', 'Hoyuelo de barbilla'),
+  'hair.hairWeight': pick(hair, 'hairWeight', 'Rayita del pelo'),
+  'hair.beardWeight': pick(hair, 'beardWeight', 'Rayita de la barba'),
+}
+
 // Todas las variables del personaje en un panel, agrupadas por parte.
 // El orden es el de las capas, para que el panel se lea como se dibuja.
 mountPreview({
   title: 'compose',
   groups: [
-    { name: 'head',  label: 'Cabeza', params: head.PARAMS },
+    { name: 'weights', label: 'Grosores de trazo', params: WEIGHTS },
+    { name: 'head',  label: 'Cabeza', params: without(head.PARAMS, 'lineWeight') },
     // dos bloques, un solo módulo: el pelo y la barba se dirigen por separado
-    { name: 'hair',  label: 'Pelo', params: hair.HAIR_PARAMS },
-    { name: 'beard', label: 'Barba', params: hair.BEARD_PARAMS, bandKey: 'hair' },
+    { name: 'hair',  label: 'Pelo', params: without(hair.HAIR_PARAMS, 'hairWeight') },
+    { name: 'beard', label: 'Barba', params: without(hair.BEARD_PARAMS, 'beardWeight'), bandKey: 'hair' },
     { name: 'brows', label: 'Cejas', params: brows.PARAMS },
-    { name: 'eyes',  label: 'Ojos', params: eyes.PARAMS },
-    { name: 'nose',  label: 'Nariz', params: nose.PARAMS },
-    { name: 'mouth', label: 'Boca', params: mouth.PARAMS },
-    { name: 'chin',  label: 'Hoyuelo de barbilla', params: chin.PARAMS },
-    { name: 'ears',  label: 'Orejas', params: ears.PARAMS },
+    { name: 'eyes',  label: 'Ojos', params: without(eyes.PARAMS, 'lineWeight', 'detailWeight') },
+    { name: 'nose',  label: 'Nariz', params: without(nose.PARAMS, 'lineWeight') },
+    { name: 'mouth', label: 'Boca', params: without(mouth.PARAMS, 'lineWeight') },
+    { name: 'chin',  label: 'Hoyuelo de barbilla', params: without(chin.PARAMS, 'lineWeight') },
+    { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight') },
   ],
   draw(ctx, frame, bands, palette, rng, seed) {
     draw(ctx, frame, makeCharacter(seed, bands), palette)
