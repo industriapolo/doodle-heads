@@ -42,10 +42,10 @@ export const PARAMS = {
   // Canal de animación. 0 = como está dibujado, 1 = cerrado del todo.
   lidCoverage: { min: 0, max: 1, range: [0, 0.07], step: 0.01, label: 'Cierre del párpado' },
 
-  // Dos multiplicadores porque el borde del párpado es la línea expresiva del ojo y
-  // pide otro peso que el arco y las bolsas.
-  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor arco y bolsas (×)' },
-  lidWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor del párpado (×)' },
+  // Anchos absolutos e independientes entre sí: el ojo (arco inferior y borde del
+  // párpado) y sus detalles (pliegue y bolsas) se ajustan por separado.
+  lineWeight: { min: 0.5, max: 12, range: [4.1, 4.1], step: 0.1, label: 'Grosor del ojo' },
+  detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los detalles' },
 }
 
 export const randomize = randomizerFor(PARAMS)
@@ -124,14 +124,14 @@ function eye(ctx, side, w, depth, p, palette) {
   const lower = new Path2D()
   lower.moveTo(-w / 2, 0)
   segmentArc(lower, w, depth, 1)
-  interior(ctx, palette, 0.85 * p.lineWeight)
+  interior(ctx, palette, p.lineWeight * 0.75)
   ctx.stroke(lower)
 
   // --- la recta de arriba: es el borde del párpado, va más gruesa ----------
   const chord = new Path2D()
   chord.moveTo(-w / 2, lidY)
   chord.lineTo(w / 2, lidY)
-  interior(ctx, palette, 1.15 * p.lidWeight)
+  interior(ctx, palette, p.lineWeight)
   ctx.stroke(chord)
 
   // --- pliegue del párpado: la línea que redondea el globo -----------------
@@ -145,12 +145,12 @@ function eye(ctx, side, w, depth, p, palette) {
   const crease = new Path2D()
   crease.moveTo(-lw / 2, 0)
   segmentArc(crease, lw, rise, -1)
-  interior(ctx, palette, 0.9 * p.lidWeight)
+  interior(ctx, palette, p.detailWeight)
   ctx.stroke(crease)
   ctx.restore()
 
   // --- bolsas -------------------------------------------------------------
-  interior(ctx, palette, 0.7 * p.lineWeight)
+  interior(ctx, palette, p.detailWeight * 0.8)
   const spacing = depth * p.bagSpacing
   // La curva no puede hundirse más que la separación o las bolsas se cruzan entre sí:
   // el vértice de una quedaría por debajo de los extremos de la siguiente.

@@ -15,7 +15,6 @@ import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
 import { makeRng } from './prng.js'
 import { getPalette } from '../style/palettes.js'
-import * as stroke from '../style/stroke.js'
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -36,7 +35,6 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     nose: nose.randomize(rng.fork(6), bands.nose),
     mouth: mouth.randomize(rng.fork(7), bands.mouth),
     chin: chin.randomize(rng.fork(9), bands.chin),
-    stroke: stroke.randomize(rng.fork(10), bands.stroke),
   }
 }
 
@@ -47,10 +45,6 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
 export function draw(ctx, frame, character, palette, overrides = {}) {
   const rng = makeRng(character.seed)
   const p = (name) => ({ ...character[name], ...(overrides[name] || {}) })
-
-  // Los pesos base se fijan al empezar CADA personaje, así que nunca queda estado
-  // colgando del anterior. Encima, cada parte aplica su propio multiplicador.
-  stroke.setWeights(p('stroke'))
 
   const headP = p('head')
   const geo = head.build(frame, headP)

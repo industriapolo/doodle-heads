@@ -20,7 +20,7 @@ export const PARAMS = {
   shadowSize: { min: 0, max: 1.2, range: [0.3, 0.5], step: 0.05, label: 'Sombra bajo la horizontal' },
   offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
   tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
-  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor de línea (×)' },
+  lineWeight: { min: 0.5, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Grosor de línea' },
 }
 
 export const randomize = randomizerFor(PARAMS)

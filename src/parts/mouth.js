@@ -20,7 +20,7 @@ export const PARAMS = {
   cigarette: { type: 'bool', p: 0.45, label: 'Probabilidad de cigarrillo' },
   cigAngle: { min: -10, max: 55, range: [8, 45], step: 1, unit: '°', label: 'Ángulo del cigarro' },
   cigLength: { min: 0.08, max: 0.30, range: [0.22, 0.27], step: 0.01, label: 'Largo del cigarro' },
-  lineWeight: { min: 0.2, max: 3, range: [1, 1], step: 0.05, label: 'Grosor de línea (×)' },
+  lineWeight: { min: 0.5, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Grosor de línea' },
 }
 
 export const randomize = randomizerFor(PARAMS)

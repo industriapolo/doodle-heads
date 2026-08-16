@@ -4,6 +4,7 @@
 import { mountPreview } from './_template.js'
 import * as hatching from '../src/style/hatching.js'
 import { roundedPolyPath } from '../src/style/stroke.js'
+import { sample } from '../src/core/params.js'
 
 // Formas de prueba: las tres situaciones reales donde se usa el motor.
 const SHAPES = {
@@ -49,7 +50,9 @@ mountPreview({
   title: 'hatching',
   groups: [{ name: 'hatching', params: PARAMS }],
   draw(ctx, frame, bands, palette, rng, seed) {
-    const p = hatching.randomize(rng, bands.hatching)
+    // sample() sobre el PARAMS combinado, no hatching.randomize(): `shape` es un
+    // parámetro de esta preview, no del motor, y su randomize no lo conoce
+    const p = sample(PARAMS, rng, bands.hatching)
     const mask = SHAPES[p.shape](frame)
     // relleno de piel + contorno, para juzgar el hatching sobre su fondo real
     ctx.fillStyle = palette.skin

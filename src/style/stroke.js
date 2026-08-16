@@ -4,57 +4,40 @@
 // `wobble` está cerrado en 0 — los contornos de las referencias son vector limpio.
 // El aire de "hecho a mano" vive entero en el jitter de hatching.js, no aquí.
 
-import { randomizerFor } from '../core/params.js'
-
 export const WOBBLE = 0
 
-// Los tres pesos base del dibujo. Son estilo, no geometría, así que se declaran aquí y
-// no dentro de ninguna parte — pero son ajustables: `character.draw` los fija al empezar
-// cada personaje a partir de sus params, de modo que no queda estado colgando entre uno
-// y otro. Cada parte lleva encima su propio multiplicador para afinar por elemento.
-export const PARAMS = {
-  // min y step tienen que dejar caer el valor por defecto justo: con min 1.5 y paso 0.2
-  // el 6 no es alcanzable y el slider lo redondeaba a 6.1
-  outline: { min: 1, max: 16, range: [6, 6], step: 0.1, label: 'Contorno principal' },
-  interior: { min: 0.8, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Líneas interiores' },
-  fine: { min: 0.4, max: 8, range: [2.2, 2.2], step: 0.1, label: 'Rayitas (hatching)' },
+// Los grosores se pasan SIEMPRE como ancho absoluto en unidades del espacio de trabajo,
+// nunca como multiplicador de un peso compartido. Con multiplicadores encadenados, tocar
+// el grosor de la nariz movía también el de los ojos: no eran ajustables de verdad por
+// separado. Cada parte declara el suyo en su PARAMS.
+//
+// Estos valores son el punto de partida de cada parte, no un estado global mutable.
+export const WEIGHT = {
+  outline: 6, // contorno principal
+  interior: 3.6, // líneas interiores: 60% del contorno (§4)
+  fine: 2.2, // rayitas de hatching
 }
 
-export const DEFAULT_WEIGHTS = { outline: 6, interior: 3.6, fine: 2.2 }
-
-let active = { ...DEFAULT_WEIGHTS }
-
-/** Fija los pesos base. character.draw lo llama antes de dibujar nada. */
-export function setWeights(w) {
-  active = { ...DEFAULT_WEIGHTS, ...w }
-}
-
-export function weights() {
-  return active
-}
-
-export const randomize = randomizerFor(PARAMS)
-
-/** Estilo de contorno principal. */
-export function outline(ctx, palette, scale = 1) {
+/** Contorno principal. `width` en unidades del espacio lógico. */
+export function outline(ctx, palette, width = WEIGHT.outline) {
   ctx.strokeStyle = palette.line
-  ctx.lineWidth = active.outline * scale
+  ctx.lineWidth = width
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }
 
-/** Estilo de línea interior (párpados, nariz, arrugas). */
-export function interior(ctx, palette, scale = 1) {
+/** Línea interior (párpados, nariz, arrugas). */
+export function interior(ctx, palette, width = WEIGHT.interior) {
   ctx.strokeStyle = palette.line
-  ctx.lineWidth = active.interior * scale
+  ctx.lineWidth = width
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }
 
-/** Estilo de rayita fina (hatching). */
-export function fine(ctx, palette, scale = 1) {
+/** Rayita fina (hatching). */
+export function fine(ctx, palette, width = WEIGHT.fine) {
   ctx.strokeStyle = palette.hatch
-  ctx.lineWidth = active.fine * scale
+  ctx.lineWidth = width
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 }
@@ -128,9 +111,9 @@ export function smoothPath(pts) {
 }
 
 /** Rellena y contornea una silueta de una sola vez. */
-export function fillAndStroke(ctx, path, fillColor, palette, scale = 1) {
+export function fillAndStroke(ctx, path, fillColor, palette, width = WEIGHT.outline) {
   ctx.fillStyle = fillColor
   ctx.fill(path)
-  outline(ctx, palette, scale)
+  outline(ctx, palette, width)
   ctx.stroke(path)
 }
