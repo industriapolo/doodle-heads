@@ -29,9 +29,14 @@ const PARAMS = {
 
   // La elipse. `ringRx` < 1 es lo que hace los piquitos de las comisuras: la cuerda
   // asoma por fuera. Igualar ringRy a ringRx da la elipse regular (círculo).
-  ringRx: { min: 0.5, max: 1.15, range: [0.9, 0.9], step: 0.01, label: 'Radio horizontal (× media cuerda)' },
-  ringRy: { min: 0.2, max: 1.6, range: [0.62, 0.62], step: 0.01, label: 'Radio vertical (× media cuerda)' },
-  ringCy: { min: -1.5, max: 3, range: [0.5, 0.5], step: 0.05, label: 'Centro Y (× flecha)' },
+  //
+  // CONDICIÓN DEL RECORTE LATERAL: el punto más ancho de la elipse tiene que caer
+  // DENTRO del blanco, o sea por encima del arco. Si la elipse es muy ancha o su centro
+  // muy bajo, sus costados se escapan por debajo del arco, no hay nada que recortar
+  // y los dos arcos se quedan unidos formando un aro cerrado.
+  ringRx: { min: 0.4, max: 1.15, range: [0.72, 0.72], step: 0.01, label: 'Radio horizontal (× media cuerda)' },
+  ringRy: { min: 0.2, max: 1.6, range: [0.48, 0.48], step: 0.01, label: 'Radio vertical (× media cuerda)' },
+  ringCy: { min: -1.5, max: 3, range: [0.28, 0.28], step: 0.02, label: 'Centro Y (× flecha)' },
 
   bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
   bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
@@ -144,6 +149,12 @@ function eye(ctx, cx, cy, p, palette, frame) {
   ctx.stroke(chord)
 
   ctx.restore()
+
+  // ¿se están cortando los costados? El punto más ancho de la elipse tiene que quedar
+  // por encima del arco. Si no, no hay interseccion que recortar y sale el aro cerrado.
+  const R = (sag * sag + half * half) / (2 * sag)
+  const arcYAt = (x) => Math.sqrt(Math.max(0, R * R - x * x)) - (R - sag)
+  return ecy < arcYAt(rx)
 }
 
 mountPreview({
@@ -157,7 +168,15 @@ mountPreview({
     const gap = frame.w * p.spacing
     const w = frame.w * p.eyeWidth
     eye(ctx, frame.cx - gap / 2 - w / 2, frame.cy, p, palette, frame)
-    eye(ctx, frame.cx + gap / 2 + w / 2, frame.cy, p, palette, frame)
+    const corta = eye(ctx, frame.cx + gap / 2 + w / 2, frame.cy, p, palette, frame)
+
+    // Aviso: sin recorte lateral no hay dos arcos, hay un aro. Es la condición más
+    // fácil de perder al mover los sliders, y a simple vista se confunde con "está bien".
+    if (!corta) {
+      ctx.fillStyle = '#E5117F'
+      ctx.font = 'bold 26px ui-monospace, monospace'
+      ctx.fillText('aro cerrado — costados sin cortar', frame.x + 16, frame.bottom - 20)
+    }
   },
   cols: 3,
   rows: 2,
