@@ -35,6 +35,15 @@ const PARAMS = {
   gapAngle: { min: 0, max: 70, range: [30, 30], step: 1, unit: '°', label: 'Apertura del hueco' },
   interior: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Copia interior' },
 
+  // El blanco solo ocupa el area CENTRAL, la que delimitan los costados de la elipse.
+  // Las comisuras que quedan fuera van en tono de sombra de cara.
+  cornerShade: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Comisuras en sombra' },
+  cornerTone: {
+    options: ['propio', 'media', 'fuerte'],
+    pool: { propio: 1, media: 0, fuerte: 0 },
+    label: 'Tono de las comisuras',
+  },
+
   bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
   bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
 
@@ -126,11 +135,30 @@ function eye(ctx, cx, cy, p, palette, frame) {
   }
 
   // --- blanco + pupila ----------------------------------------------------
+  // El blanco NO llena el segmento de comisura a comisura: solo el área central, la
+  // que delimitan los costados de la elipse. Lo de fuera va en tono de sombra.
+  // Se pinta en dos pasadas — todo en sombra, y encima el blanco recortado a la
+  // elipse — porque la elipse ya es quien parte el ojo en tres: las líneas que separan
+  // las zonas son las de la copia interior, así que coinciden solas.
+  const blanco = p.sclera === 'accent' ? palette.accent : palette.accent2
   ctx.save()
   ctx.translate(0, chordY)
   ctx.clip(now)
-  ctx.fillStyle = palette.accent2
+
+  const tonoComisura = { propio: palette.eyeCorner, media: palette.skinShadow, fuerte: palette.skinDeep }
+  ctx.fillStyle = p.cornerShade === 'si' ? tonoComisura[p.cornerTone] : blanco
   ctx.fillRect(-w, -sag * 4, w * 2, sag * 8)
+
+  if (p.cornerShade === 'si') {
+    ctx.save()
+    ctx.translate(0, -chordY) // la elipse vive en el marco sin desplazar
+    const centro = new Path2D()
+    centro.ellipse(0, ecy, rx, ry, 0, 0, Math.PI * 2)
+    ctx.fillStyle = blanco
+    ctx.fill(centro)
+    ctx.restore()
+  }
+
   const pr = (w * p.pupilSize) / 2
   ctx.fillStyle = palette.line
   ctx.beginPath()
