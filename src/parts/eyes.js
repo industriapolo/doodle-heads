@@ -52,6 +52,10 @@ export const PARAMS = {
   // `accent` apagado: en la paleta magenta daba ojos rojos. No lo borro porque la
   // referencia del esqueleto sí los lleva — se enciende desde el panel.
   sclera: { options: ['white', 'accent'], pool: { white: 1, accent: 0 }, label: 'Esclerótica' },
+  // El blanco solo ocupa el área CENTRAL, la que delimitan los costados de la elipse.
+  // Las comisuras que quedan fuera van en `eyeCorner`, un tono propio: con skinShadow
+  // desaparecían sobre la sombra plana lateral de la cara, que es ese mismo tono.
+  cornerShade: { options: ['si', 'no'], pool: { si: 1, no: 0 }, label: 'Comisuras en sombra' },
 
   // UN canal de cierre, no dos. Antes `lidCoverage` y `depth` colapsaban los dos el
   // blanco a cero por caminos distintos. `blink` cierra y `blinkPivot` decide hacia
@@ -165,11 +169,24 @@ function eye(ctx, side, w, sag, p, palette) {
   }
 
   // --- blanco + pupila ----------------------------------------------------
+  // Dos pasadas: todo en tono de comisura y encima el blanco recortado a la elipse.
+  // Las líneas que separan las tres zonas son las de la copia interior, así que
+  // coinciden solas — es la misma elipse.
+  const blanco = p.sclera === 'accent' ? palette.accent : palette.accent2
   ctx.save()
   ctx.translate(0, chordY)
   ctx.clip(now)
-  ctx.fillStyle = p.sclera === 'accent' ? palette.accent : palette.accent2
+  ctx.fillStyle = p.cornerShade === 'si' ? palette.eyeCorner : blanco
   ctx.fillRect(-w, -sag * 4, w * 2, sag * 8)
+  if (p.cornerShade === 'si') {
+    ctx.save()
+    ctx.translate(0, -chordY) // la elipse vive en el marco sin desplazar
+    const centro = new Path2D()
+    centro.ellipse(0, ecy, rx, ry, 0, 0, Math.PI * 2)
+    ctx.fillStyle = blanco
+    ctx.fill(centro)
+    ctx.restore()
+  }
   const pr = (w * p.pupilSize) / 2
   ctx.fillStyle = palette.line
   ctx.beginPath()

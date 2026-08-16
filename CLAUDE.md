@@ -28,6 +28,25 @@ sigue corriendo el viejo — y con imports de namespace eso no da error de carga
    itera ahí, aislado, antes de componer.
 3. **Params serializables.** Un personaje completo = un objeto plano de números y strings.
 4. **Estilo centralizado.** Colores y grosores viven en `src/style/`. Ninguna parte los hardcodea.
+
+### Color
+
+No son esquemas cerrados: es una familia **derivada en HSL** de unos pocos números, con
+sus `PARAMS` como cualquier parte. Con diez colores sueltos, desplazar una piel hacia el
+naranja obligaría a mover diez valores de forma coherente y bastaría con que uno se
+desincronizara para que la cara se cayera. Derivando, el tono de piel es **un número**.
+
+Consecuencias, todas gratis por ser params con banda:
+- **Piel distinta por cara**: abrir la banda de `skinHue`.
+- **Fondo común o mosaico**: banda de `bgHue/Sat/Light` cerrada o abierta. No hay switch.
+- Las sombras son **pasos relativos**, no colores: una piel oscura no se queda con las
+  sombras aplastadas contra el negro.
+- El tono es **circular** y la banda interpola recto, así que los sliders de tono llegan
+  a 420°: para cruzar el 0 se pide 330→400, no 330→40 — que baja por el 180 y se pasea
+  por cianes y verdes.
+
+Los cuatro esquemas de siempre viven como **presets de parámetros**: el desplegable
+vuelca sus valores en los sliders y desde ahí se afina.
 5. **Determinismo por seed.** Todo random pasa por `mulberry32`. Misma seed = mismo personaje.
 
 ### Contrato de módulo
@@ -111,8 +130,9 @@ se coma la silueta.
 
 - **`wobble` = 0.** Los contornos de las refs son vector limpio. El aire de "hecho a mano" vive
   entero en el jitter interno de `hatching.js` (ángulo y largo por raya), no en la silueta.
-- **El color de línea varía por paleta.** No asumir negro: en `magenta` la línea es plum
-  (`#5B1140`), en `verde-noche` es negra (`#111111`).
+- **El color de línea varía por paleta.** No asumir negro: en `magenta` la línea es plum,
+  en `verde-noche` es negra. En el sistema paramétrico eso es un solo número
+  (`lineSat`), no dos paletas distintas.
 - **El cigarrillo es firma de estilo**, no un caso raro — sale en 2 de las 3 refs de cabeza.
   Probabilidad alta en el `randomize` de `mouth.js`.
 - **Cejas: `width` es el parámetro más expresivo.** Varía entre 30% y 46% del ancho de cabeza

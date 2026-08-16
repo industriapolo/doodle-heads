@@ -14,7 +14,7 @@ import * as nose from '../parts/nose.js'
 import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
 import { makeRng } from './prng.js'
-import { getPalette } from '../style/palettes.js'
+import * as palettes from '../style/palettes.js'
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -35,6 +35,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     nose: nose.randomize(rng.fork(6), bands.nose),
     mouth: mouth.randomize(rng.fork(7), bands.mouth),
     chin: chin.randomize(rng.fork(9), bands.chin),
+    palette: palettes.randomize(rng.fork(11), bands.palette),
   }
 }
 
@@ -142,8 +143,12 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   return { geo, browGeo, noseGeo, mouthGeo }
 }
 
+/**
+ * El color del personaje. Va con el, no con la rejilla: con la banda del fondo cerrada
+ * todas las caras comparten fondo, y abrirla convierte el grid en mosaico sin tocar nada.
+ */
 export function paletteFor(character, fallback) {
-  return character.paletteName ? getPalette(character.paletteName) : fallback
+  return character.palette ? palettes.buildPalette(character.palette) : fallback
 }
 
 // Dónde puede acabar la nariz como muy abajo, en fracción de faceBox. Deja sitio para

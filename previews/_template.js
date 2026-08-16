@@ -117,6 +117,7 @@ function mount(opts) {
     cell = 190,
     inset = 0.08,
     refs = [],
+    onPalette = null,
   } = opts
 
   document.head.insertAdjacentHTML('beforeend', `<style>${CSS}</style>`)
@@ -353,7 +354,18 @@ function mount(opts) {
     palEl.append(o)
   }
   palEl.value = DEFAULT_PALETTE
-  palEl.addEventListener('change', renderAll)
+  palEl.addEventListener('change', () => {
+    // Con `onPalette`, el desplegable deja de imponer un esquema cerrado y pasa a ser un
+    // cargador de PRESETS: vuelca valores en las bandas y desde ahí se afina.
+    if (onPalette) {
+      Object.assign(bands, onPalette(palEl.value, bands) || {})
+      persist()
+      building = true
+      buildControls()
+      building = false
+    }
+    renderAll()
+  })
 
   document.getElementById('regen').addEventListener('click', () => {
     for (const c of cells) c.seed = randomSeed()

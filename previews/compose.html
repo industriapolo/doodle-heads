@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <script type="module">
 import { mountPreview } from './_template.js'
-import { makeCharacter, draw } from '../src/core/character.js'
+import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
 import * as head from '../src/parts/head.js'
 import * as ears from '../src/parts/ears.js'
 import * as hair from '../src/parts/hair.js'
@@ -11,6 +11,7 @@ import * as eyes from '../src/parts/eyes.js'
 import * as nose from '../src/parts/nose.js'
 import * as mouth from '../src/parts/mouth.js'
 import * as chin from '../src/parts/chin.js'
+import * as palettes from '../src/style/palettes.js'
 
 const without = (params, ...drop) =>
   Object.fromEntries(Object.entries(params).filter(([k]) => !drop.includes(k)))
@@ -37,6 +38,7 @@ const WEIGHTS = {
 mountPreview({
   title: 'compose',
   groups: [
+    { name: 'palette', label: 'Color', params: palettes.PARAMS },
     { name: 'weights', label: 'Grosores de trazo', params: WEIGHTS },
     { name: 'head',  label: 'Cabeza', params: without(head.PARAMS, 'lineWeight') },
     // dos bloques, un solo módulo: el pelo y la barba se dirigen por separado
@@ -51,8 +53,15 @@ mountPreview({
     // la de los ojos. Lo que se ajusta aquí es el margen de desvío.
     { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight', 'offsetY') },
   ],
-  draw(ctx, frame, bands, palette, rng, seed) {
-    draw(ctx, frame, makeCharacter(seed, bands), palette)
+  // El desplegable ya no impone un esquema: carga sus valores en los sliders de Color.
+  onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
+  draw(ctx, frame, bands, fallback, rng, seed) {
+    const character = makeCharacter(seed, bands)
+    const pal = paletteFor(character, fallback)
+    // el fondo lo pone el personaje: banda cerrada = común, banda abierta = mosaico
+    ctx.fillStyle = pal.bg
+    ctx.fillRect(0, 0, 800, 800)
+    draw(ctx, frame, character, pal)
   },
   inset: 0.06,
   refs: [
