@@ -8,6 +8,11 @@ import { interior } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
+  // `escalon`: la vertical no baja hasta la horizontal — sale hacia el lado CONTRARIO
+  // al gancho, baja, y desde ahí arranca la horizontal larga.
+  type: { options: ['recta', 'escalon'], pool: { recta: 2, escalon: 1 }, label: 'Tipo de punta' },
+  stepWidth: { min: 0.01, max: 0.14, range: [0.035, 0.075], step: 0.005, label: 'Ancho del escalón' },
+  stepDrop: { min: 0.005, max: 0.12, range: [0.03, 0.065], step: 0.005, label: 'Caída del escalón' },
   startY: { min: 0.14, max: 0.44, range: [0.15, 0.36], step: 0.01, label: 'Arranque' },
   length: { min: 0.20, max: 0.56, range: [0.29, 0.52], step: 0.01, label: 'Largo' },
   hookWidth: { min: 0.02, max: 0.22, range: [0.025, 0.14], step: 0.005, label: 'Ancho del gancho' },
@@ -35,25 +40,36 @@ export function draw(ctx, faceBox, p, palette, rng) {
   const bx = nx + lean // base de la vertical
 
   const r = hw * p.curlRadius
-  const corner = Math.min(hw * 0.45, faceBox.h * 0.02)
+
+  // El escalón sale hacia el lado CONTRARIO al gancho, así que la horizontal de abajo
+  // va de `xFar` (lado del escalón) a `px` (donde arranca el rizo).
+  const stepped = p.type === 'escalon'
+  const sw = stepped ? faceBox.w * p.stepWidth : 0
+  const sd = stepped ? faceBox.h * p.stepDrop : 0
+  const xFar = bx - dir * sw
+  const px = bx + dir * hw // la esquina: punto más bajo y más externo del gancho
 
   // --- sombra plana bajo la horizontal, antes que la línea -----------------
   const sr = hw * p.shadowSize
   if (sr > 1) {
-    const scx = bx + dir * (hw * 0.5)
     const shadow = new Path2D()
-    shadow.arc(scx, y1, sr, 0, Math.PI, false) // semicírculo hacia abajo
+    shadow.arc((xFar + px) / 2, y1, sr, 0, Math.PI, false) // semicírculo hacia abajo
     shadow.closePath()
     ctx.fillStyle = palette.skinShadow
     ctx.fill(shadow)
   }
 
-  // --- vertical, esquina redondeada, horizontal ---------------------------
+  // --- vertical y horizontal, con la punta EN PICO ------------------------
+  // Sin redondear: la esquina entre la vertical y la horizontal es un ángulo vivo.
   const path = new Path2D()
   path.moveTo(nx, y0)
-  path.lineTo(bx, y1 - corner)
-  path.quadraticCurveTo(bx, y1, bx + dir * corner, y1)
-  const px = bx + dir * hw // la esquina: punto más bajo y más externo del gancho
+  if (stepped) {
+    path.lineTo(bx, y1 - sd)
+    path.lineTo(xFar, y1 - sd)
+    path.lineTo(xFar, y1)
+  } else {
+    path.lineTo(bx, y1)
+  }
   path.lineTo(px, y1)
 
   // --- aleta: la línea QUIEBRA y se enrosca sobre sí misma ----------------
