@@ -11,7 +11,11 @@ import { randomizerFor } from '../core/params.js'
 
 export const PARAMS = {
   size: { min: 0.04, max: 0.18, range: [0.05, 0.1], step: 0.005, label: 'Tamaño' },
-  offsetY: { min: 0.26, max: 0.68, range: [0.3, 0.59], step: 0.01, label: 'Altura' },
+  // La altura NO se sortea suelta: character.js la deriva de los ojos. Regla clásica de
+  // proporción — el borde de arriba de la oreja a la altura de la línea de los ojos.
+  // `eyeAlign` es el margen que se le permite desviarse, para que no salga monolítico.
+  eyeAlign: { min: -0.14, max: 0.14, range: [-0.03, 0.045], step: 0.005, label: 'Desvío sobre la línea de ojos' },
+  offsetY: { min: 0.26, max: 0.68, range: [0.3, 0.59], step: 0.01, label: 'Altura (solo suelto)' },
   stretch: { min: 0.7, max: 1.8, range: [1, 1.6], step: 0.05, label: 'Alargamiento' },
   innerSize: { min: 0.2, max: 0.8, range: [0.2, 0.43], step: 0.01, label: 'Tamaño del oído' },
   innerSweep: { min: 140, max: 360, range: [140, 360], step: 5, unit: '°', label: 'Cierre del oído' },
@@ -21,6 +25,15 @@ export const PARAMS = {
 }
 
 export const randomize = randomizerFor(PARAMS)
+
+/**
+ * Media altura de la oreja en fracción de faceBox.h. character.js la necesita para
+ * poder poner el BORDE SUPERIOR a la altura de los ojos: así la correlación se ajusta
+ * sola al tamaño de la oreja en vez de descuadrarse con las grandes.
+ */
+export function halfHeight(faceBox, p) {
+  return (faceBox.w * p.size * p.stretch) / faceBox.h
+}
 
 export function draw(ctx, geo, p, palette, rng) {
   const { headBox, faceBox } = geo

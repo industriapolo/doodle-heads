@@ -47,7 +47,9 @@ mountPreview({
     { name: 'nose',  label: 'Nariz', params: without(nose.PARAMS, 'lineWeight') },
     { name: 'mouth', label: 'Boca', params: without(mouth.PARAMS, 'lineWeight') },
     { name: 'chin',  label: 'Hoyuelo de barbilla', params: without(chin.PARAMS, 'lineWeight') },
-    { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight') },
+    // `offsetY` no sale: al componer, la altura de la oreja la deriva character.js de
+    // la de los ojos. Lo que se ajusta aquí es el margen de desvío.
+    { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight', 'offsetY') },
   ],
   draw(ctx, frame, bands, palette, rng, seed) {
     draw(ctx, frame, makeCharacter(seed, bands), palette)
