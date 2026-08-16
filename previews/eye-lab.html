@@ -38,6 +38,11 @@ const PARAMS = {
   ringRy: { min: 0.2, max: 1.6, range: [0.48, 0.48], step: 0.01, label: 'Radio vertical (× media cuerda)' },
   ringCy: { min: -1.5, max: 3, range: [0.28, 0.28], step: 0.02, label: 'Centro Y (× flecha)' },
 
+  // Recorte angular, ENCIMA del recorte por intersección. Con solo la intersección el
+  // hueco entre los dos arcos es una consecuencia de la geometría y no se puede pedir:
+  // los arcos tienden a cerrarse en huevo. Esto lo hace un número.
+  gapAngle: { min: 0, max: 70, range: [30, 30], step: 1, unit: '°', label: 'Apertura del hueco' },
+
   bagLines: { min: 0, max: 3, range: [1, 1], step: 1, int: true, label: 'Bolsas concéntricas extra' },
   bagStep:  { min: 0.02, max: 0.5, range: [0.12, 0.12], step: 0.01, label: 'Paso entre concéntricas' },
 
@@ -122,21 +127,29 @@ function eye(ctx, cx, cy, p, palette, frame) {
   // actual: si no, al cerrarse el blanco no habría nada que recortar y saldría el aro
   // entero rodeando un ojo cerrado. Además el pliegue y la ojera no se mueven al
   // parpadear — solo baja el borde del párpado.
+  // Dos recortes que se suman:
+  //  · el angular decide el HUECO entre los dos arcos, y es un número que pides
+  //  · el de intersección garantiza que nada cruce por dentro del blanco pase lo que pase
+  // En canvas, 90° es hacia abajo: el arco de arriba vive alrededor de 270°.
+  const t = (p.gapAngle * Math.PI) / 180
   interior(ctx, palette, p.detailWeight)
   for (let i = 0; i <= p.bagLines; i++) {
     const k = 1 + i * p.bagStep
     ctx.save()
     ctx.clip(outside(closed), 'evenodd')
-    // de las concéntricas extra solo se enseña la mitad de abajo, o se acumularían
-    // pliegues sobre el ojo
-    if (i > 0) {
-      const belowChord = new Path2D()
-      belowChord.rect(-4000, 0, 8000, 4000)
-      ctx.clip(belowChord)
+
+    // Cada arco en su propio Path2D: metidos en el mismo, el segundo arrastraría una
+    // recta desde donde acabó el primero.
+    const abajo = new Path2D()
+    abajo.ellipse(0, ecy, rx * k, ry * k, 0, t, Math.PI - t)
+    ctx.stroke(abajo)
+
+    if (i === 0) {
+      // arriba (el pliegue), solo la primera: si no, se acumulan pliegues sobre el ojo
+      const arriba = new Path2D()
+      arriba.ellipse(0, ecy, rx * k, ry * k, 0, Math.PI + t, Math.PI * 2 - t)
+      ctx.stroke(arriba)
     }
-    const ring = new Path2D()
-    ring.ellipse(0, ecy, rx * k, ry * k, 0, 0, Math.PI * 2)
-    ctx.stroke(ring)
     ctx.restore()
   }
 
@@ -152,9 +165,11 @@ function eye(ctx, cx, cy, p, palette, frame) {
 
   // ¿se están cortando los costados? El punto más ancho de la elipse tiene que quedar
   // por encima del arco. Si no, no hay interseccion que recortar y sale el aro cerrado.
+  // Con recorte angular el aro ya no puede cerrarse, así que el aviso solo aplica
+  // cuando el hueco se deja en cero y todo depende de la intersección.
   const R = (sag * sag + half * half) / (2 * sag)
   const arcYAt = (x) => Math.sqrt(Math.max(0, R * R - x * x)) - (R - sag)
-  return ecy < arcYAt(rx)
+  return p.gapAngle > 3 || ecy < arcYAt(rx)
 }
 
 mountPreview({
