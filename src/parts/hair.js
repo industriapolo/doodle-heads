@@ -133,7 +133,16 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
       // ny = 0 arriba de la región, 1 abajo. La barba nace difusa en la mejilla y
       // se cierra hacia la mandíbula: eso es lo que hace el degradado.
       const fadeZone = 1 - p.beardCoverage * 0.85
-      const densityAt = (_nx, ny) => (fadeZone <= 0.01 ? 1 : smoothstep(ny / fadeZone))
+      // Y no crece sobre la nariz. Es anatomía, no un parche: la alternativa —tapar la
+      // barba con un relleno de piel— fallaría sobre la sombra plana lateral de la cara,
+      // que se vería como un halo claro alrededor de la nariz.
+      const keep = limits.noseKeepOut
+      const densityAt = (nx, ny) => {
+        let d = fadeZone <= 0.01 ? 1 : smoothstep(ny / fadeZone)
+        if (keep && d > 0) d *= smoothstep(distanceToSegment(
+          region.x + nx * region.w, region.y + ny * region.h, keep) / keep.r - 1)
+        return d
+      }
 
       hatch(ctx, mask, region, {
         mode: p.beardMode,
@@ -332,6 +341,15 @@ function sidePath(headBox, faceBox, p, dir, fringeY, lean, rng) {
   path.lineTo(outerX + inward * w, top)
   path.closePath()
   return path
+}
+
+/** Distancia de un punto al eje de la nariz, para apagar la barba a su alrededor. */
+function distanceToSegment(px, py, s) {
+  const dx = s.x1 - s.x0
+  const dy = s.y1 - s.y0
+  const len2 = dx * dx + dy * dy || 1
+  const t = Math.max(0, Math.min(1, ((px - s.x0) * dx + (py - s.y0) * dy) / len2))
+  return Math.hypot(px - (s.x0 + t * dx), py - (s.y0 + t * dy))
 }
 
 function smoothstep(t) {

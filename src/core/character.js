@@ -61,9 +61,17 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   const browGeo = brows.build(faceBox, browsP)
   const browBottom = (browGeo.bottom - faceBox.y) / faceBox.h
 
+  // Reparto del ANCHO. El par de ojos llega a ocupar el 96% de la cara, así que no queda
+  // sitio físico para el pelo lateral y acaban montándose. Ceden primero los laterales,
+  // que son decorativos; el ojo solo se estrecha si el lateral ya está en su mínimo.
+  const eyesP0 = p('eyes')
+  const hairP = p('hair')
+  const room = 0.5 - eyesP0.spacing / 2 - SIDE_MARGIN
+  const sideWidth = Math.min(hairP.sideWidth, Math.max(MIN_SIDE, room - eyesP0.eyeWidth))
+  const eyesP = { ...eyesP0, eyeWidth: Math.min(eyesP0.eyeWidth, room - sideWidth) }
+
   // ojos: colgados de la ceja. Lo que se cuelga NO es la cuerda del ojo, es el punto
   // más alto del pliegue, que queda por encima. Lo calcula el propio módulo.
-  const eyesP = p('eyes')
   const eyesY = clamp(browBottom + eyesP.browGap + eyes.topExtent(faceBox, eyesP), 0.24, 0.64)
 
   // orejas: el borde de ARRIBA a la altura de los ojos, con margen para desviarse.
@@ -72,6 +80,33 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   const earsP = p('ears')
   const earsY = clamp(eyesY + ears.halfHeight(faceBox, earsP) + earsP.eyeAlign, 0.2, 0.72)
 
+  // La nariz se resuelve aquí, antes de dibujar nada, porque la BARBA necesita saber
+  // dónde cae para no crecerle encima.
+  //
+  // El descentrado mueve el arranque y la inclinación desvía la PUNTA, así que se suman:
+  // no basta con topar el arranque, hay que topar dónde acaba. Se despeja la inclinación
+  // que deja la punta dentro del hueco entre los ojos, y se permite la que corrige hacia
+  // el centro — de ahí que el rango sea asimétrico.
+  const noseP = p('nose')
+  const noseStart = clamp(browBottom, 0.12, 0.5)
+  const noseLen = Math.min(noseP.length, NOSE_MAX_END - noseStart)
+  const maxDrift = Math.max(0, eyesP.spacing / 2 - 0.015)
+  const offX = clamp(noseP.offsetX, -maxDrift, maxDrift)
+  const lenPx = faceBox.h * noseLen
+  const offPx = offX * faceBox.w
+  const driftPx = maxDrift * faceBox.w
+  const deg = (r) => (Math.atan(r) * 180) / Math.PI
+  const noseTilt = clamp(noseP.tilt, deg((-driftPx - offPx) / lenPx), deg((driftPx - offPx) / lenPx))
+
+  const noseTop = faceBox.y + faceBox.h * noseStart
+  const noseKeepOut = {
+    x0: faceBox.cx + offPx,
+    y0: noseTop,
+    x1: faceBox.cx + offPx + Math.tan((noseTilt * Math.PI) / 180) * lenPx,
+    y1: noseTop + lenPx,
+    r: Math.max(faceBox.w * 0.055, faceBox.w * noseP.hookWidth * 0.95),
+  }
+
   // 1. orejas — DETRÁS de la cabeza
   ears.draw(ctx, geo, { ...earsP, offsetY: earsY }, palette, rng.fork(2))
 
@@ -79,8 +114,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   head.paint(ctx, geo, headP, palette)
 
   // 3. pelo texturado y barba, recortados a la silueta y topados por la ceja
-  const hairP = p('hair')
-  hair.draw(ctx, geo, hairP, palette, rng.fork(3), { hairBottom: browGeo.top })
+  hair.draw(ctx, geo, hairP, palette, rng.fork(3), { hairBottom: browGeo.top, noseKeepOut })
 
   // 4. re-trazo del contorno: impide que el hatching se coma la silueta.
   //    Va aquí y no al final porque todo el hatching ya está puesto, y porque la masa
@@ -93,7 +127,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   brows.drawShadow(ctx, faceBox, browsP, palette, geo.path)
 
   // 6. masa de pelo: tapa la sombra de la ceja, pero no la ceja
-  hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
+  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(8), { hairBottom: browGeo.top })
 
   // 7. ojos
   const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(5))
@@ -105,26 +139,10 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    y con el largo al máximo, la nariz se salía del faceBox
   //  · el desplazamiento lateral se limita al hueco entre los ojos, o la vertical
   //    aterriza sobre el borde de uno
-  const noseP = p('nose')
-  const noseStart = clamp(browBottom, 0.12, 0.5)
-  const noseLen = Math.min(noseP.length, NOSE_MAX_END - noseStart)
-  const maxDrift = Math.max(0, eyesP.spacing / 2 - 0.015)
-  const offX = clamp(noseP.offsetX, -maxDrift, maxDrift)
-
-  // El descentrado mueve el arranque y la inclinación desvía la PUNTA, así que se suman.
-  // No basta con topar el arranque: hay que topar dónde acaba. Se despeja la inclinación
-  // que deja la punta dentro del hueco entre los ojos, y se permite la que corrige hacia
-  // el centro — de ahí que el rango sea asimétrico.
-  const lenPx = faceBox.h * noseLen
-  const driftPx = maxDrift * faceBox.w
-  const offPx = offX * faceBox.w
-  const deg = (r) => (Math.atan(r) * 180) / Math.PI
-  const tilt = clamp(noseP.tilt, deg((-driftPx - offPx) / lenPx), deg((driftPx - offPx) / lenPx))
-
   const noseGeo = nose.draw(
     ctx,
     faceBox,
-    { ...noseP, startY: noseStart, length: noseLen, offsetX: offX, tilt },
+    { ...noseP, startY: noseStart, length: noseLen, offsetX: offX, tilt: noseTilt },
     palette,
     rng.fork(6)
   )
@@ -169,6 +187,11 @@ export function paletteFor(character, fallback) {
 // Dónde puede acabar la nariz como muy abajo, en fracción de faceBox. Deja sitio para
 // su propia sombra, la boca y el hoyuelo sin que ninguno tenga que apretarse.
 const NOSE_MAX_END = 0.78
+
+// Reparto del ancho entre ojos y pelo lateral: margen de aire, y lo mínimo que puede
+// quedarse un lateral antes de que empiece a ceder el ojo.
+const SIDE_MARGIN = 0.02
+const MIN_SIDE = 0.05
 
 function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v
