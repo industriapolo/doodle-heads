@@ -28,6 +28,13 @@
     opacity: 0; transition: opacity .12s; pointer-events: none;
   }
   .cell:hover b { opacity: 1; }
+  .cell .fav {
+    position: absolute; right: 5px; top: 5px; font-size: 13px; line-height: 1;
+    color: #fff; background: rgba(0,0,0,.5); padding: 3px 6px; border-radius: 2px;
+    border: 0; cursor: pointer; opacity: 0; transition: opacity .12s;
+  }
+  .cell:hover .fav { opacity: 1; }
+  .cell .fav.on { opacity: 1; color: #ffd34d; }
   .hint { color: #6d7379; font-size: 11px; margin: 14px 0 0; }
 </style>
 
@@ -35,10 +42,12 @@
   <h1>doodle-heads</h1>
   <button id="regen">regenerar todos</button>
   <button id="pause">pausar</button>
+  <button id="saved">guardados: 0 · copiar</button>
   <span id="fps"></span>
 </header>
 <div id="grid"></div>
-<p class="hint">Click en un personaje = seed nueva solo para él. Pasa el ratón para ver su seed.</p>
+<p class="hint">Click en un personaje = seed nueva solo para él. Pasa el ratón para ver su seed
+  y guardarlo con la ★. «guardados · copiar» pone la lista en el portapapeles.</p>
 
 <script type="module">
 import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
@@ -58,32 +67,63 @@ try {
 } catch {}
 
 const fallback = getPalette('magenta')
-// Marco casi a sangre: respecto al 0.88 anterior las cabezas salen ~14% más grandes.
-// El 1% de margen deja sitio al vuelo del pelo; una cresta muy larga en una cabeza muy
-// alta puede rozar el borde, y está bien — mejor eso que aire alrededor de todas.
-const frame = box(LOGICAL * 0.005, LOGICAL * 0.005, LOGICAL * 0.99, LOGICAL * 0.99)
+// Marco al 0.95: cabezas ~8% más grandes que con el 0.88 original, pero con aire — al
+// 0.99 y con las cards a hueso, las cabezas de celdas vecinas quedaban pegadas y el
+// grid se leía como un solape.
+const frame = box(LOGICAL * 0.025, LOGICAL * 0.025, LOGICAL * 0.95, LOGICAL * 0.95)
 const gridEl = document.getElementById('grid')
 const actors = []
+
+// --- seeds guardados: la lista vive en localStorage, «copiar» la exporta ----
+const SAVED_KEY = 'doodle-seeds:saved'
+let savedSeeds = []
+try {
+  savedSeeds = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') || []
+} catch {}
+const savedBtn = document.getElementById('saved')
+
+function syncSaved() {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(savedSeeds))
+  savedBtn.textContent = `guardados: ${savedSeeds.length} · copiar`
+}
+
+savedBtn.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(JSON.stringify(savedSeeds))
+  savedBtn.textContent = `guardados: ${savedSeeds.length} · copiado ✓`
+  setTimeout(syncSaved, 900)
+})
 
 for (let i = 0; i < COUNT; i++) {
   const cell = document.createElement('div')
   cell.className = 'cell'
   const canvas = document.createElement('canvas')
   const tag = document.createElement('b')
-  cell.append(canvas, tag)
+  const fav = document.createElement('button')
+  fav.className = 'fav'
+  fav.textContent = '★'
+  cell.append(canvas, tag, fav)
   gridEl.append(cell)
 
-  const a = makeActor(randomSeed(), { canvas, tag, ctx: setupCanvas(canvas, CELL) })
+  const a = makeActor(randomSeed(), { canvas, tag, fav, ctx: setupCanvas(canvas, CELL) })
   reseed(a, a.seed)
   cell.addEventListener('click', () => reseed(a, randomSeed()))
+  fav.addEventListener('click', (e) => {
+    e.stopPropagation() // que guardar no re-sortee la cara
+    const hex = a.seed.toString(16)
+    savedSeeds = savedSeeds.includes(hex) ? savedSeeds.filter((s) => s !== hex) : [...savedSeeds, hex]
+    fav.classList.toggle('on', savedSeeds.includes(hex))
+    syncSaved()
+  })
   actors.push(a)
 }
+syncSaved()
 
 function reseed(a, seed) {
   a.seed = seed
   a.character = makeCharacter(seed, bands)
   a.palette = paletteFor(a.character, fallback)
   a.tag.textContent = seed.toString(16)
+  if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(seed.toString(16)))
   a.drawn = null // fuerza el repintado en el próximo frame
 }
 

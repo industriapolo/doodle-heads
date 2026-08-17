@@ -57,8 +57,11 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // La coherencia entre partes se resuelve aquí porque ningún módulo ve a los demás.
   // Y hay que resolverla antes de pintar nada: las orejas van en la primera capa pero
   // dependen de los ojos, que son de las últimas.
+  // El layout cuelga de las cejas SIN los canales de ánimo del rig: si el humor moviera
+  // browGeo, levantar una ceja arrastraría ojos, nariz y tope del pelo. El ánimo solo
+  // entra en el DIBUJO de la ceja (browsP, más abajo).
   const browsP = p('brows')
-  const browGeo = brows.build(faceBox, browsP)
+  const browGeo = brows.build(faceBox, character.brows)
   const browBottom = (browGeo.bottom - faceBox.y) / faceBox.h
 
   // Reparto del ANCHO. El par de ojos llega a ocupar el 96% de la cara, así que no queda

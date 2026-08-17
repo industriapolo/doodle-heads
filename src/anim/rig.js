@@ -6,6 +6,9 @@
 //  · el parpadeo dura ~120ms cada 2-7s, así que en un frame cualquiera hay una o dos
 //    caras animándose de treinta. Las demás se saltan enteras.
 //  · la mirada solo se mueve durante la transición, ~380ms cada 3-10s.
+//  · el ánimo (cejas) solo se mueve durante su transición, ~700ms cada 4-12s — y la
+//    mayoría de los cambios son VOLVER al neutro: el personaje vive alrededor de su
+//    expresión base y hace excursiones, no va saltando de mueca en mueca.
 //
 // La flotación se quitó: movía las cards y hacía que se solaparan entre sí.
 //
@@ -19,6 +22,17 @@ const BLINK_GAP = [2000, 7000] // entre parpadeos
 const BLINK_DUR = [100, 140] // lo que dura uno
 const GAZE_GAP = [3000, 10000]
 const GAZE_EASE = 380
+const MOOD_GAP = [4000, 12000] // entre cambios de ánimo
+const MOOD_EASE = 700 // las cejas se mueven despacio: rápido se lee como tic
+
+// Las excursiones de ánimo, en los dos canales de brows.js: grados de inclinación
+// (positivo = ceño) y subida en fracción de faceBox.h (negativo = cejas arriba).
+const MOODS = [
+  { tilt: [5, 12], lift: [0, 0.01] }, // ceño
+  { tilt: [-10, -5], lift: [0, 0.008] }, // caído
+  { tilt: [-4, 0], lift: [-0.03, -0.018] }, // sorpresa leve
+  { tilt: [-2, 2], lift: [-0.012, -0.006] }, // atención
+]
 
 /**
  * Estado de animación de un personaje. El desfase inicial sale de su seed: sin eso los
@@ -39,6 +53,11 @@ export function makeActor(seed, extra = {}) {
     gazeTo: 0,
     gazeAt: null,
     gazeNext: rng.range(0, GAZE_GAP[1]),
+    mood: { tilt: 0, lift: 0 },
+    moodFrom: null,
+    moodTo: null,
+    moodAt: null,
+    moodNext: rng.range(0, MOOD_GAP[1]),
     drawn: null,
   }
 }
@@ -86,6 +105,46 @@ export function advance(a, t) {
       a.gaze = a.gazeFrom + (a.gazeTo - a.gazeFrom) * easeInOut(phase)
     }
   }
+
+  // --- ánimo (cejas) ----------------------------------------------------
+  if (a.moodAt === null) {
+    if (t >= a.moodNext) {
+      const enNeutro = a.mood.tilt === 0 && a.mood.lift === 0
+      // desde una excursión casi siempre se vuelve al neutro; desde el neutro, a veces
+      // ni eso — el personaje se queda quieto y solo se reprograma el reloj
+      let target = null
+      if (!enNeutro) {
+        target = a.rng.next() < 0.75 ? { tilt: 0, lift: 0 } : moodTarget(a.rng)
+      } else if (a.rng.next() < 0.5) {
+        target = moodTarget(a.rng)
+      }
+      if (target) {
+        a.moodAt = t
+        a.moodFrom = a.mood
+        a.moodTo = target
+      } else {
+        a.moodNext = t + a.rng.range(...MOOD_GAP)
+      }
+    }
+  } else {
+    const phase = (t - a.moodAt) / MOOD_EASE
+    if (phase >= 1) {
+      a.mood = a.moodTo
+      a.moodAt = null
+      a.moodNext = t + a.rng.range(...MOOD_GAP)
+    } else {
+      const e = easeInOut(phase)
+      a.mood = {
+        tilt: a.moodFrom.tilt + (a.moodTo.tilt - a.moodFrom.tilt) * e,
+        lift: a.moodFrom.lift + (a.moodTo.lift - a.moodFrom.lift) * e,
+      }
+    }
+  }
+}
+
+function moodTarget(rng) {
+  const m = MOODS[Math.floor(rng.next() * MOODS.length)]
+  return { tilt: rng.range(...m.tilt), lift: rng.range(...m.lift) }
 }
 
 /**
@@ -106,7 +165,7 @@ export function startRig(actors, redraw) {
 
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
-      const sig = `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}`
+      const sig = `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|${a.mood.lift.toFixed(4)}`
       if (sig !== a.drawn) {
         a.drawn = sig
         redraw(a)
@@ -124,5 +183,8 @@ export function startRig(actors, redraw) {
 
 /** Los overrides que este actor le pasa a character.draw. */
 export function overridesFor(a) {
-  return { eyes: { blink: a.blink, pupilX: a.gaze } }
+  return {
+    eyes: { blink: a.blink, pupilX: a.gaze },
+    brows: { moodTilt: a.mood.tilt, moodLift: a.mood.lift },
+  }
 }

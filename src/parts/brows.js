@@ -32,12 +32,20 @@ export const PRESETS = {
 
 export const randomize = randomizerFor(PARAMS)
 
-/** Geometría sin dibujar. El pelo la necesita para saber dónde parar. */
+/**
+ * Geometría sin dibujar. El pelo la necesita para saber dónde parar.
+ *
+ * `moodTilt` (grados) y `moodLift` (fracción de faceBox.h, negativo = arriba) son los
+ * canales de ánimo del rig: se suman a la expresión BASE del personaje, así que cada
+ * cara deriva alrededor de su carácter, no de un neutro común. El rig los pasa solo al
+ * DIBUJO — el layout (de dónde cuelgan ojos y pelo) usa los params sin ánimo, porque
+ * levantar las cejas no puede mover los ojos de sitio.
+ */
 export function build(faceBox, p) {
   const preset = PRESETS[p.preset] || null
   // el tilt del preset marca la expresión; `tilt` es la variación individual encima
-  const tilt = (preset?.tilt ?? 0) + p.tilt
-  const offsetY = preset?.offsetY ?? p.offsetY
+  const tilt = (preset?.tilt ?? 0) + p.tilt + (p.moodTilt ?? 0)
+  const offsetY = (preset?.offsetY ?? p.offsetY) + (p.moodLift ?? 0)
 
   const gap = faceBox.w * p.gap
   // el par de cejas nunca puede desbordar la cabeza

@@ -14,7 +14,9 @@ export const PARAMS = {
   // La altura NO se sortea suelta: character.js la deriva de los ojos. Regla clásica de
   // proporción — el borde de arriba de la oreja a la altura de la línea de los ojos.
   // `eyeAlign` es el margen que se le permite desviarse, para que no salga monolítico.
-  eyeAlign: { min: -0.14, max: 0.14, range: [-0.03, 0.045], step: 0.005, label: 'Desvío sobre la línea de ojos' },
+  // Banda corta a propósito: con [-0.03, 0.045] las orejas bailaban demasiado respecto
+  // a los ojos y la regla dejaba de leerse.
+  eyeAlign: { min: -0.14, max: 0.14, range: [-0.012, 0.02], step: 0.005, label: 'Desvío sobre la línea de ojos' },
   offsetY: { min: 0.26, max: 0.68, range: [0.3, 0.59], step: 0.01, label: 'Altura (solo suelto)' },
   stretch: { min: 0.7, max: 1.8, range: [1, 1.6], step: 0.05, label: 'Alargamiento' },
   innerSize: { min: 0.2, max: 0.8, range: [0.2, 0.43], step: 0.01, label: 'Tamaño del oído' },
