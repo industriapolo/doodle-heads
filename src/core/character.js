@@ -13,6 +13,7 @@ import * as eyes from '../parts/eyes.js'
 import * as nose from '../parts/nose.js'
 import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
+import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
 import * as palettes from '../style/palettes.js'
 
@@ -35,6 +36,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     nose: nose.randomize(rng.fork(6), bands.nose),
     mouth: mouth.randomize(rng.fork(7), bands.mouth),
     chin: chin.randomize(rng.fork(9), bands.chin),
+    glasses: glasses.randomize(rng.fork(10), bands.glasses),
     palette: palettes.randomize(rng.fork(11), bands.palette),
   }
 }
@@ -94,7 +96,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   hair.drawMass(ctx, geo, hairP, palette, rng.fork(8), { hairBottom: browGeo.top })
 
   // 7. ojos
-  eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(5))
+  const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(5))
 
   // 8. nariz, arrancando en el entrecejo.
   //
@@ -137,7 +139,12 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     rng.fork(9)
   )
 
-  // 11. las CEJAS macizas, lo último de todo: nada se dibuja por encima de una ceja
+  // 11. gafas: DESPUÉS de la nariz, porque se apoyan en ella. Reciben la geometría de
+  //     los ojos en vez de recalcularla — si se colocaran solas, cualquier cambio en el
+  //     ojo las dejaría descuadradas.
+  glasses.draw(ctx, eyeGeo, geo.headBox, p('glasses'), palette)
+
+  // 12. las CEJAS macizas, lo último de todo: nada se dibuja por encima de una ceja
   brows.drawSlabs(ctx, faceBox, browsP, palette)
 
   return { geo, browGeo, noseGeo, mouthGeo }

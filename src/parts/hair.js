@@ -39,6 +39,15 @@ export const HAIR_PARAMS = {
   sideTaper: { min: 0, max: 1, range: [0.15, 0.8], step: 0.05, label: 'Estrechamiento' },
   sideburn: { min: 0, max: 0.45, range: [0.03, 0.26], step: 0.01, label: 'Patilla (bajo la oreja)' },
   sideJag: { min: 0, max: 0.09, range: [0, 0.008], step: 0.002, label: 'Dentado del borde interior' },
+  // Los tres acabados de flequillo salen de la MISMA linea base: `pico` es el zigzag de
+  // siempre, `curva` la arquea y quita las puas, y `curva-picos` arquea y deja puas
+  // cortas. No es geometria nueva, es modular dos numeros.
+  fringeShape: {
+    options: ['pico', 'curva', 'curva-picos'],
+    pool: { pico: 2, curva: 2, 'curva-picos': 2 },
+    label: 'Acabado del flequillo',
+  },
+  fringeBow: { min: 0, max: 0.22, range: [0.04, 0.12], step: 0.005, label: 'Arqueo del flequillo' },
   fringeSpikes: { min: 3, max: 18, range: [9, 16], step: 1, int: true, label: 'Nº de púas del flequillo' },
   fringeDepth: { min: 0, max: 0.22, range: [0.015, 0.07], step: 0.005, label: 'Profundidad de las púas' },
   topSpikes: { min: 3, max: 20, range: [5, 12], step: 1, int: true, label: 'Nº de picos de la silueta' },
@@ -46,6 +55,14 @@ export const HAIR_PARAMS = {
   // en las referencias la silueta de arriba es casi lisa con algún mechón suelto, y el
   // zigzag de verdad está en el flequillo. Con picos largos por defecto sale un punk.
   topSpikeDepth: { min: 0, max: 0.20, range: [0, 0.046], step: 0.002, label: 'Largo de los picos' },
+  // Pelos de punta en un solo lado. El bias multiplica el largo del pico segun donde
+  // caiga en el recorrido de la cupula, asi que la asimetria sale de un solo numero.
+  spikeSide: {
+    options: ['ambos', 'izquierda', 'derecha'],
+    pool: { ambos: 2, izquierda: 1, derecha: 1 },
+    label: 'Lado de los pelos de punta',
+  },
+  spikeAsym: { min: 0, max: 1, range: [0.6, 1], step: 0.05, label: 'Fuerza de la asimetría' },
   fringeShadow: { min: 0, max: 0.09, range: [0.015, 0.035], step: 0.002, label: 'Sombra proyectada' },
   parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
   partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
@@ -163,8 +180,13 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const spike = headBox.w * p.topSpikeDepth
   for (let i = 0; i <= n; i++) {
     const a = Math.PI - (i / n) * Math.PI // 180° → 0°
+    // i/n recorre la cúpula de izquierda a derecha: con eso se apagan los picos de un
+    // lado y quedan de punta solo en el otro
+    const nx = i / n
+    const lado = p.spikeSide === 'izquierda' ? 1 - nx : p.spikeSide === 'derecha' ? nx : 1
+    const bias = 1 - p.spikeAsym * (1 - lado * lado)
     // los índices impares salen disparados: eso es lo que hace la silueta de pico
-    const out = i % 2 === 1 ? spike * (0.55 + rng.next() * 0.9) : 0
+    const out = i % 2 === 1 ? spike * (0.55 + rng.next() * 0.9) * bias : 0
     const x = cx + Math.cos(a) * (halfW + out)
     const y = fringeY - Math.sin(a) * (domeH + out)
     if (i === 0) path.moveTo(x, y)
@@ -176,12 +198,16 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // sea más largo por las sienes que por el centro.
   const spikes = Math.max(2, Math.round(p.fringeSpikes))
   const depth = faceBox.h * p.fringeDepth
-  const steps = spikes * 2
+  // `curva` arquea la línea base y apaga las púas; `curva-picos` arquea y las deja
+  // cortas. En modo curva hacen falta más tramos o el arco se ve poligonal.
+  const bow = p.fringeShape === 'pico' ? 0 : faceBox.h * p.fringeBow
+  const spikeMul = p.fringeShape === 'curva' ? 0 : p.fringeShape === 'curva-picos' ? 0.42 : 1
+  const steps = p.fringeShape === 'curva' ? Math.max(spikes * 2, 28) : spikes * 2
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
     const edge = (2 * t - 1) ** 2 // 1 en los bordes, 0 en el centro
-    const base = fringeY + (sideY - fringeY) * edge
-    const tip = i % 2 === 1 ? depth * (0.6 + rng.next() * 0.8) : -depth * 0.12
+    const base = fringeY + (sideY - fringeY) * edge + bow * (1 - edge)
+    const tip = i % 2 === 1 ? depth * spikeMul * (0.6 + rng.next() * 0.8) : -depth * spikeMul * 0.12
     path.lineTo(cx + (t * 2 - 1) * halfW, base + tip)
   }
 

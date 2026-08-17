@@ -22,7 +22,9 @@ export const PARAMS = {
   // 0° = el rizo entra en tangente y la esquina desaparece. Es el error que había que
   // corregir: la horizontal tiene que QUEBRAR antes de subir.
   curlCorner: { min: 0, max: 80, range: [32, 52], step: 2, unit: '°', label: 'Ángulo de la esquina' },
-  shadowSize: { min: 0, max: 1.2, range: [0.3, 0.5], step: 0.05, label: 'Sombra bajo la horizontal' },
+  // PROFUNDIDAD de la sombra, no su ancho: el ancho va clavado al de la horizontal.
+  // Como fraccion del gancho salia mas estrecha que la nariz y ademas variable.
+  shadowDepth: { min: 0, max: 1.2, range: [0.45, 0.7], step: 0.05, label: 'Hondura de la sombra' },
   offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
   tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
   lineWeight: { min: 0.5, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Grosor de línea' },
@@ -50,10 +52,14 @@ export function draw(ctx, faceBox, p, palette, rng) {
   const px = bx + dir * hw // la esquina: punto más bajo y más externo del gancho
 
   // --- sombra plana bajo la horizontal, antes que la línea -----------------
-  const sr = hw * p.shadowSize
-  if (sr > 1) {
+  // Media elipse, no medio círculo: el ancho lo fija la horizontal —de xFar a px— y solo
+  // la hondura es ajustable. Con un círculo el ancho dependía del radio y la sombra no
+  // coincidía nunca con la nariz.
+  const srx = Math.abs(px - xFar) / 2
+  const sry = srx * p.shadowDepth
+  if (sry > 0.5) {
     const shadow = new Path2D()
-    shadow.arc((xFar + px) / 2, y1, sr, 0, Math.PI, false) // semicírculo hacia abajo
+    shadow.ellipse((xFar + px) / 2, y1, srx, sry, 0, 0, Math.PI, false)
     shadow.closePath()
     ctx.fillStyle = palette.skinShadow
     ctx.fill(shadow)
@@ -89,5 +95,5 @@ export function draw(ctx, faceBox, p, palette, rng) {
   interior(ctx, palette, p.lineWeight)
   ctx.stroke(path)
 
-  return { tipX: bx, tipY: y1, endY: y1 + (sr > 1 ? sr : 0) }
+  return { tipX: bx, tipY: y1, endY: y1 + Math.max(0, sry) }
 }

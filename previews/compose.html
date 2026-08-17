@@ -11,6 +11,7 @@ import * as eyes from '../src/parts/eyes.js'
 import * as nose from '../src/parts/nose.js'
 import * as mouth from '../src/parts/mouth.js'
 import * as chin from '../src/parts/chin.js'
+import * as glasses from '../src/parts/glasses.js'
 import * as palettes from '../src/style/palettes.js'
 
 const without = (params, ...drop) =>
@@ -29,6 +30,7 @@ const WEIGHTS = {
   'nose.lineWeight': pick(nose, 'lineWeight', 'Nariz'),
   'mouth.lineWeight': pick(mouth, 'lineWeight', 'Boca'),
   'chin.lineWeight': pick(chin, 'lineWeight', 'Hoyuelo de barbilla'),
+  'glasses.lineWeight': pick(glasses, 'lineWeight', 'Gafas'),
   'hair.hairWeight': pick(hair, 'hairWeight', 'Rayita del pelo'),
   'hair.beardWeight': pick(hair, 'beardWeight', 'Rayita de la barba'),
 }
@@ -49,6 +51,7 @@ mountPreview({
     { name: 'nose',  label: 'Nariz', params: without(nose.PARAMS, 'lineWeight') },
     { name: 'mouth', label: 'Boca', params: without(mouth.PARAMS, 'lineWeight') },
     { name: 'chin',  label: 'Hoyuelo de barbilla', params: without(chin.PARAMS, 'lineWeight') },
+    { name: 'glasses', label: 'Gafas', params: without(glasses.PARAMS, 'lineWeight') },
     // `offsetY` no sale: al componer, la altura de la oreja la deriva character.js de
     // la de los ojos. Lo que se ajusta aquí es el margen de desvío.
     { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight', 'offsetY') },
