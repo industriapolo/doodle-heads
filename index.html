@@ -17,9 +17,11 @@
   }
   button:hover { background: #363b42; }
   #fps { margin-left: auto; color: #6d7379; font-size: 11px; font-variant-numeric: tabular-nums; }
-  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  /* Cards a hueso: sin gap, sin radio — con esquinas redondeadas asomarían rendijas de
+     fondo entre celdas contiguas. El tamaño de celda puede variar; los huecos no. */
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   .cell { position: relative; cursor: pointer; aspect-ratio: 1; }
-  .cell canvas { display: block; width: 100%; height: 100%; border-radius: 4px; will-change: transform; }
+  .cell canvas { display: block; width: 100%; height: 100%; }
   .cell b {
     position: absolute; left: 5px; bottom: 5px; font-size: 9px; font-weight: 400;
     color: #fff; background: rgba(0,0,0,.5); padding: 2px 5px; border-radius: 2px;
@@ -56,7 +58,10 @@ try {
 } catch {}
 
 const fallback = getPalette('magenta')
-const frame = box(LOGICAL * 0.06, LOGICAL * 0.06, LOGICAL * 0.88, LOGICAL * 0.88)
+// Marco casi a sangre: respecto al 0.88 anterior las cabezas salen ~14% más grandes.
+// El 1% de margen deja sitio al vuelo del pelo; una cresta muy larga en una cabeza muy
+// alta puede rozar el borde, y está bien — mejor eso que aire alrededor de todas.
+const frame = box(LOGICAL * 0.005, LOGICAL * 0.005, LOGICAL * 0.99, LOGICAL * 0.99)
 const gridEl = document.getElementById('grid')
 const actors = []
 

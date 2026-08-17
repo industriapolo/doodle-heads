@@ -129,8 +129,15 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    si no, desborda por los lados de la ceja y se ve encima del pelo.
   brows.drawShadow(ctx, faceBox, browsP, palette, geo.path)
 
-  // 6. masa de pelo: tapa la sombra de la ceja, pero no la ceja
-  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(8), { hairBottom: browGeo.top })
+  // 6. masas de pelo y barba: tapan la sombra de la ceja, pero no la ceja. La barba de
+  //    masa necesita la nariz (anatomía) y el borde bajo de la oreja (vuela por fuera
+  //    de la silueta y sin tope pintaría sobre el lóbulo).
+  const earBottom = faceBox.y + faceBox.h * (earsY + ears.halfHeight(faceBox, earsP))
+  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(8), {
+    hairBottom: browGeo.top,
+    noseKeepOut,
+    earBottom,
+  })
 
   // 7. ojos
   const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(5))

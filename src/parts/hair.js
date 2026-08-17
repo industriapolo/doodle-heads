@@ -11,7 +11,7 @@
 // La barba, aparte, tiene su propio modo — no comparte dirección con el pelo.
 
 import { hatch } from '../style/hatching.js'
-import { roundedRectPath } from '../style/stroke.js'
+import { roundedRectPath, shellBetween } from '../style/stroke.js'
 import { randomizerFor } from '../core/params.js'
 
 export const HAIR_PARAMS = {
@@ -80,10 +80,17 @@ export const HAIR_PARAMS = {
 // de barba (valores negativos), que es como crece de verdad — abriéndose desde la cara
 // hacia la mandíbula.
 export const BEARD_PARAMS = {
+  // Dos estilos: `rayitas` es el hatching de siempre; `masa` es tinta plana como el
+  // pelo — un casquete de la mandíbula cerrado por un borde superior dentado.
+  beardStyle: {
+    options: ['rayitas', 'masa'],
+    pool: { rayitas: 3, masa: 2 },
+    label: 'Estilo',
+  },
   beardMode: {
     options: ['radial', 'directional'],
     pool: { radial: 1, directional: 2 },
-    label: 'Modo',
+    label: 'Modo (rayitas)',
   },
   beardCoverage: { min: 0, max: 1, range: [0, 0.95], step: 0.01, label: 'Cobertura' },
   beardTop: { min: 0.45, max: 0.95, range: [0.52, 0.82], step: 0.01, label: 'Arranque' },
@@ -91,6 +98,11 @@ export const BEARD_PARAMS = {
   beardAngle: { min: -60, max: 60, range: [-12, 10], step: 1, unit: '°', label: 'Ángulo (directional)' },
   beardOriginY: { min: -3, max: 2, range: [-1.3, -0.35], step: 0.05, label: 'Origen radial Y' },
   beardWeight: { min: 0.4, max: 8, range: [2.2, 2.2], step: 0.1, label: 'Grosor de rayita' },
+
+  // --- masa (beardStyle: masa) ---
+  beardOverhang: { min: 0, max: 0.08, range: [0.005, 0.03], step: 0.005, label: 'Vuelo sobre la mandíbula' },
+  beardJags: { min: 4, max: 24, range: [10, 18], step: 1, int: true, label: 'Nº de dientes del borde' },
+  beardJagDepth: { min: 0, max: 0.1, range: [0.02, 0.05], step: 0.005, label: 'Profundidad del dentado' },
 }
 
 export const PARAMS = { ...HAIR_PARAMS, ...BEARD_PARAMS }
@@ -125,7 +137,9 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
     }
   }
 
-  if (p.beardCoverage > 0.05 && p.beardDensity > 0.02) {
+  // La barba de rayitas solo si el estilo es rayitas: la de masa se pinta en drawMass,
+  // en la capa de masas, porque vuela por fuera de la mandíbula como el pelo del cráneo.
+  if (p.beardStyle !== 'masa' && p.beardCoverage > 0.05 && p.beardDensity > 0.02) {
     const top = faceBox.y + faceBox.h * p.beardTop
     const region = { x: headBox.x, y: top, w: headBox.w, h: headBox.bottom - top }
     if (region.h > 4) {
@@ -162,22 +176,35 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
 }
 
 /**
- * La masa de pelo. Se pinta APARTE y por encima del re-trazo del contorno, porque
- * sobresale del cráneo: si el contorno de la cabeza se dibujara después, le cruzaría
- * una línea por encima que en las referencias no existe.
+ * Las masas: pelo y barba de tinta plana. Se pintan APARTE y por encima del re-trazo
+ * del contorno, porque sobresalen de la silueta: si el contorno de la cabeza se dibujara
+ * después, les cruzaría una línea por encima que en las referencias no existe.
+ *
+ * Las dos son casquetes del contorno real de la cabeza (shellBetween sobre pts + radii):
+ * el pelo por la coronilla, la barba por la mandíbula. Nada aproxima la silueta — se
+ * hereda, así que encajan con cualquier radio de esquina y cualquier asimetría.
  *
  * Sin contorno propio, como las cejas: es tinta plana.
  */
 export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
-  if (p.mode !== 'solid') return null
   const { headBox, faceBox } = geo
+
+  // La barba va primero: los laterales del pelo (la patilla) caen encima y, como son la
+  // misma tinta, se funden en una sola forma.
+  const beard =
+    p.beardStyle === 'masa' && p.beardCoverage > 0.05 ? beardMassPath(geo, p, rng, limits) : null
+  if (beard) {
+    ctx.fillStyle = palette.solid
+    ctx.fill(beard)
+  }
+
+  if (p.mode !== 'solid') return beard ? { beard } : null
 
   // El vuelo incluye el desplazamiento de la asimetría, y la cúpula se mueve con él:
   // si no, el pelo se queda corto por el lado hacia el que se inclina la cabeza.
   const lean = geo.lean || 0
   const o = headBox.w * p.overhang + Math.abs(lean)
   const cx = headBox.cx + lean
-  const halfW = headBox.w / 2 + o
   const topY = headBox.y - o
 
   // El flequillo no puede llegar a la ceja. La masa y las cejas son la MISMA tinta, así
@@ -204,38 +231,48 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const baseline = (u) =>
     fringeY + (sideY - fringeY) * u ** 4 + bow * (1 - u * u) + tilt * u
 
-  // El alto de la cúpula se mide desde el CENTRO de esa base, no desde `fringeY`.
-  // Midiéndolo desde fringeY, la curva y el barrido bajaban también el punto más alto
-  // —hasta 80 unidades— y el pelo dejaba la coronilla al aire. La base manda en los
-  // extremos, donde empalma con el flequillo; arriba manda la cabeza.
-  const domeH = baseline(0) - topY
-  if (domeH <= 2) return null
+  // Costuras: donde la línea base toca los lados del casquete. Con tope por arriba —
+  // que un barrido extremo no suba una costura por encima de la coronilla y deje al
+  // casquete sin donde cortar — y por abajo, que no invadan la zona de mandíbula.
+  const seam = (u) =>
+    Math.min(Math.max(baseline(u), headBox.y + o + 6), headBox.y + headBox.h * 0.72)
+  const crown = shellBetween(geo.pts, geo.radii, o, seam(-1), seam(1), 'crown')
+  if (!crown) return beard ? { beard } : null
 
   const path = new Path2D()
 
-  // --- silueta superior: elipse muestreada con picos alternos -------------
+  // --- silueta superior: el casquete remuestreado, con picos alternos ------
+  // Los picos salen sobre la NORMAL local del casquete: verticales en la coronilla,
+  // tumbados en las sienes, igual que crece el pelo.
   const n = Math.max(4, Math.round(p.topSpikes) * 2)
   const spike = headBox.w * p.topSpikeDepth
+  const dome = resample(crown, n)
   for (let i = 0; i <= n; i++) {
-    const a = Math.PI - (i / n) * Math.PI // 180° → 0°
-    // i/n recorre la cúpula de izquierda a derecha: con eso se apagan los picos de un
-    // lado y quedan de punta solo en el otro
-    const nx = i / n
-    const lado = p.spikeSide === 'izquierda' ? 1 - nx : p.spikeSide === 'derecha' ? nx : 1
-    const bias = 1 - p.spikeAsym * (1 - lado * lado)
-    // los índices impares salen disparados: eso es lo que hace la silueta de pico
-    const out = i % 2 === 1 ? spike * (0.55 + rng.next() * 0.9) * bias : 0
-    // la cúpula cuelga de la misma línea base, así que sus extremos caen exactamente
-    // donde arranca el flequillo y el contorno cierra sin costura
-    const x = cx + Math.cos(a) * (halfW + out)
-    const y = baseline(Math.cos(a)) - Math.sin(a) * (domeH + out)
+    let { x, y } = dome[i]
+    if (i % 2 === 1) {
+      // i/n recorre la cúpula de izquierda a derecha: con eso se apagan los picos de
+      // un lado y quedan de punta solo en el otro
+      const nx = i / n
+      const lado = p.spikeSide === 'izquierda' ? 1 - nx : p.spikeSide === 'derecha' ? nx : 1
+      const bias = 1 - p.spikeAsym * (1 - lado * lado)
+      // los índices impares salen disparados: eso es lo que hace la silueta de pico
+      const out = spike * (0.55 + rng.next() * 0.9) * bias
+      const A = dome[i - 1]
+      const B = dome[i + 1]
+      const tl = Math.hypot(B.x - A.x, B.y - A.y) || 1
+      x += ((B.y - A.y) / tl) * out
+      y += (-(B.x - A.x) / tl) * out
+    }
     if (i === 0) path.moveTo(x, y)
     else path.lineTo(x, y)
   }
 
   // --- flequillo: zigzag de púas hacia la frente, de derecha a izquierda ---
   // La línea base cae hacia los lados (parábola), que es lo que hace que el pelo
-  // sea más largo por las sienes que por el centro.
+  // sea más largo por las sienes que por el centro. Corre exactamente entre las dos
+  // costuras del casquete, así que el contorno cierra sin salto.
+  const xL = dome[0].x
+  const xR = dome[n].x
   const spikes = Math.max(2, Math.round(p.fringeSpikes))
   const depth = faceBox.h * p.fringeDepth
   // `curva` arquea la línea base y apaga las púas; `curva-picos` arquea y las deja
@@ -245,7 +282,9 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
     const u = 2 * t - 1 // -1 izquierda, 0 centro, +1 derecha
-    const base = baseline(u)
+    // la base nunca sube por encima del vuelo del casquete: si lo hiciera, la masa
+    // se invertiría en ese tramo y el relleno se agujerea
+    const base = Math.max(baseline(u), topY + 4)
     // Las púas se concentran en un lado, como los picos de la silueta, en vez de
     // repartirse por igual: en las referencias son dos o tres grandes, no una fila.
     const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1 // eslint-disable-line
@@ -254,7 +293,7 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
       i % 2 === 1
         ? depth * spikeMul * bias * (0.6 + rng.next() * 0.8)
         : -depth * spikeMul * bias * 0.12
-    path.lineTo(cx + (t * 2 - 1) * halfW, base + tip)
+    path.lineTo((xL + xR) / 2 + (u * (xR - xL)) / 2, base + tip)
   }
 
   path.closePath()
@@ -298,7 +337,7 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     const a = (p.partingAngle * Math.PI) / 180
     const r = headBox.w * 2
     const px = cx + Math.sin(a) * headBox.w * 0.12
-    const py = topY + domeH * 0.35
+    const py = topY + Math.max(baseline(0) - topY, 8) * 0.35
     const wedge = new Path2D()
     wedge.moveTo(px, py)
     wedge.lineTo(px + Math.cos(a - 0.35) * r, py + Math.sin(a - 0.35) * r)
@@ -309,7 +348,65 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     ctx.restore()
   }
 
-  return { path, sides, fringeY, sideY }
+  return { path, sides, fringeY, sideY, beard }
+}
+
+/**
+ * La barba de masa: casquete de la mandíbula (con su propio vuelo) cerrado por un borde
+ * superior dentado con los dientes hacia arriba, hacia el pómulo. La boca y la nariz se
+ * dibujan en capas posteriores, así que quedan SOBRE la barba, como en las referencias.
+ */
+function beardMassPath(geo, p, rng, limits) {
+  const { headBox, faceBox } = geo
+  const ob = headBox.w * p.beardOverhang
+
+  // El arranque no puede subir a la nariz ni a la oreja: la nariz porque es anatomía
+  // (mismo criterio que la barba de rayitas), y la oreja porque la masa vuela por fuera
+  // de la silueta — sin este tope pintaría tinta plana sobre el lóbulo.
+  let top = faceBox.y + faceBox.h * p.beardTop
+  if (limits.noseKeepOut) top = Math.max(top, limits.noseKeepOut.y1 + faceBox.h * 0.02)
+  if (limits.earBottom) top = Math.max(top, limits.earBottom + faceBox.h * 0.01)
+  if (top > headBox.bottom - faceBox.h * 0.06) return null // no queda mandíbula
+
+  const jaw = shellBetween(geo.pts, geo.radii, ob, top, top, 'jaw')
+  if (!jaw) return null
+
+  const path = new Path2D()
+  const xl = jaw[jaw.length - 1].x
+  const xr = jaw[0].x
+  const jags = Math.max(2, Math.round(p.beardJags))
+  const depth = faceBox.h * p.beardJagDepth
+  const steps = jags * 2
+  path.moveTo(xl, top)
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const tip = i === steps ? 0 : i % 2 === 1 ? -depth * (0.55 + rng.next() * 0.9) : depth * 0.08
+    path.lineTo(xl + (xr - xl) * t, top + tip)
+  }
+  // y la mandíbula inflada de vuelta, de derecha a izquierda por la barbilla
+  for (const q of jaw) path.lineTo(q.x, q.y)
+  path.closePath()
+  return path
+}
+
+/** Remuestrea una polilínea a n tramos iguales por longitud de arco (n+1 puntos). */
+function resample(poly, n) {
+  const L = [0]
+  for (let i = 1; i < poly.length; i++)
+    L.push(L[i - 1] + Math.hypot(poly[i].x - poly[i - 1].x, poly[i].y - poly[i - 1].y))
+  const total = L[L.length - 1]
+  const out = []
+  let j = 0
+  for (let i = 0; i <= n; i++) {
+    const t = (total * i) / n
+    while (j < poly.length - 2 && L[j + 1] < t) j++
+    const f = (t - L[j]) / (L[j + 1] - L[j] || 1)
+    out.push({
+      x: poly[j].x + (poly[j + 1].x - poly[j].x) * f,
+      y: poly[j].y + (poly[j + 1].y - poly[j].y) * f,
+    })
+  }
+  return out
 }
 
 /**

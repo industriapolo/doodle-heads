@@ -119,12 +119,23 @@ así una cúpula alta añade frente en vez de empujar la cara hacia abajo.
 ### Orden de capas
 
 ```
-bg → orejas → relleno cabeza → sombra plana → hatching superficie/pelo
-   → barba → cejas → ojos → nariz → boca+cigarro → RE-TRAZO del contorno
+bg → orejas → relleno cabeza → sombra plana → hatching pelo/barba de rayitas
+   → RE-TRAZO del contorno → sombra de cejas → masas (barba y pelo planos)
+   → ojos → nariz → boca+cigarro → hoyuelo → gafas → cejas macizas
 ```
 
-Las orejas van **detrás** de la cabeza. El re-trazo final del contorno impide que el hatching
-se coma la silueta.
+Las orejas van **detrás** de la cabeza. El re-trazo del contorno impide que el hatching se
+coma la silueta, y va ANTES de las masas: masas y patillas sobresalen de la silueta a
+propósito y el contorno no puede cruzarles por encima.
+
+### Masas de pelo y barba
+
+Son **casquetes del contorno real de la cabeza** (`shellBetween` en `src/style/stroke.js`,
+sobre los `pts` + `radii` que expone `head.build`): el pelo por la coronilla cerrado por el
+flequillo, la barba por la mandíbula cerrada por un dentado. Nada aproxima la silueta con
+otra forma — se hereda, y así encaja con cualquier radio de esquina y cualquier asimetría.
+La historia de por qué (dos generaciones de fallos con una cúpula elíptica) está en
+`HANDOFF-pelo.md`.
 
 ## Decisiones de estilo cerradas
 

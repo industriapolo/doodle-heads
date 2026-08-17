@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
+import * as head from '../src/parts/head.js'
+import * as hair from '../src/parts/hair.js'
+import * as palettes from '../src/style/palettes.js'
+
+// Preview del PELO: personajes completos (el pelo no se puede juzgar sin cara debajo),
+// pero el panel solo expone cabeza, pelo y barba. El resto de rasgos sale de sus bandas
+// declaradas — ruido visual constante, variables bajo control.
+mountPreview({
+  title: 'hair',
+  groups: [
+    { name: 'palette', label: 'Color', params: palettes.PARAMS },
+    { name: 'head', label: 'Cabeza', params: head.PARAMS },
+    { name: 'hair', label: 'Pelo', params: hair.HAIR_PARAMS },
+    { name: 'beard', label: 'Barba', params: hair.BEARD_PARAMS, bandKey: 'hair' },
+  ],
+  onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
+  draw(ctx, frame, bands, fallback, rng, seed) {
+    const character = makeCharacter(seed, bands)
+    const pal = paletteFor(character, fallback)
+    ctx.fillStyle = pal.bg
+    ctx.fillRect(0, 0, 800, 800)
+    draw(ctx, frame, character, pal)
+  },
+  inset: 0.06,
+  refs: [
+    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+    '../referencias/tumblr_n5m7rycInM1qbb5vqo1_1280.jpg',
+  ],
+})
+</script>

@@ -58,7 +58,11 @@ export function build(frame, p) {
     { x, y: y + h - chin },                   // arranque del chaflán izq
   ]
 
-  const path = roundedPolyPath(pts, [rTopL, rTopR, rBot * 1.4, rBot, rBot, rBot * 1.4])
+  // Los radios van con la geometría: las masas de pelo y barba se construyen como
+  // casquetes de ESTE contorno (shellBetween sobre pts + radii), no como formas que
+  // lo aproximen — así encajan por construcción con cualquier radio y asimetría.
+  const radii = [rTopL, rTopR, rBot * 1.4, rBot, rBot, rBot * 1.4]
+  const path = roundedPolyPath(pts, radii)
 
   const headBox = box(x, y, w, h)
 
@@ -70,7 +74,7 @@ export function build(frame, p) {
   // `lean` es lo que la asimetría desplaza el borde superior. El pelo lo necesita: su
   // caja es headBox, que NO se entera del desplazamiento, así que por el lado hacia el
   // que se inclina la cabeza quedaba una franja de piel sin cubrir.
-  return { path, headBox, faceBox, pts, lean: a }
+  return { path, headBox, faceBox, pts, radii, lean: a }
 }
 
 /** Pinta a partir de geometría ya calculada. character.js la necesita antes de dibujar. */

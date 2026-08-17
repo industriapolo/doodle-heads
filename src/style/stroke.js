@@ -96,6 +96,99 @@ export function roundedRectPath(x, y, w, h, radii) {
   return roundedPolyPath(pts, radii)
 }
 
+// ---------------------------------------------------------------------------
+// Casquetes del contorno
+// ---------------------------------------------------------------------------
+
+/**
+ * El tramo de un polígono redondeado desplazado `o` hacia fuera que va de la costura
+ * izquierda (altura `yL`) a la derecha (`yR`): por arriba (`crown`) o por abajo (`jaw`).
+ *
+ * Es la primitiva de las masas de pelo y barba: al derivarse de los MISMOS puntos y
+ * radios que dibujan la silueta, encajan por construcción con cualquier radio de esquina
+ * y cualquier asimetría — aproximarla con una elipse dejaba esquinas de cráneo asomando.
+ *
+ * Devuelve una polilínea ordenada — crown: izquierda → derecha; jaw: derecha → izquierda
+ * pasando por la barbilla (el sentido horario del contorno en ambos casos) — o `null` si
+ * alguna costura no corta el contorno.
+ */
+export function shellBetween(pts, radii, o, yL, yR, part = 'crown') {
+  const loop = offsetLoop(pts, radii, o)
+  const m = loop.length
+  // costura izquierda: primer cruce de yL subiendo desde la barbilla por el lado
+  // izquierdo. Costura derecha: último cruce de yR bajando por el derecho.
+  let iL = -1
+  let iR = -1
+  for (let i = 0; i < m - 1 && iL < 0; i++) if (loop[i].y >= yL && loop[i + 1].y < yL) iL = i
+  for (let i = m - 1; i > 0 && iR < 0; i--) if (loop[i].y >= yR && loop[i - 1].y < yR) iR = i
+  if (iL < 0 || iR < 0 || iL >= iR) return null
+
+  const cut = (A, B, y) => ({ x: A.x + ((B.x - A.x) * (y - A.y)) / (B.y - A.y || 1), y })
+  if (part === 'crown') {
+    const out = [cut(loop[iL], loop[iL + 1], yL)]
+    for (let i = iL + 1; i < iR; i++) out.push(loop[i])
+    out.push(cut(loop[iR], loop[iR - 1], yR))
+    return out
+  }
+  const out = [cut(loop[iR], loop[iR - 1], yR)]
+  for (let i = iR; i < m; i++) out.push(loop[i])
+  for (let i = 0; i <= iL; i++) out.push(loop[i])
+  out.push(cut(loop[iL], loop[iL + 1], yL))
+  return out
+}
+
+/**
+ * La silueta completa desplazada `o`, como polilínea cerrada. Cada esquina se desplaza
+ * sobre su círculo real — mismo centro, radio + o — con la misma tangencia y el mismo
+ * clamp de radio que aplica `arcTo` dentro de roundedPolyPath. Las aristas no hace falta
+ * muestrearlas: entre el final de un arco y el principio del siguiente son rectas.
+ *
+ * El lazo se rota para empezar en su punto más bajo (la barbilla), de modo que el
+ * recorrido horario sea barbilla → lado izquierdo → coronilla → lado derecho.
+ */
+function offsetLoop(pts, radii, o) {
+  const n = pts.length
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const V = pts[i]
+    const P = pts[(i - 1 + n) % n]
+    const N = pts[(i + 1) % n]
+    const c = cornerArc(P, V, N, Array.isArray(radii) ? radii[i] ?? 0 : radii)
+    const a1 = edgeNormalAngle(P, V)
+    const a2 = edgeNormalAngle(V, N)
+    let delta = a2 - a1
+    while (delta <= -Math.PI) delta += Math.PI * 2
+    while (delta > Math.PI) delta -= Math.PI * 2
+    const R = c.r + o
+    const steps = Math.max(2, Math.ceil((Math.abs(delta) * R) / 7))
+    for (let k = 0; k <= steps; k++) {
+      const a = a1 + (delta * k) / steps
+      out.push({ x: c.x + Math.cos(a) * R, y: c.y + Math.sin(a) * R })
+    }
+  }
+  let lo = 0
+  for (let i = 1; i < out.length; i++) if (out[i].y > out[lo].y) lo = i
+  return out.slice(lo).concat(out.slice(0, lo))
+}
+
+/** Círculo del redondeo del vértice V entre sus vecinos P y N: { x, y, r } del arco real. */
+function cornerArc(P, V, N, r) {
+  const l1 = dist(P, V)
+  const l2 = dist(V, N)
+  const rr = Math.max(0, Math.min(r, Math.min(l1, l2) / 2))
+  const d1 = { x: (P.x - V.x) / l1, y: (P.y - V.y) / l1 }
+  const d2 = { x: (N.x - V.x) / l2, y: (N.y - V.y) / l2 }
+  const half = Math.acos(Math.max(-1, Math.min(1, d1.x * d2.x + d1.y * d2.y))) / 2
+  const bl = Math.hypot(d1.x + d2.x, d1.y + d2.y) || 1
+  const dd = rr / Math.sin(half)
+  return { x: V.x + ((d1.x + d2.x) / bl) * dd, y: V.y + ((d1.y + d2.y) / bl) * dd, r: rr }
+}
+
+/** Ángulo de la normal exterior de la arista A→B (polígono horario, y hacia abajo). */
+function edgeNormalAngle(A, B) {
+  return Math.atan2(-(B.x - A.x), B.y - A.y)
+}
+
 /** Traza una polilínea abierta suavizada por curvas cuadráticas (párpados, arrugas). */
 export function smoothPath(pts) {
   const path = new Path2D()

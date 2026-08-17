@@ -6,8 +6,8 @@
 //  · el parpadeo dura ~120ms cada 2-7s, así que en un frame cualquiera hay una o dos
 //    caras animándose de treinta. Las demás se saltan enteras.
 //  · la mirada solo se mueve durante la transición, ~380ms cada 3-10s.
-//  · la flotación NO repinta nada: es un desplazamiento rígido de todo el dibujo, así
-//    que va por transform de CSS y le cuesta cero al canvas.
+//
+// La flotación se quitó: movía las cards y hacía que se solaparan entre sí.
 //
 // Cachear capas estáticas en offscreen seguirá haciendo falta cuando entre el humo, que
 // sí cambia cada frame. Pero mientras el estilo se está afinando sale caro: obligaría a
@@ -19,8 +19,6 @@ const BLINK_GAP = [2000, 7000] // entre parpadeos
 const BLINK_DUR = [100, 140] // lo que dura uno
 const GAZE_GAP = [3000, 10000]
 const GAZE_EASE = 380
-const FLOAT_PERIOD = [3000, 5000]
-const FLOAT_AMP = [0.008, 0.02] // fracción de la altura de celda
 
 /**
  * Estado de animación de un personaje. El desfase inicial sale de su seed: sin eso los
@@ -41,9 +39,6 @@ export function makeActor(seed, extra = {}) {
     gazeTo: 0,
     gazeAt: null,
     gazeNext: rng.range(0, GAZE_GAP[1]),
-    floatAmp: rng.range(...FLOAT_AMP),
-    floatPeriod: rng.range(...FLOAT_PERIOD),
-    floatPhase: rng.range(0, Math.PI * 2),
     drawn: null,
   }
 }
@@ -108,12 +103,6 @@ export function startRig(actors, redraw) {
     if (!alive) return
     for (const a of actors) {
       advance(a, t)
-
-      // flotación: transform, sin tocar el canvas
-      if (a.canvas) {
-        const y = Math.sin((t / a.floatPeriod) * Math.PI * 2 + a.floatPhase) * a.floatAmp * 100
-        a.canvas.style.transform = `translateY(${y.toFixed(2)}%)`
-      }
 
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
