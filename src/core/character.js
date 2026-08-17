@@ -66,8 +66,11 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // que son decorativos; el ojo solo se estrecha si el lateral ya está en su mínimo.
   const eyesP0 = p('eyes')
   const hairP = p('hair')
+  // Y si al lateral no le queda sitio decente, no se dibuja: mejor sin patilla que con
+  // un hilo de tinta bajando por el borde de la cara.
   const room = 0.5 - eyesP0.spacing / 2 - SIDE_MARGIN
-  const sideWidth = Math.min(hairP.sideWidth, Math.max(MIN_SIDE, room - eyesP0.eyeWidth))
+  const libre = room - eyesP0.eyeWidth
+  const sideWidth = libre < MIN_SIDE ? 0 : Math.min(hairP.sideWidth, libre)
   const eyesP = { ...eyesP0, eyeWidth: Math.min(eyesP0.eyeWidth, room - sideWidth) }
 
   // ojos: colgados de la ceja. Lo que se cuelga NO es la cuerda del ojo, es el punto
@@ -191,7 +194,7 @@ const NOSE_MAX_END = 0.78
 // Reparto del ancho entre ojos y pelo lateral: margen de aire, y lo mínimo que puede
 // quedarse un lateral antes de que empiece a ceder el ojo.
 const SIDE_MARGIN = 0.02
-const MIN_SIDE = 0.05
+const MIN_SIDE = 0.07
 
 function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v

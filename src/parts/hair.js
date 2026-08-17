@@ -29,7 +29,7 @@ export const HAIR_PARAMS = {
   // --- masa (mode: solid) ---
   overhang: { min: 0, max: 0.16, range: [0.01, 0.035], step: 0.005, label: 'Vuelo sobre el cráneo' },
   fringeY: { min: -0.05, max: 0.42, range: [-0.05, -0.05], step: 0.01, label: 'Altura del flequillo' },
-  sideDrop: { min: 0, max: 0.5, range: [0.07, 0.5], step: 0.01, label: 'Caída del flequillo a los lados' },
+  sideDrop: { min: 0, max: 0.5, range: [0.02, 0.14], step: 0.01, label: 'Caída del flequillo a los lados' },
 
   // --- laterales: piezas INDEPENDIENTES de la masa -----------------------
   // Separados para poder ajustarlos sin tocar el casquete, y para poder bajarlos por
@@ -192,6 +192,20 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const domeH = fringeY - topY
   if (domeH <= 2) return null
 
+  // UNA sola línea base para la silueta de arriba y para el flequillo.
+  //
+  // Antes eran dos: la cúpula acababa en `fringeY` y el flequillo arrancaba en
+  // `fringeY + caída + barrido`. Como son dos tramos del MISMO contorno, entre el final
+  // de uno y el principio del otro se colaba un muro vertical de hasta 330 unidades —
+  // los cortes raros de los lados.
+  //
+  // `u` va de -1 (izquierda) a +1 (derecha). La caída usa u⁴: se concentra en las
+  // sienes en vez de hundir también el centro, pero sin el escalón que dejaba u⁶.
+  const bow = p.fringeShape === 'pico' ? 0 : faceBox.h * p.fringeBow
+  const tilt = faceBox.h * p.fringeTilt
+  const baseline = (u) =>
+    fringeY + (sideY - fringeY) * u ** 4 + bow * (1 - u * u) + tilt * u
+
   const path = new Path2D()
 
   // --- silueta superior: elipse muestreada con picos alternos -------------
@@ -206,8 +220,10 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     const bias = 1 - p.spikeAsym * (1 - lado * lado)
     // los índices impares salen disparados: eso es lo que hace la silueta de pico
     const out = i % 2 === 1 ? spike * (0.55 + rng.next() * 0.9) * bias : 0
+    // la cúpula cuelga de la misma línea base, así que sus extremos caen exactamente
+    // donde arranca el flequillo y el contorno cierra sin costura
     const x = cx + Math.cos(a) * (halfW + out)
-    const y = fringeY - Math.sin(a) * (domeH + out)
+    const y = baseline(Math.cos(a)) - Math.sin(a) * (domeH + out)
     if (i === 0) path.moveTo(x, y)
     else path.lineTo(x, y)
   }
@@ -219,20 +235,12 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const depth = faceBox.h * p.fringeDepth
   // `curva` arquea la línea base y apaga las púas; `curva-picos` arquea y las deja
   // cortas. En modo curva hacen falta más tramos o el arco se ve poligonal.
-  const bow = p.fringeShape === 'pico' ? 0 : faceBox.h * p.fringeBow
-  const tilt = faceBox.h * p.fringeTilt
   const spikeMul = p.fringeShape === 'curva' ? 0 : p.fringeShape === 'curva-picos' ? 0.42 : 1
   const steps = p.fringeShape === 'curva' ? Math.max(spikes * 2, 28) : spikes * 2
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
     const u = 2 * t - 1 // -1 izquierda, 0 centro, +1 derecha
-    // Dos formas SEPARADAS, y ahi estaba el fallo. La caida lateral usa una curva
-    // empinada, asi que se queda en las sienes en vez de hundir tambien el centro; y la
-    // curva del flequillo usa su propia parabola, que manda de verdad en el medio.
-    const sien = u ** 6 // ~0 hasta el 80% del ancho, sube de golpe en el borde
-    const centro = 1 - u * u // 1 en el centro, 0 en los bordes
-    // el barrido inclina la línea entera: alta por un lado, baja por el otro
-    const base = fringeY + (sideY - fringeY) * sien + bow * centro + tilt * u
+    const base = baseline(u)
     // Las púas se concentran en un lado, como los picos de la silueta, en vez de
     // repartirse por igual: en las referencias son dos o tres grandes, no una fila.
     const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1 // eslint-disable-line
