@@ -16,6 +16,7 @@ import * as chin from '../parts/chin.js'
 import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
 import * as palettes from '../style/palettes.js'
+import { applyFinish } from '../style/finish.js'
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -183,8 +184,12 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //     ojo las dejaría descuadradas.
   glasses.draw(ctx, eyeGeo, geo.headBox, p('glasses'), palette)
 
-  // 12. las CEJAS macizas, lo último de todo: nada se dibuja por encima de una ceja
+  // 12. las CEJAS macizas, lo último del personaje: nada SUYO se dibuja encima
   brows.drawSlabs(ctx, faceBox, browsP, palette)
+
+  // 13. acabado: grano y viñeta sobre el lienzo entero, personaje y fondo por igual —
+  //     es textura de papel, no de piel
+  applyFinish(ctx, palette)
 
   return { geo, browGeo, noseGeo, mouthGeo }
 }

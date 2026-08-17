@@ -47,12 +47,28 @@ export const PARAMS = {
   bgHue: { min: 0, max: 420, range: [0, 0], step: 1, unit: '°', label: 'Tono de fondo' },
   bgSat: { min: 0, max: 100, range: [0, 0], step: 1, unit: '%', label: 'Saturación de fondo' },
   bgLight: { min: 0, max: 100, range: [100, 100], step: 1, unit: '%', label: 'Luz de fondo' },
+
+  // --- acabado -------------------------------------------------------------
+  // Capa final sobre el dibujo entero (src/style/finish.js): grano de papel y viñeta.
+  // A 0 no existe. Es estilo global, por eso vive en la paleta y no en una parte.
+  grain: { min: 0, max: 0.6, range: [0.08, 0.16], step: 0.01, label: 'Grano' },
+  grainScale: { min: 0.5, max: 3, range: [1, 1.6], step: 0.05, label: 'Tamaño del grano' },
+  vignette: { min: 0, max: 0.5, range: [0.04, 0.1], step: 0.01, label: 'Viñeta' },
+
+  // --- trazo ---------------------------------------------------------------
+  // `lapiz` rompe la tinta (dash irregular + transparencia) y repasa el contorno de la
+  // cabeza con una segunda pasada desplazada, como un boceto. Es OPT-IN: el pool sortea
+  // siempre `limpio` — el modo dibujo se activa desde el panel, no por azar.
+  strokeStyle: { options: ['limpio', 'lapiz'], pool: { limpio: 1, lapiz: 0 }, label: 'Trazo' },
+  sketchJitter: { min: 0, max: 6, range: [1.5, 3], step: 0.1, label: 'Temblor del lápiz' },
+  sketchAlpha: { min: 0.3, max: 1, range: [0.55, 0.75], step: 0.05, label: 'Tinta del lápiz' },
 }
 
 export const randomize = randomizerFor(PARAMS)
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
-const hsl = (h, s, l) => `hsl(${((h % 360) + 360) % 360} ${clamp(s, 0, 100)}% ${clamp(l, 0, 100)}%)`
+const hsl = (h, s, l, a = 1) =>
+  `hsl(${((h % 360) + 360) % 360} ${clamp(s, 0, 100)}% ${clamp(l, 0, 100)}%${a < 1 ? ` / ${a}` : ''})`
 
 /** Construye los tokens de color a partir de los parámetros. */
 export function buildPalette(p) {
@@ -74,6 +90,15 @@ export function buildPalette(p) {
     accent: hsl(p.accentHue, p.accentSat, p.accentLight),
     // clavado: es el blanco del ojo, y dejarlo variar da ojos de colores raros
     accent2: '#FFFFFF',
+
+    // acabado y trazo — los lee finish.js y stroke.js; los presets viejos no los
+    // traen, de ahí los valores de reposo
+    grain: p.grain ?? 0,
+    grainScale: p.grainScale ?? 1.3,
+    vignette: p.vignette ?? 0,
+    strokeStyle: p.strokeStyle ?? 'limpio',
+    sketchJitter: p.sketchJitter ?? 2,
+    sketchLine: hsl(lineH, p.lineSat, p.lineLight, p.sketchAlpha ?? 0.65),
   }
 }
 
@@ -126,7 +151,11 @@ export const DEFAULT_PALETTE = 'magenta'
 export function presetBands(name) {
   const preset = PRESETS[name] || PRESETS[DEFAULT_PALETTE]
   const bands = {}
-  for (const key of Object.keys(PARAMS)) bands[key] = [preset[key], preset[key]]
+  // solo los params que el preset define: acabado y trazo no son de color y conservan
+  // su banda declarada al cambiar de esquema
+  for (const key of Object.keys(PARAMS)) {
+    if (preset[key] !== undefined) bands[key] = [preset[key], preset[key]]
+  }
   return bands
 }
 

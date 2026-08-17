@@ -122,7 +122,12 @@ así una cúpula alta añade frente en vez de empujar la cara hacia abajo.
 bg → orejas → relleno cabeza → sombra plana → hatching pelo/barba de rayitas
    → RE-TRAZO del contorno → sombra de cejas → masas (barba y pelo planos)
    → ojos → nariz → boca+cigarro → hoyuelo → gafas → cejas macizas
+   → acabado (grano+viñeta, style/finish.js) → humo del cigarro (anim/smoke.js)
 ```
+
+El acabado y el estilo de trazo (`limpio`/`lapiz`) son params de la PALETA: son estilo
+global, y la paleta ya llega a todas las funciones de trazo. El humo lo pinta el host
+(index) encima del blit de la cara cacheada — ver el compositor de index.html.
 
 Las orejas van **detrás** de la cabeza. El re-trazo del contorno impide que el hatching se
 coma la silueta, y va ANTES de las masas: masas y patillas sobresalen de la silueta a

@@ -24,6 +24,9 @@ const GAZE_GAP = [3000, 10000]
 const GAZE_EASE = 380
 const MOOD_GAP = [4000, 12000] // entre cambios de ánimo
 const MOOD_EASE = 700 // las cejas se mueven despacio: rápido se lee como tic
+// El humo se mueve a 25fps, no a 60: es una voluta, no un proyectil — y como el fumador
+// solo re-blitea su cara cacheada + una línea, el coste por tic es ridículo.
+const SMOKE_STEP = 40
 
 // Las excursiones de ánimo, en los dos canales de brows.js: grados de inclinación
 // (positivo = ceño) y subida en fracción de faceBox.h (negativo = cejas arriba).
@@ -58,6 +61,11 @@ export function makeActor(seed, extra = {}) {
     moodTo: null,
     moodAt: null,
     moodNext: rng.range(0, MOOD_GAP[1]),
+    // el humo: fase propia (que treinta volutas no ondulen a coro) y reloj de tic.
+    // `smokeTip` lo rellena el redraw del host cuando la cara tiene cigarro.
+    smokeTip: null,
+    smokePhase: rng.range(0, Math.PI * 2),
+    smokeAt: 0,
     drawn: null,
   }
 }
@@ -151,7 +159,9 @@ function moodTarget(rng) {
  * Arranca el bucle compartido.
  *
  * @param actors  lista de estados creados con makeActor. Cada uno debe traer `canvas`.
- * @param redraw  (actor) => void — solo se llama cuando el actor ha cambiado de verdad
+ * @param redraw  (actor, t, faceChanged) => void — se llama cuando el actor cambió de
+ *                verdad, o en el tic de humo (faceChanged=false: basta re-blitear la
+ *                cara cacheada y pintar la voluta encima)
  * @returns una función para parar
  */
 export function startRig(actors, redraw) {
@@ -166,9 +176,12 @@ export function startRig(actors, redraw) {
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
       const sig = `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|${a.mood.lift.toFixed(4)}`
-      if (sig !== a.drawn) {
+      const faceChanged = sig !== a.drawn
+      const smokeDue = a.smokeTip !== null && t - a.smokeAt >= SMOKE_STEP
+      if (faceChanged || smokeDue) {
         a.drawn = sig
-        redraw(a)
+        if (smokeDue) a.smokeAt = t
+        redraw(a, t, faceChanged)
       }
     }
     raf = requestAnimationFrame(frame)

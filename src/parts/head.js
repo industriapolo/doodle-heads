@@ -3,7 +3,7 @@
 // el `faceBox` sobre el que se posiciona todo lo demás, y el `path` que hace de máscara
 // para el hatching de pelo y barba.
 
-import { roundedPolyPath, outline } from '../style/stroke.js'
+import { roundedPolyPath, strokeOutline } from '../style/stroke.js'
 import { box } from '../core/canvas.js'
 import { randomizerFor } from '../core/params.js'
 
@@ -95,8 +95,7 @@ export function paint(ctx, g, p, palette) {
     ctx.restore()
   }
 
-  outline(ctx, palette, p.lineWeight)
-  ctx.stroke(path)
+  strokeOutline(ctx, path, palette, p.lineWeight)
 
   return g
 }
@@ -107,6 +106,5 @@ export function draw(ctx, frame, p, palette, rng) {
 
 /** Re-traza el contorno por encima de todo, para que el hatching no se coma la silueta. */
 export function restroke(ctx, geometry, palette, width) {
-  outline(ctx, palette, width)
-  ctx.stroke(geometry.path)
+  strokeOutline(ctx, geometry.path, palette, width)
 }

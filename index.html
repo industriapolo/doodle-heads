@@ -1,5 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>doodle-heads</title>
 <style>
   :root { color-scheme: dark; }
@@ -18,10 +19,16 @@
   button:hover { background: #363b42; }
   #fps { margin-left: auto; color: #6d7379; font-size: 11px; font-variant-numeric: tabular-nums; }
   /* Cards a hueso: sin gap, sin radio — con esquinas redondeadas asomarían rendijas de
-     fondo entre celdas contiguas. El tamaño de celda puede variar; los huecos no. */
+     fondo entre celdas contiguas. El tamaño de celda puede variar; los huecos no.
+
+     El canvas se dimensiona como una IMAGEN fluida: width 100% + height auto, y el
+     cuadrado sale de su ratio intrínseco (width == height de atributo). Nada de
+     aspect-ratio en CSS ni de height:100%: el canvas llegaba con width/height inline
+     en px fijos (setupCanvas) y en columnas más estrechas que ese fijo desbordaba la
+     celda y pisaba a las vecinas — ESE era el solape. El JS pisa el inline. */
   #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-  .cell { position: relative; cursor: pointer; aspect-ratio: 1; }
-  .cell canvas { display: block; width: 100%; height: 100%; }
+  .cell { position: relative; cursor: pointer; overflow: hidden; }
+  .cell canvas { display: block; }
   .cell b {
     position: absolute; left: 5px; bottom: 5px; font-size: 9px; font-weight: 400;
     color: #fff; background: rgba(0,0,0,.5); padding: 2px 5px; border-radius: 2px;
@@ -55,9 +62,10 @@ import { randomSeed } from './src/core/prng.js'
 import { makeCharacter, draw, paletteFor } from './src/core/character.js'
 import { getPalette } from './src/style/palettes.js'
 import { makeActor, startRig, overridesFor } from './src/anim/rig.js'
+import { drawSmoke } from './src/anim/smoke.js'
 
 const COUNT = 30
-const CELL = 260 // resolución de dibujo; el CSS lo escala al hueco del grid
+const CELL = 320 // resolución de dibujo; el CSS lo escala al hueco del grid
 
 // Si has estado afinando en compose, el grid final usa TUS bandas. Si no, las
 // declaradas en cada módulo.
@@ -67,10 +75,10 @@ try {
 } catch {}
 
 const fallback = getPalette('magenta')
-// Marco al 0.95: cabezas ~8% más grandes que con el 0.88 original, pero con aire — al
-// 0.99 y con las cards a hueso, las cabezas de celdas vecinas quedaban pegadas y el
-// grid se leía como un solape.
-const frame = box(LOGICAL * 0.025, LOGICAL * 0.025, LOGICAL * 0.95, LOGICAL * 0.95)
+// El aislamiento de cada cara vive AQUÍ, dentro del dibujo: 7% de margen por lado, en
+// unidades lógicas, así que escala con la celda y aguanta cualquier ancho de pantalla.
+// Nada de fiarlo al CSS.
+const frame = box(LOGICAL * 0.07, LOGICAL * 0.07, LOGICAL * 0.86, LOGICAL * 0.86)
 const gridEl = document.getElementById('grid')
 const actors = []
 
@@ -105,6 +113,11 @@ for (let i = 0; i < COUNT; i++) {
   gridEl.append(cell)
 
   const a = makeActor(randomSeed(), { canvas, tag, fav, ctx: setupCanvas(canvas, CELL) })
+  // setupCanvas deja width/height inline en px FIJOS (lo que necesitan las previews);
+  // aquí manda la columna del grid: el canvas fluye como una imagen y el cuadrado lo
+  // pone su ratio intrínseco. Sin esto, columnas < CELL px = canvases pisándose.
+  canvas.style.width = '100%'
+  canvas.style.height = 'auto'
   reseed(a, a.seed)
   cell.addEventListener('click', () => reseed(a, randomSeed()))
   fav.addEventListener('click', (e) => {
@@ -125,14 +138,41 @@ function reseed(a, seed) {
   a.tag.textContent = seed.toString(16)
   if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(seed.toString(16)))
   a.drawn = null // fuerza el repintado en el próximo frame
+  a.hasBase = false
+  a.smokeTip = null
 }
 
 let repaints = 0
 
-function redraw(a) {
-  repaints++
-  clear(a.ctx, a.palette.bg)
-  draw(a.ctx, frame, a.character, a.palette, overridesFor(a))
+// La cara se pinta en un canvas BASE fuera de pantalla y el visible recibe un blit.
+// Es lo que hace barato el humo: en su tic (25fps) no se redibuja la cara — se
+// re-blitea la base cacheada y se traza una línea encima. La base solo se repinta
+// cuando parpadeo/mirada/ánimo cambian de verdad, igual que antes.
+function ensureBase(a) {
+  if (a.base) return
+  a.base = document.createElement('canvas')
+  a.base.width = a.canvas.width
+  a.base.height = a.canvas.height
+  a.bctx = a.base.getContext('2d')
+  const s = a.ctx._baseScale
+  a.bctx.setTransform(s, 0, 0, s, 0, 0)
+  a.bctx._baseScale = s
+}
+
+function redraw(a, t = 0, faceChanged = true) {
+  ensureBase(a)
+  if (faceChanged || !a.hasBase) {
+    repaints++
+    clear(a.bctx, a.palette.bg)
+    const r = draw(a.bctx, frame, a.character, a.palette, overridesFor(a))
+    a.smokeTip = r.mouthGeo?.smoke || null
+    a.hasBase = true
+  }
+  a.ctx.save()
+  a.ctx.setTransform(1, 0, 0, 1, 0, 0)
+  a.ctx.drawImage(a.base, 0, 0)
+  a.ctx.restore()
+  if (a.smokeTip) drawSmoke(a.ctx, a.smokeTip, t, a.palette, a.smokePhase)
 }
 
 let stop = startRig(actors, redraw)

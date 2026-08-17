@@ -18,28 +18,61 @@ export const WEIGHT = {
   fine: 2.2, // rayitas de hatching
 }
 
-/** Contorno principal. `width` en unidades del espacio lógico. */
-export function outline(ctx, palette, width = WEIGHT.outline) {
-  ctx.strokeStyle = palette.line
+// Modo `lapiz` (palette.strokeStyle): la tinta se rompe con un dash irregular FIJO
+// (determinista: nada de rng aquí) y pierde opacidad (palette.sketchLine). El patrón se
+// escala con el grosor para que contorno e interiores rompan en la misma proporción.
+const SKETCH_DASH = [46, 4, 23, 3, 34, 5, 17, 3]
+
+function configure(ctx, palette, width, color) {
+  const lapiz = palette.strokeStyle === 'lapiz'
+  ctx.strokeStyle = lapiz ? palette.sketchLine || color : color
   ctx.lineWidth = width
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
+  // el dash es estado del contexto: el modo limpio tiene que RESETEARLO, porque todo
+  // trazo pasa por aquí pero los rellenos no
+  if (lapiz) ctx.setLineDash(SKETCH_DASH.map((d) => (d * width) / WEIGHT.outline))
+  else ctx.setLineDash([])
+}
+
+/** Contorno principal. `width` en unidades del espacio lógico. */
+export function outline(ctx, palette, width = WEIGHT.outline) {
+  configure(ctx, palette, width, palette.line)
 }
 
 /** Línea interior (párpados, nariz, arrugas). */
 export function interior(ctx, palette, width = WEIGHT.interior) {
-  ctx.strokeStyle = palette.line
-  ctx.lineWidth = width
-  ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
+  configure(ctx, palette, width, palette.line)
 }
 
-/** Rayita fina (hatching). */
+/** Rayita fina (hatching). Sin dash: romper rayitas de 12 unidades las evapora. */
 export function fine(ctx, palette, width = WEIGHT.fine) {
-  ctx.strokeStyle = palette.hatch
+  const lapiz = palette.strokeStyle === 'lapiz'
+  ctx.strokeStyle = lapiz ? palette.sketchLine || palette.hatch : palette.hatch
   ctx.lineWidth = width
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
+  ctx.setLineDash([])
+}
+
+/**
+ * Traza un contorno con el estilo de la paleta: `limpio` es una pasada; `lapiz` añade
+ * una segunda más fina, desplazada y levemente girada sobre el centro del lienzo — el
+ * repaso del boceto. Determinista: el desplazamiento es fijo, escalado por sketchJitter.
+ */
+export function strokeOutline(ctx, path, palette, width = WEIGHT.outline) {
+  outline(ctx, palette, width)
+  ctx.stroke(path)
+  if (palette.strokeStyle === 'lapiz' && (palette.sketchJitter ?? 0) > 0.05) {
+    const j = palette.sketchJitter
+    ctx.save()
+    ctx.translate(400, 400)
+    ctx.rotate(0.0035 * j)
+    ctx.translate(-400 + j * 0.9, -400 - j * 0.7)
+    outline(ctx, palette, width * 0.5)
+    ctx.stroke(path)
+    ctx.restore()
+  }
 }
 
 // ---------------------------------------------------------------------------
