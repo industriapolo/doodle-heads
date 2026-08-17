@@ -67,7 +67,10 @@ export function build(frame, p) {
   const faceTop = y + rTop * 0.75
   const faceBox = box(x, faceTop, w, y + h - faceTop)
 
-  return { path, headBox, faceBox, pts }
+  // `lean` es lo que la asimetría desplaza el borde superior. El pelo lo necesita: su
+  // caja es headBox, que NO se entera del desplazamiento, así que por el lado hacia el
+  // que se inclina la cabeza quedaba una franja de piel sin cubrir.
+  return { path, headBox, faceBox, pts, lean: a }
 }
 
 /** Pinta a partir de geometría ya calculada. character.js la necesita antes de dibujar. */

@@ -21,6 +21,8 @@ export const PARAMS = {
   innerSweep: { min: 140, max: 360, range: [140, 360], step: 5, unit: '°', label: 'Cierre del oído' },
   innerRotation: { min: -180, max: 180, range: [-180, -180], step: 5, unit: '°', label: 'Giro del oído' },
   innerRise: { min: -0.5, max: 0.5, range: [-0.28, 0.06], step: 0.01, label: 'Altura del oído' },
+  innerShade: { options: ['si', 'no'], pool: { si: 3, no: 1 }, label: 'Sombra dentro del oído' },
+  innerTone: { options: ['media', 'fuerte'], pool: { media: 2, fuerte: 1 }, label: 'Tono de esa sombra' },
   lineWeight: { min: 0.5, max: 16, range: [6, 6], step: 0.1, label: 'Grosor del contorno' },
 }
 
@@ -61,6 +63,20 @@ export function draw(ctx, geo, p, palette, rng) {
 
     const inner = new Path2D()
     inner.arc(ix, iy, ir, start, start + sweep)
+
+    // Sombra dentro de la caracola: la misma curva cerrada y rellena. Recortada a la
+    // oreja porque con giros abiertos la cuerda que la cierra se sale del contorno.
+    if (p.innerShade === 'si') {
+      const hueco = new Path2D()
+      hueco.arc(ix, iy, ir, start, start + sweep)
+      hueco.closePath()
+      ctx.save()
+      ctx.clip(shell)
+      ctx.fillStyle = p.innerTone === 'fuerte' ? palette.skinDeep : palette.skinShadow
+      ctx.fill(hueco)
+      ctx.restore()
+    }
+
     interior(ctx, palette, p.lineWeight * 0.55)
     ctx.stroke(inner)
   }

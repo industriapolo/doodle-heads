@@ -162,8 +162,11 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   if (p.mode !== 'solid') return null
   const { headBox, faceBox } = geo
 
-  const o = headBox.w * p.overhang
-  const cx = headBox.cx
+  // El vuelo incluye el desplazamiento de la asimetría, y la cúpula se mueve con él:
+  // si no, el pelo se queda corto por el lado hacia el que se inclina la cabeza.
+  const lean = geo.lean || 0
+  const o = headBox.w * p.overhang + Math.abs(lean)
+  const cx = headBox.cx + lean
   const halfW = headBox.w / 2 + o
   const topY = headBox.y - o
 
@@ -231,8 +234,8 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // Los laterales son piezas aparte, no parte del casquete: así se ajustan solos y
   // pueden pasar de la oreja hacia abajo como patilla.
   const sides = [
-    sidePath(headBox, faceBox, p, -1, fringeY, rng),
-    sidePath(headBox, faceBox, p, 1, fringeY, rng),
+    sidePath(headBox, faceBox, p, -1, fringeY, lean, rng),
+    sidePath(headBox, faceBox, p, 1, fringeY, lean, rng),
   ]
 
   // Sombra proyectada: la propia masa desplazada hacia abajo. Como el borde de abajo es
@@ -280,13 +283,15 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
  *
  * @param dir -1 izquierda, +1 derecha
  */
-function sidePath(headBox, faceBox, p, dir, fringeY, rng) {
+function sidePath(headBox, faceBox, p, dir, fringeY, lean, rng) {
   const w = headBox.w * p.sideWidth
   if (w < 1) return null
 
   // Pegado al borde del cráneo, SIN el vuelo del casquete: con vuelo la pieza tapaba la
   // oreja entera. Así el lateral cae por delante y la oreja sigue asomando por fuera.
-  const outerX = dir < 0 ? headBox.x : headBox.right
+  // Lo único que se le suma es la asimetría, o deja de cubrir por el lado inclinado.
+  const grow = Math.abs(lean)
+  const outerX = dir < 0 ? headBox.x - grow : headBox.right + grow
   const inward = -dir // hacia el centro de la cara
 
   const top = fringeY - faceBox.h * 0.08
