@@ -107,16 +107,24 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    aterriza sobre el borde de uno
   const noseP = p('nose')
   const noseStart = clamp(browBottom, 0.12, 0.5)
-  const maxOffX = Math.max(0, eyesP.spacing / 2 - 0.015)
+  const noseLen = Math.min(noseP.length, NOSE_MAX_END - noseStart)
+  const maxDrift = Math.max(0, eyesP.spacing / 2 - 0.015)
+  const offX = clamp(noseP.offsetX, -maxDrift, maxDrift)
+
+  // El descentrado mueve el arranque y la inclinación desvía la PUNTA, así que se suman.
+  // No basta con topar el arranque: hay que topar dónde acaba. Se despeja la inclinación
+  // que deja la punta dentro del hueco entre los ojos, y se permite la que corrige hacia
+  // el centro — de ahí que el rango sea asimétrico.
+  const lenPx = faceBox.h * noseLen
+  const driftPx = maxDrift * faceBox.w
+  const offPx = offX * faceBox.w
+  const deg = (r) => (Math.atan(r) * 180) / Math.PI
+  const tilt = clamp(noseP.tilt, deg((-driftPx - offPx) / lenPx), deg((driftPx - offPx) / lenPx))
+
   const noseGeo = nose.draw(
     ctx,
     faceBox,
-    {
-      ...noseP,
-      startY: noseStart,
-      length: Math.min(noseP.length, NOSE_MAX_END - noseStart),
-      offsetX: clamp(noseP.offsetX, -maxOffX, maxOffX),
-    },
+    { ...noseP, startY: noseStart, length: noseLen, offsetX: offX, tilt },
     palette,
     rng.fork(6)
   )

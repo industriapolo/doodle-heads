@@ -25,8 +25,11 @@ export const PARAMS = {
   // PROFUNDIDAD de la sombra, no su ancho: el ancho va clavado al de la horizontal.
   // Como fraccion del gancho salia mas estrecha que la nariz y ademas variable.
   shadowDepth: { min: 0, max: 1.2, range: [0.45, 0.7], step: 0.05, label: 'Hondura de la sombra' },
-  offsetX: { min: -0.08, max: 0.08, range: [-0.05, 0.05], step: 0.005, label: 'Desplazamiento X' },
-  tilt: { min: -8, max: 8, range: [-5, 5], step: 0.5, unit: '°', label: 'Inclinación' },
+  // Bandas mas cortas que antes: el descentrado mueve la nariz entera y la inclinacion
+  // desvia ademas la punta, asi que se sumaban y la nariz se iba de la cara. El tope
+  // duro de la desviacion total lo pone character.js, que es quien sabe donde estan los ojos.
+  offsetX: { min: -0.08, max: 0.08, range: [-0.025, 0.025], step: 0.005, label: 'Desplazamiento X' },
+  tilt: { min: -8, max: 8, range: [-3.5, 3.5], step: 0.5, unit: '°', label: 'Inclinación' },
   lineWeight: { min: 0.5, max: 12, range: [3.6, 3.6], step: 0.1, label: 'Grosor de línea' },
 }
 

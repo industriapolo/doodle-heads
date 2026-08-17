@@ -34,10 +34,10 @@ export const HAIR_PARAMS = {
   // --- laterales: piezas INDEPENDIENTES de la masa -----------------------
   // Separados para poder ajustarlos sin tocar el casquete, y para poder bajarlos por
   // debajo de la oreja a modo de patilla.
-  sideWidth: { min: 0, max: 0.26, range: [0.05, 0.205], step: 0.005, label: 'Ancho del lateral' },
+  sideWidth: { min: 0, max: 0.26, range: [0.085, 0.20], step: 0.005, label: 'Ancho del lateral' },
   sideLength: { min: 0.05, max: 0.9, range: [0.28, 0.75], step: 0.01, label: 'Largo del lateral' },
-  sideTaper: { min: 0, max: 1, range: [0.15, 0.8], step: 0.05, label: 'Estrechamiento' },
-  sideburn: { min: 0, max: 0.45, range: [0.03, 0.26], step: 0.01, label: 'Patilla (bajo la oreja)' },
+  sideTaper: { min: 0, max: 1, range: [0.1, 0.6], step: 0.05, label: 'Estrechamiento' },
+  sideburn: { min: 0, max: 0.45, range: [0, 0.18], step: 0.01, label: 'Patilla (bajo la oreja)' },
   sideJag: { min: 0, max: 0.09, range: [0, 0.008], step: 0.002, label: 'Dentado del borde interior' },
   // Los tres acabados de flequillo salen de la MISMA linea base: `pico` es el zigzag de
   // siempre, `curva` la arquea y quita las puas, y `curva-picos` arquea y deja puas
@@ -47,9 +47,10 @@ export const HAIR_PARAMS = {
     pool: { pico: 2, curva: 2, 'curva-picos': 2 },
     label: 'Acabado del flequillo',
   },
-  // Negativo = la frente se redondea hacia ARRIBA, que es lo que pasa en varias
-  // referencias. Solo positivo, la linea del pelo unicamente podia hundirse.
-  fringeBow: { min: -0.22, max: 0.22, range: [-0.08, 0.10], step: 0.005, label: 'Arqueo del flequillo' },
+  // Positivo = el centro BAJA (pico de viuda), negativo = sube (arco). Antes la
+  // direccion no dependia de este numero sino de si superaba a `sideDrop`, que llega a
+  // 0.5 — asi que en la practica la curva salia siempre hacia arriba.
+  fringeBow: { min: -0.25, max: 0.25, range: [0.02, 0.16], step: 0.005, label: 'Curva del flequillo' },
   // El BARRIDO diagonal: entra alto por un lado y sale bajo por el otro. Es lo mas
   // constante de las referencias de pelo y no lo hacia ninguno de los tres acabados,
   // que eran todos simetricos.
@@ -215,12 +216,17 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const steps = p.fringeShape === 'curva' ? Math.max(spikes * 2, 28) : spikes * 2
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
-    const edge = (2 * t - 1) ** 2 // 1 en los bordes, 0 en el centro
+    const u = 2 * t - 1 // -1 izquierda, 0 centro, +1 derecha
+    // Dos formas SEPARADAS, y ahi estaba el fallo. La caida lateral usa una curva
+    // empinada, asi que se queda en las sienes en vez de hundir tambien el centro; y la
+    // curva del flequillo usa su propia parabola, que manda de verdad en el medio.
+    const sien = u ** 6 // ~0 hasta el 80% del ancho, sube de golpe en el borde
+    const centro = 1 - u * u // 1 en el centro, 0 en los bordes
     // el barrido inclina la línea entera: alta por un lado, baja por el otro
-    const base = fringeY + (sideY - fringeY) * edge + bow * (1 - edge) + tilt * (2 * t - 1)
+    const base = fringeY + (sideY - fringeY) * sien + bow * centro + tilt * u
     // Las púas se concentran en un lado, como los picos de la silueta, en vez de
     // repartirse por igual: en las referencias son dos o tres grandes, no una fila.
-    const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1
+    const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1 // eslint-disable-line
     const bias = 1 - p.spikeAsym * (1 - lado * lado)
     const tip =
       i % 2 === 1
@@ -254,7 +260,14 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
 
   ctx.fillStyle = palette.solid
   ctx.fill(path)
+
+  // Los laterales SÍ van recortados a la cabeza. El casquete vuela a propósito, pero un
+  // lateral que vuele se sale de la silueta justo por donde la mandíbula se estrecha, y
+  // queda colgando sobre el fondo como un goterón.
+  ctx.save()
+  ctx.clip(geo.path)
   for (const s of sides) if (s) ctx.fill(s)
+  ctx.restore()
 
   // --- raya: división diagonal plana, más clara. No es un degradado ------
   if (p.parting > 0.01) {
@@ -297,7 +310,9 @@ function sidePath(headBox, faceBox, p, dir, fringeY, lean, rng) {
   const top = fringeY - faceBox.h * 0.08
   const inner = faceBox.y + faceBox.h * p.sideLength
   const outer = inner + faceBox.h * p.sideburn
-  const wBottom = w * (1 - p.sideTaper)
+  // Suelo al estrechamiento: sin él, un lateral estrecho y muy afilado se convierte en
+  // un hilo de tinta de 5 unidades de ancho y media cara de largo.
+  const wBottom = w * (1 - p.sideTaper * 0.6)
 
   const path = new Path2D()
   path.moveTo(outerX, top)
