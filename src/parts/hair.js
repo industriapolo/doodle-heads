@@ -47,7 +47,13 @@ export const HAIR_PARAMS = {
     pool: { pico: 2, curva: 2, 'curva-picos': 2 },
     label: 'Acabado del flequillo',
   },
-  fringeBow: { min: 0, max: 0.22, range: [0.04, 0.12], step: 0.005, label: 'Arqueo del flequillo' },
+  // Negativo = la frente se redondea hacia ARRIBA, que es lo que pasa en varias
+  // referencias. Solo positivo, la linea del pelo unicamente podia hundirse.
+  fringeBow: { min: -0.22, max: 0.22, range: [-0.08, 0.10], step: 0.005, label: 'Arqueo del flequillo' },
+  // El BARRIDO diagonal: entra alto por un lado y sale bajo por el otro. Es lo mas
+  // constante de las referencias de pelo y no lo hacia ninguno de los tres acabados,
+  // que eran todos simetricos.
+  fringeTilt: { min: -0.3, max: 0.3, range: [-0.16, 0.16], step: 0.01, label: 'Barrido diagonal' },
   fringeSpikes: { min: 3, max: 18, range: [9, 16], step: 1, int: true, label: 'Nº de púas del flequillo' },
   fringeDepth: { min: 0, max: 0.22, range: [0.015, 0.07], step: 0.005, label: 'Profundidad de las púas' },
   topSpikes: { min: 3, max: 20, range: [5, 12], step: 1, int: true, label: 'Nº de picos de la silueta' },
@@ -201,13 +207,22 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // `curva` arquea la línea base y apaga las púas; `curva-picos` arquea y las deja
   // cortas. En modo curva hacen falta más tramos o el arco se ve poligonal.
   const bow = p.fringeShape === 'pico' ? 0 : faceBox.h * p.fringeBow
+  const tilt = faceBox.h * p.fringeTilt
   const spikeMul = p.fringeShape === 'curva' ? 0 : p.fringeShape === 'curva-picos' ? 0.42 : 1
   const steps = p.fringeShape === 'curva' ? Math.max(spikes * 2, 28) : spikes * 2
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
     const edge = (2 * t - 1) ** 2 // 1 en los bordes, 0 en el centro
-    const base = fringeY + (sideY - fringeY) * edge + bow * (1 - edge)
-    const tip = i % 2 === 1 ? depth * spikeMul * (0.6 + rng.next() * 0.8) : -depth * spikeMul * 0.12
+    // el barrido inclina la línea entera: alta por un lado, baja por el otro
+    const base = fringeY + (sideY - fringeY) * edge + bow * (1 - edge) + tilt * (2 * t - 1)
+    // Las púas se concentran en un lado, como los picos de la silueta, en vez de
+    // repartirse por igual: en las referencias son dos o tres grandes, no una fila.
+    const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1
+    const bias = 1 - p.spikeAsym * (1 - lado * lado)
+    const tip =
+      i % 2 === 1
+        ? depth * spikeMul * bias * (0.6 + rng.next() * 0.8)
+        : -depth * spikeMul * bias * 0.12
     path.lineTo(cx + (t * 2 - 1) * halfW, base + tip)
   }
 
