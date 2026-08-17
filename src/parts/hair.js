@@ -189,8 +189,6 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const maxFringeY = (limits.hairBottom ?? Infinity) - deepest - faceBox.h * 0.02
   const fringeY = Math.min(faceBox.y + faceBox.h * p.fringeY, maxFringeY)
   const sideY = fringeY + faceBox.h * p.sideDrop
-  const domeH = fringeY - topY
-  if (domeH <= 2) return null
 
   // UNA sola línea base para la silueta de arriba y para el flequillo.
   //
@@ -205,6 +203,13 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const tilt = faceBox.h * p.fringeTilt
   const baseline = (u) =>
     fringeY + (sideY - fringeY) * u ** 4 + bow * (1 - u * u) + tilt * u
+
+  // El alto de la cúpula se mide desde el CENTRO de esa base, no desde `fringeY`.
+  // Midiéndolo desde fringeY, la curva y el barrido bajaban también el punto más alto
+  // —hasta 80 unidades— y el pelo dejaba la coronilla al aire. La base manda en los
+  // extremos, donde empalma con el flequillo; arriba manda la cabeza.
+  const domeH = baseline(0) - topY
+  if (domeH <= 2) return null
 
   const path = new Path2D()
 
