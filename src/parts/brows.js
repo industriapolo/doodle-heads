@@ -72,6 +72,14 @@ export function build(faceBox, p) {
 
 const tilts = (g, p) => [g.tilt + p.asymmetry, -g.tilt]
 
+// `moodRaise` es el tercer canal de ánimo: levanta UNA ceja (positivo la izquierda,
+// negativo la derecha) — la ceja arqueada de la duda y la picardía. Igual que el resto
+// del ánimo, solo dibujo: el layout cuelga de `top`, que no se toca.
+const raisedTops = (g, faceBox, p) => {
+  const raise = faceBox.h * (p.moodRaise ?? 0)
+  return [g.top - Math.max(0, raise), g.top - Math.max(0, -raise)]
+}
+
 /**
  * Sombra proyectada. Es la propia ceja desplazada hacia abajo, así que sigue sola la
  * inclinación y la asimetría de cada una sin duplicar geometría.
@@ -84,13 +92,14 @@ export function drawShadow(ctx, faceBox, p, palette, clip = null) {
   if (off <= 0.5) return g
 
   const [left, right] = tilts(g, p)
+  const [topL, topR] = raisedTops(g, faceBox, p)
   ctx.save()
   if (clip) ctx.clip(clip)
   // skinDeep y no skinShadow: sobre el lado ya sombreado de la cara, skinShadow
   // sería invisible
   ctx.fillStyle = palette.skinDeep
-  slab(ctx, g.innerLeft - g.bw, g.top + off, g.bw, g.bh, left)
-  slab(ctx, g.innerRight, g.top + off, g.bw, g.bh, right)
+  slab(ctx, g.innerLeft - g.bw, topL + off, g.bw, g.bh, left)
+  slab(ctx, g.innerRight, topR + off, g.bw, g.bh, right)
   ctx.restore()
   return g
 }
@@ -99,10 +108,11 @@ export function drawShadow(ctx, faceBox, p, palette, clip = null) {
 export function drawSlabs(ctx, faceBox, p, palette) {
   const g = build(faceBox, p)
   const [left, right] = tilts(g, p)
+  const [topL, topR] = raisedTops(g, faceBox, p)
   ctx.fillStyle = palette.solid
   // izquierda: rotación positiva baja su extremo derecho, que es el interior
-  slab(ctx, g.innerLeft - g.bw, g.top, g.bw, g.bh, left)
-  slab(ctx, g.innerRight, g.top, g.bw, g.bh, right)
+  slab(ctx, g.innerLeft - g.bw, topL, g.bw, g.bh, left)
+  slab(ctx, g.innerRight, topR, g.bw, g.bh, right)
   return g
 }
 

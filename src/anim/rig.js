@@ -30,17 +30,25 @@ const MOOD_EASE = 700 // las cejas se mueven despacio: rápido se lee como tic
 const SMOKE_STEP = 40
 
 // Las excursiones de ánimo. Cejas y boca son UN estado, no dos: cada ánimo define sus
-// cuatro canales a la vez y la coordinación sale sola. Cejas: grados de inclinación
-// (positivo = ceño) y subida en fracción de faceBox.h (negativo = arriba). Boca:
-// curva (positivo = sonrisa ⌣, negativo = mueca ⌢) y apertura 0..1 — con cigarrillo
-// la propia boca los atenúa/anula (mouth.js), no hace falta tratarlo aquí.
+// canales a la vez y la coordinación sale sola. Cejas: `tilt` en grados (positivo =
+// ceño), `lift` en fracción de faceBox.h (negativo = arriba) y `raise` levanta UNA
+// ceja (la arqueada de la duda; `mirror` sortea el lado). Boca: `curve` (positivo =
+// sonrisa ⌣, negativo = mueca ⌢) y `open` 0..1 — con cigarrillo la propia boca los
+// atenúa/anula (mouth.js), no hace falta tratarlo aquí.
+// Un canal omitido en un ánimo queda en [0, 0].
 const MOODS = [
-  { tilt: [5, 12], lift: [0, 0.01], curve: [-0.55, -0.2], open: [0, 0] }, // ceño
-  { tilt: [-10, -5], lift: [0, 0.008], curve: [-0.4, -0.1], open: [0, 0] }, // caído
-  { tilt: [-4, 0], lift: [-0.03, -0.018], curve: [0, 0], open: [0.4, 0.75] }, // sorpresa
-  { tilt: [-2, 2], lift: [-0.012, -0.006], curve: [0.15, 0.5], open: [0, 0] }, // atención
+  { tilt: [5, 12], lift: [0, 0.01], curve: [-0.55, -0.2] }, // ceño
+  { tilt: [12, 17], lift: [0.004, 0.014], curve: [-0.8, -0.5] }, // enfado
+  { tilt: [-10, -5], lift: [0, 0.008], curve: [-0.4, -0.1] }, // caído
+  { tilt: [-14, -9], lift: [0.006, 0.016], curve: [-0.6, -0.35] }, // tristeza
+  { tilt: [-4, 0], lift: [-0.03, -0.018], open: [0.4, 0.75] }, // sorpresa
+  { tilt: [-6, -2], lift: [-0.038, -0.028], curve: [0, 0.1], open: [0.75, 1] }, // susto
+  { tilt: [-2, 2], lift: [-0.012, -0.006], curve: [0.15, 0.5] }, // atención
+  { tilt: [-3, 1], lift: [-0.02, -0.008], curve: [0.5, 0.85], open: [0, 0.15] }, // alegría
+  { tilt: [0, 4], curve: [-0.35, -0.1], raise: [0.028, 0.048], mirror: true }, // duda
+  { tilt: [-2, 2], lift: [-0.006, 0], curve: [0.3, 0.6], raise: [0.022, 0.04], mirror: true }, // picardía
 ]
-const NEUTRAL = { tilt: 0, lift: 0, curve: 0, open: 0 }
+const NEUTRAL = { tilt: 0, lift: 0, curve: 0, open: 0, raise: 0 }
 
 /**
  * Estado de animación de un personaje. El desfase inicial sale de su seed: sin eso los
@@ -156,7 +164,10 @@ export function advance(a, t) {
 
 function moodTarget(rng) {
   const m = MOODS[Math.floor(rng.next() * MOODS.length)]
-  return Object.fromEntries(Object.keys(NEUTRAL).map((k) => [k, rng.range(...m[k])]))
+  const t = Object.fromEntries(Object.keys(NEUTRAL).map((k) => [k, rng.range(...(m[k] || [0, 0]))]))
+  // la ceja arqueada no tiene lado bueno: se sortea
+  if (m.mirror && rng.next() < 0.5) t.raise = -t.raise
+  return t
 }
 
 /**
@@ -181,7 +192,8 @@ export function startRig(actors, redraw) {
       // repintar por diferencias que no se ven.
       const sig =
         `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|` +
-        `${a.mood.lift.toFixed(4)}|${a.mood.curve.toFixed(3)}|${a.mood.open.toFixed(3)}`
+        `${a.mood.lift.toFixed(4)}|${a.mood.curve.toFixed(3)}|${a.mood.open.toFixed(3)}|` +
+        a.mood.raise.toFixed(4)
       const faceChanged = sig !== a.drawn
       const smokeDue = a.smokeTip !== null && t - a.smokeAt >= SMOKE_STEP
       if (faceChanged || smokeDue) {
@@ -204,7 +216,7 @@ export function startRig(actors, redraw) {
 export function overridesFor(a) {
   return {
     eyes: { blink: a.blink, pupilX: a.gaze },
-    brows: { moodTilt: a.mood.tilt, moodLift: a.mood.lift },
+    brows: { moodTilt: a.mood.tilt, moodLift: a.mood.lift, moodRaise: a.mood.raise },
     mouth: { moodCurve: a.mood.curve, moodOpen: a.mood.open },
   }
 }
