@@ -119,6 +119,10 @@ function mount(opts) {
     refs = [],
     onPalette = null,
     configs = null, // { nombre: { label, bands } } — juegos completos de bandas guardados
+    // En las previews de partes sueltas el desplegable de paletas ELIGE la paleta con la
+    // que se pinta. En las de personaje completo (compose, hair) el color ya es
+    // paramétrico y los esquemas viven como configuraciones: el desplegable sobra.
+    paletteSelect = true,
   } = opts
 
   document.head.insertAdjacentHTML('beforeend', `<style>${CSS}</style>`)
@@ -356,6 +360,7 @@ function mount(opts) {
     palEl.append(o)
   }
   palEl.value = DEFAULT_PALETTE
+  if (!paletteSelect) palEl.style.display = 'none'
   palEl.addEventListener('change', () => {
     // Con `onPalette`, el desplegable deja de imponer un esquema cerrado y pasa a ser un
     // cargador de PRESETS: vuelca valores en las bandas y desde ahí se afina.

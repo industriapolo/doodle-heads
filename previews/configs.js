@@ -1,10 +1,12 @@
-// Configuraciones del composer: juegos COMPLETOS de bandas con nombre, capturados con
-// «copiar rangos» y guardados aquí para poder volver a ellos. El desplegable
-// «configuración» del panel los vuelca en los sliders — desde ahí se afina, igual que
-// los presets de paleta.
+// Configuraciones del composer: juegos de bandas con nombre, capturados con «copiar
+// rangos» y guardados aquí para poder volver a ellos. El desplegable «configuración»
+// del panel los vuelca en los sliders — solo las claves que la config define, así que
+// una config puede ser parcial (los esquemas de color de abajo solo traen `palette`).
 //
 // Formato: bandas por módulo, como las guarda el panel — numérico [lo, hi],
 // lista { opción: peso }, booleano { p }.
+
+import { PRESETS, presetBands } from '../src/style/palettes.js'
 
 export const CONFIGS = {
   'poster-granulado': {
@@ -183,6 +185,15 @@ export const CONFIGS = {
       },
     },
   },
+}
+
+// Los cuatro esquemas clásicos, como configuraciones de SOLO color: cargan el bloque
+// Color y no tocan nada más. Sustituyen al viejo desplegable de paletas del composer.
+for (const [name, preset] of Object.entries(PRESETS)) {
+  CONFIGS[`esquema-${name}`] = {
+    label: `esquema ${preset.label}`,
+    bands: { palette: presetBands(name) },
+  }
 }
 
 export const CONFIG_NAMES = Object.keys(CONFIGS)

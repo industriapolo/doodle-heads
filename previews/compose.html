@@ -57,9 +57,9 @@ mountPreview({
     // la de los ojos. Lo que se ajusta aquí es el margen de desvío.
     { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight', 'offsetY') },
   ],
-  // El desplegable ya no impone un esquema: carga sus valores en los sliders de Color.
-  onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
-  // Configuraciones guardadas: juegos completos de bandas (previews/configs.js).
+  // Sin desplegable de paletas: el color es paramétrico y los esquemas clásicos viven
+  // como configuraciones de solo-color en el desplegable de configuración.
+  paletteSelect: false,
   configs: CONFIGS,
   draw(ctx, frame, bands, fallback, rng, seed) {
     const character = makeCharacter(seed, bands)

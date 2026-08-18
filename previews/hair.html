@@ -19,7 +19,7 @@ mountPreview({
     { name: 'hair', label: 'Pelo', params: hair.HAIR_PARAMS },
     { name: 'beard', label: 'Barba', params: hair.BEARD_PARAMS, bandKey: 'hair' },
   ],
-  onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
+  paletteSelect: false,
   configs: CONFIGS,
   draw(ctx, frame, bands, fallback, rng, seed) {
     const character = makeCharacter(seed, bands)
