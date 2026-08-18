@@ -73,6 +73,14 @@ export const HAIR_PARAMS = {
   fringeShadow: { min: 0, max: 0.09, range: [0.015, 0.035], step: 0.002, label: 'Sombra proyectada' },
   parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
   partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
+
+  // --- melena: masa trasera, cae por DETRÁS de cabeza y orejas -------------
+  // La probabilidad base es baja: quién la lleva lo deciden los arquetipos.
+  backHair: { type: 'bool', p: 0.12, label: 'Probabilidad de melena' },
+  backLength: { min: 0.85, max: 1.6, range: [1.02, 1.38], step: 0.01, label: 'Largo de la melena' },
+  backWidth: { min: 0, max: 0.2, range: [0.05, 0.13], step: 0.005, label: 'Vuelo de la melena' },
+  backTips: { min: 2, max: 12, range: [4, 9], step: 1, int: true, label: 'Nº de puntas' },
+  backTipDepth: { min: 0, max: 0.3, range: [0.08, 0.2], step: 0.01, label: 'Largo de las puntas' },
 }
 
 // La barba tiene su propio modo: es una superficie distinta del pelo y no tiene por qué
@@ -173,6 +181,49 @@ export function draw(ctx, geo, p, palette, rng, limits = {}) {
   }
 
   ctx.restore()
+}
+
+/**
+ * La melena: masa trasera que cae por detrás de cabeza y orejas hasta debajo de la
+ * mandíbula, acabada en puntas. Es la barba de masa invertida en escala: el mismo
+ * casquete del contorno (costuras a la altura de la sien), cerrado por abajo con un
+ * dentado de puntas hacia abajo. Se pinta en la PRIMERA capa — todo lo demás le pasa
+ * por delante, que es como cae el pelo en las referencias de mujer.
+ *
+ * Por encima de las costuras la silueta la pone el casquete delantero de siempre:
+ * por eso la melena exige `mode: solid` — sin corona delante sería una peluca flotando.
+ */
+export function drawBack(ctx, geo, p, palette, rng) {
+  if (!p.backHair || p.mode !== 'solid') return null
+  const { headBox, faceBox } = geo
+  const o = headBox.w * p.backWidth + Math.abs(geo.lean || 0)
+  const seamY = faceBox.y + faceBox.h * 0.35
+  const crown = shellBetween(geo.pts, geo.radii, o, seamY, seamY, 'crown')
+  if (!crown) return null
+
+  const bottomY = headBox.y + headBox.h * p.backLength
+  const xl = crown[0].x
+  const xr = crown[crown.length - 1].x
+
+  const path = new Path2D()
+  path.moveTo(xl, crown[0].y)
+  for (const q of crown) path.lineTo(q.x, q.y)
+  // la caída es recta: el vuelo lateral ya lo puso la costura, y la mandíbula se
+  // estrecha por debajo — eso deja la franja de pelo visible junto a las mejillas
+  path.lineTo(xr, bottomY)
+  const tips = Math.max(2, Math.round(p.backTips))
+  const depth = faceBox.h * p.backTipDepth
+  const steps = tips * 2
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps
+    const tip = i % 2 === 1 ? depth * (0.5 + rng.next() * 0.9) : 0
+    path.lineTo(xr + (xl - xr) * t, bottomY + tip)
+  }
+  path.closePath()
+
+  ctx.fillStyle = palette.solid
+  ctx.fill(path)
+  return path
 }
 
 /**

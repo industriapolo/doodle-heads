@@ -7,6 +7,7 @@ import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
 import * as head from '../src/parts/head.js'
 import * as hair from '../src/parts/hair.js'
 import * as palettes from '../src/style/palettes.js'
+import * as archetypes from '../src/core/archetypes.js'
 
 // Preview del PELO: personajes completos (el pelo no se puede juzgar sin cara debajo),
 // pero el panel solo expone cabeza, pelo y barba. El resto de rasgos sale de sus bandas
@@ -14,6 +15,7 @@ import * as palettes from '../src/style/palettes.js'
 mountPreview({
   title: 'hair',
   groups: [
+    { name: 'arquetipo', label: 'Arquetipo', params: archetypes.PARAMS },
     { name: 'palette', label: 'Color', params: palettes.PARAMS },
     { name: 'head', label: 'Cabeza', params: head.PARAMS },
     { name: 'hair', label: 'Pelo', params: hair.HAIR_PARAMS },
@@ -32,8 +34,10 @@ mountPreview({
   refs: [
     '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
     '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
-    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
-    '../referencias/tumblr_n5m7rycInM1qbb5vqo1_1280.jpg',
+    '../referencias/mujer-geisha.png',
+    '../referencias/mujer-morada.png',
+    '../referencias/mujer-fumadora.png',
+    '../referencias/mujer-jeune-fille.png',
   ],
 })
 </script>

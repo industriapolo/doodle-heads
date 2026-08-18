@@ -14,6 +14,7 @@ import * as mouth from '../src/parts/mouth.js'
 import * as chin from '../src/parts/chin.js'
 import * as glasses from '../src/parts/glasses.js'
 import * as palettes from '../src/style/palettes.js'
+import * as archetypes from '../src/core/archetypes.js'
 
 const without = (params, ...drop) =>
   Object.fromEntries(Object.entries(params).filter(([k]) => !drop.includes(k)))
@@ -41,6 +42,7 @@ const WEIGHTS = {
 mountPreview({
   title: 'compose',
   groups: [
+    { name: 'arquetipo', label: 'Arquetipo', params: archetypes.PARAMS },
     { name: 'palette', label: 'Color', params: palettes.PARAMS },
     { name: 'weights', label: 'Grosores de trazo', params: WEIGHTS },
     { name: 'head',  label: 'Cabeza', params: without(head.PARAMS, 'lineWeight') },
@@ -75,6 +77,10 @@ mountPreview({
     '../referencias/tumblr_nmww44tSk81qbb5vqo1_1280.jpg',
     '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
     '../referencias/tumblr_n5m7rycInM1qbb5vqo1_1280.jpg',
+    '../referencias/mujer-geisha.png',
+    '../referencias/mujer-morada.png',
+    '../referencias/mujer-fumadora.png',
+    '../referencias/mujer-jeune-fille.png',
   ],
 })
 </script>

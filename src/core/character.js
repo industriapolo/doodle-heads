@@ -16,6 +16,7 @@ import * as chin from '../parts/chin.js'
 import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
 import * as palettes from '../style/palettes.js'
+import * as archetypes from './archetypes.js'
 import { applyFinish } from '../style/finish.js'
 
 /**
@@ -26,18 +27,24 @@ import { applyFinish } from '../style/finish.js'
  */
 export function makeCharacter(seed, bands = {}, paletteName = null) {
   const rng = makeRng(seed)
+  // El arquetipo pone bandas por parte DEBAJO de las del panel: correlaciona rasgos
+  // (melena + ceja fina + sin barba llegan juntos) sin quitarle el mando a los sliders.
+  const arch = archetypes.randomize(rng.fork(12), bands.arquetipo)
+  const overlay = archetypes.BANDS[arch.arquetipo] || {}
+  const bandFor = (k) => ({ ...(overlay[k] || {}), ...(bands[k] || {}) })
   return {
     seed,
     paletteName,
-    head: head.randomize(rng.fork(1), bands.head),
-    ears: ears.randomize(rng.fork(2), bands.ears),
-    hair: hair.randomize(rng.fork(3), bands.hair),
-    brows: brows.randomize(rng.fork(4), bands.brows),
-    eyes: eyes.randomize(rng.fork(5), bands.eyes),
-    nose: nose.randomize(rng.fork(6), bands.nose),
-    mouth: mouth.randomize(rng.fork(7), bands.mouth),
-    chin: chin.randomize(rng.fork(9), bands.chin),
-    glasses: glasses.randomize(rng.fork(10), bands.glasses),
+    arquetipo: arch.arquetipo,
+    head: head.randomize(rng.fork(1), bandFor('head')),
+    ears: ears.randomize(rng.fork(2), bandFor('ears')),
+    hair: hair.randomize(rng.fork(3), bandFor('hair')),
+    brows: brows.randomize(rng.fork(4), bandFor('brows')),
+    eyes: eyes.randomize(rng.fork(5), bandFor('eyes')),
+    nose: nose.randomize(rng.fork(6), bandFor('nose')),
+    mouth: mouth.randomize(rng.fork(7), bandFor('mouth')),
+    chin: chin.randomize(rng.fork(9), bandFor('chin')),
+    glasses: glasses.randomize(rng.fork(10), bandFor('glasses')),
     palette: palettes.randomize(rng.fork(11), bands.palette),
   }
 }
@@ -114,7 +121,10 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     r: Math.max(faceBox.w * 0.055, faceBox.w * noseP.hookWidth * 0.95),
   }
 
-  // 1. orejas — DETRÁS de la cabeza
+  // 0. melena: la masa trasera cae por detrás de TODO — cabeza, orejas y patillas
+  hair.drawBack(ctx, geo, hairP, palette, rng.fork(13))
+
+  // 1. orejas — DETRÁS de la cabeza (pero delante de la melena, como en las refs)
   ears.draw(ctx, geo, { ...earsP, offsetY: earsY }, palette, rng.fork(2))
 
   // 2. cabeza: relleno + sombra plana + contorno

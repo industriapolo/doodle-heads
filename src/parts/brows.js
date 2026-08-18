@@ -12,8 +12,15 @@ export const PARAMS = {
     pool: { neutral: 3, cansado: 3, molesto: 2, sorpresa: 1 },
     label: 'Expresión',
   },
+  // `fina` es un arco de línea con la panza hacia arriba — la ceja de las referencias
+  // de mujer. Por defecto no sale: quién la lleva lo deciden los arquetipos.
+  style: {
+    options: ['maciza', 'fina'],
+    pool: { maciza: 1, fina: 0 },
+    label: 'Estilo',
+  },
   width: { min: 0.20, max: 0.50, range: [0.22, 0.47], step: 0.01, label: 'Ancho de ceja' },
-  thickness: { min: 0.05, max: 0.20, range: [0.06, 0.17], step: 0.005, label: 'Grosor' },
+  thickness: { min: 0.03, max: 0.20, range: [0.06, 0.17], step: 0.005, label: 'Grosor' },
   gap: { min: 0, max: 0.18, range: [0.115, 0.18], step: 0.005, label: 'Separación' },
   offsetY: { min: 0.02, max: 0.32, range: [0.04, 0.27], step: 0.01, label: 'Altura' },
   tilt: { min: -20, max: 20, range: [-14, 15], step: 1, unit: '°', label: 'Inclinación extra' },
@@ -97,22 +104,20 @@ export function drawShadow(ctx, faceBox, p, palette, clip = null) {
   if (clip) ctx.clip(clip)
   // skinDeep y no skinShadow: sobre el lado ya sombreado de la cara, skinShadow
   // sería invisible
-  ctx.fillStyle = palette.skinDeep
-  slab(ctx, g.innerLeft - g.bw, topL + off, g.bw, g.bh, left)
-  slab(ctx, g.innerRight, topR + off, g.bw, g.bh, right)
+  brow(ctx, g.innerLeft - g.bw, topL + off, g.bw, g.bh, left, p.style, palette.skinDeep)
+  brow(ctx, g.innerRight, topR + off, g.bw, g.bh, right, p.style, palette.skinDeep)
   ctx.restore()
   return g
 }
 
-/** El slab macizo. Va el último de la cara: nada se dibuja por encima de una ceja. */
+/** La ceja maciza (o fina). Va la última de la cara: nada se dibuja por encima. */
 export function drawSlabs(ctx, faceBox, p, palette) {
   const g = build(faceBox, p)
   const [left, right] = tilts(g, p)
   const [topL, topR] = raisedTops(g, faceBox, p)
-  ctx.fillStyle = palette.solid
   // izquierda: rotación positiva baja su extremo derecho, que es el interior
-  slab(ctx, g.innerLeft - g.bw, topL, g.bw, g.bh, left)
-  slab(ctx, g.innerRight, topR, g.bw, g.bh, right)
+  brow(ctx, g.innerLeft - g.bw, topL, g.bw, g.bh, left, p.style, palette.solid)
+  brow(ctx, g.innerRight, topR, g.bw, g.bh, right, p.style, palette.solid)
   return g
 }
 
@@ -122,10 +127,23 @@ export function draw(ctx, faceBox, p, palette, rng, clip = null) {
   return drawSlabs(ctx, faceBox, p, palette)
 }
 
-function slab(ctx, x, y, w, h, deg) {
+function brow(ctx, x, y, w, h, deg, style, color) {
   ctx.save()
   ctx.translate(x + w / 2, y + h / 2)
   ctx.rotate((deg * Math.PI) / 180)
-  ctx.fillRect(-w / 2, -h / 2, w, h)
+  if (style === 'fina') {
+    // el arco de línea de las refs de mujer: panza arriba, extremos caídos. El grosor
+    // del trazo sale del mismo `thickness`, así los sliders sirven para los dos estilos.
+    ctx.strokeStyle = color
+    ctx.lineWidth = Math.max(3, h * 0.55)
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(-w / 2, h * 0.35)
+    ctx.quadraticCurveTo(0, -h * 0.9, w / 2, h * 0.35)
+    ctx.stroke()
+  } else {
+    ctx.fillStyle = color
+    ctx.fillRect(-w / 2, -h / 2, w, h)
+  }
   ctx.restore()
 }
