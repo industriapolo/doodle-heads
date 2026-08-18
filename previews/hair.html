@@ -2,6 +2,7 @@
 <meta charset="utf-8">
 <script type="module">
 import { mountPreview } from './_template.js'
+import { CONFIGS } from './configs.js'
 import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
 import * as head from '../src/parts/head.js'
 import * as hair from '../src/parts/hair.js'
@@ -19,6 +20,7 @@ mountPreview({
     { name: 'beard', label: 'Barba', params: hair.BEARD_PARAMS, bandKey: 'hair' },
   ],
   onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
+  configs: CONFIGS,
   draw(ctx, frame, bands, fallback, rng, seed) {
     const character = makeCharacter(seed, bands)
     const pal = paletteFor(character, fallback)

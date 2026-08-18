@@ -2,6 +2,7 @@
 <meta charset="utf-8">
 <script type="module">
 import { mountPreview } from './_template.js'
+import { CONFIGS } from './configs.js'
 import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
 import * as head from '../src/parts/head.js'
 import * as ears from '../src/parts/ears.js'
@@ -58,6 +59,8 @@ mountPreview({
   ],
   // El desplegable ya no impone un esquema: carga sus valores en los sliders de Color.
   onPalette: (name, bands) => ({ ...bands, palette: palettes.presetBands(name) }),
+  // Configuraciones guardadas: juegos completos de bandas (previews/configs.js).
+  configs: CONFIGS,
   draw(ctx, frame, bands, fallback, rng, seed) {
     const character = makeCharacter(seed, bands)
     const pal = paletteFor(character, fallback)

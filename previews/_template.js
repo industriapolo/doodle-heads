@@ -118,6 +118,7 @@ function mount(opts) {
     inset = 0.08,
     refs = [],
     onPalette = null,
+    configs = null, // { nombre: { label, bands } } — juegos completos de bandas guardados
   } = opts
 
   document.head.insertAdjacentHTML('beforeend', `<style>${CSS}</style>`)
@@ -129,6 +130,7 @@ function mount(opts) {
         <h1>${title}</h1>
         <button id="regen">regenerar</button>
         <select id="pal"></select>
+        <select id="cfg" style="display:none"></select>
         <button id="zoom">zoom</button>
         <button id="reset">rangos por defecto</button>
         <button id="copy">copiar rangos</button>
@@ -366,6 +368,41 @@ function mount(opts) {
     }
     renderAll()
   })
+
+  // --- configuraciones: juegos completos de bandas con nombre ---------------
+  // Como el cargador de presets de paleta, pero para TODO el panel: vuelca las bandas
+  // guardadas (previews/configs.js) y desde ahí se afina. Solo aplica las claves que
+  // esta preview conoce, así la misma config sirve en compose y en previews parciales.
+  const cfgEl = document.getElementById('cfg')
+  if (configs && Object.keys(configs).length) {
+    cfgEl.style.display = ''
+    const ph = document.createElement('option')
+    ph.value = ''
+    ph.textContent = 'configuración…'
+    cfgEl.append(ph)
+    for (const [n, c] of Object.entries(configs)) {
+      const o = document.createElement('option')
+      o.value = n
+      o.textContent = c.label || n
+      cfgEl.append(o)
+    }
+    cfgEl.addEventListener('change', () => {
+      const c = configs[cfgEl.value]
+      if (!c) return
+      // copia, no referencia: los controles mutan las bandas en sitio y sin esto
+      // afinarían la CONFIG en memoria en vez de la sesión
+      for (const k of Object.keys(bands)) {
+        if (!c.bands[k]) continue
+        for (const [pname, b] of Object.entries(c.bands[k]))
+          bands[k][pname] = Array.isArray(b) ? [...b] : { ...b }
+      }
+      persist()
+      building = true
+      buildControls()
+      building = false
+      renderAll()
+    })
+  }
 
   document.getElementById('regen').addEventListener('click', () => {
     for (const c of cells) c.seed = randomSeed()
