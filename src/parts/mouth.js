@@ -8,11 +8,16 @@ import { randomizerFor } from '../core/params.js'
 export const PARAMS = {
   // La × NO es una boca: es el hoyuelo de la barbilla, y vive en chin.js, en la punta
   // del mentón. Estaba aquí por una lectura mía equivocada de las referencias.
+  // `labios` es la boca de las referencias de mujer: labio superior bilobulado y
+  // panza inferior, tinta plana. Por defecto no sale — lo reparte el arquetipo.
   type: {
-    options: ['line', 'frown', 'tiny-o'],
-    pool: { line: 3, frown: 2, 'tiny-o': 1 },
+    options: ['line', 'frown', 'tiny-o', 'labios'],
+    pool: { line: 3, frown: 2, 'tiny-o': 1, labios: 0 },
     label: 'Tipo',
   },
+  lipFull: { min: 0.3, max: 1.1, range: [0.55, 0.9], step: 0.05, label: 'Carnosidad' },
+  // la geisha los lleva rojos (acento); la morada, de tinta
+  lipInk: { options: ['tinta', 'acento'], pool: { tinta: 3, acento: 1 }, label: 'Color de labios' },
   width: { min: 0.03, max: 0.24, range: [0.05, 0.18], step: 0.005, label: 'Ancho' },
   offsetY: { min: 0.68, max: 0.96, range: [0.76, 0.92], step: 0.01, label: 'Altura' },
   offsetX: { min: -0.14, max: 0.14, range: [-0.1, 0.1], step: 0.01, label: 'Descentrado' },
@@ -43,7 +48,24 @@ export function draw(ctx, faceBox, p, palette, rng) {
   interior(ctx, palette, p.lineWeight)
 
   const path = new Path2D()
-  if (p.type === 'tiny-o') {
+  if (p.type === 'labios') {
+    // Tinta plana sin contorno, como las masas. El ánimo tuerce las COMISURAS
+    // (curve > 0 las sube: sonrisa) y la apertura hincha la panza inferior — un
+    // labio de verdad no se abre en O sin romper el dibujo.
+    const lw = w * 1.15
+    const hUp = lw * 0.17 * p.lipFull
+    const hLo = lw * 0.24 * p.lipFull * (1 + open * 0.45)
+    const yC = -curve * lw * 0.18 // las comisuras
+    path.moveTo(-lw / 2 + mx, my + yC)
+    path.quadraticCurveTo(mx - lw * 0.3, my - hUp, mx - lw * 0.09, my - hUp * 0.82)
+    path.quadraticCurveTo(mx, my - hUp * 0.45, mx + lw * 0.09, my - hUp * 0.82)
+    path.quadraticCurveTo(mx + lw * 0.3, my - hUp, mx + lw / 2, my + yC)
+    path.quadraticCurveTo(mx + lw * 0.26, my + hLo, mx, my + hLo)
+    path.quadraticCurveTo(mx - lw * 0.26, my + hLo, mx - lw / 2, my + yC)
+    path.closePath()
+    ctx.fillStyle = p.lipInk === 'acento' ? palette.accent : palette.line
+    ctx.fill(path)
+  } else if (p.type === 'tiny-o') {
     // ya es una boca abierta: el ánimo solo la abre un poco más
     path.ellipse(mx, my, w * 0.36, w * 0.44 * (1 + open * 0.5), 0, 0, Math.PI * 2)
     ctx.fillStyle = palette.line
@@ -62,7 +84,8 @@ export function draw(ctx, faceBox, p, palette, rng) {
     if (Math.abs(bow) > 0.03) path.quadraticCurveTo(mx, my + w * bow, mx + w / 2, my)
     else path.lineTo(mx + w / 2, my)
   }
-  ctx.stroke(path)
+  // los labios van sin contorno (son masa, como el pelo); el resto de bocas son línea
+  if (p.type !== 'labios') ctx.stroke(path)
 
   if (!p.cigarette) return { smoke: null }
 

@@ -39,6 +39,7 @@ export const BANDS = {
     hair: {
       mode: { solid: 5, radial: 1, directional: 0, bald: 0 },
       backHair: { p: 0.85 },
+      bun: { p: 0.3 },
       beardCoverage: [0, 0],
       topSpikeDepth: [0, 0.06],
       fringeShape: { pico: 1, curva: 3, 'curva-picos': 2 },
@@ -49,6 +50,15 @@ export const BANDS = {
       style: { maciza: 1, fina: 4 },
       thickness: [0.035, 0.08],
       width: [0.2, 0.4],
+    },
+    eyes: {
+      lashes: { p: 0.7 },
+    },
+    mouth: {
+      type: { line: 2, frown: 1, 'tiny-o': 0.5, labios: 4 },
+    },
+    cheeks: {
+      type: { nada: 2, rubor: 2, pecas: 1 },
     },
   },
 }

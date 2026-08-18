@@ -64,6 +64,13 @@ export const PARAMS = {
   blink: { min: 0, max: 1, range: [0, 0], step: 0.01, label: 'Cierre' },
   blinkPivot: { min: 0, max: 1, range: [0, 0.15], step: 0.05, label: 'Hacia dónde cierra' },
 
+  // Pestañas: rayitas cortas sobre la mitad EXTERIOR del pliegue, apuntando hacia
+  // fuera por la normal — como los ticks de la geisha y la jeune fille. Por defecto
+  // no salen: las reparte el arquetipo.
+  lashes: { type: 'bool', p: 0, label: 'Probabilidad de pestañas' },
+  lashCount: { min: 1, max: 5, range: [2, 3], step: 1, int: true, label: 'Nº de pestañas' },
+  lashLen: { min: 0.04, max: 0.2, range: [0.07, 0.12], step: 0.005, label: 'Largo de pestaña' },
+
   lineWeight: { min: 0.5, max: 12, range: [4.1, 4.1], step: 0.1, label: 'Grosor del ojo' },
   detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los arcos' },
 }
@@ -218,6 +225,29 @@ function eye(ctx, side, w, sag, p, palette) {
       ctx.stroke(arriba)
     }
     ctx.restore()
+  }
+
+  // --- pestañas: sobre la mitad exterior del pliegue ----------------------
+  // Del MISMO arco de la copia A (misma elipse, mismos radios): así se mueven con el
+  // pliegue si algún radio cambia. Apuntan por la radial de la elipse, hacia fuera.
+  if (p.lashes) {
+    const nL = Math.max(1, Math.round(p.lashCount))
+    const len = w * p.lashLen
+    const a0 = Math.PI + gap
+    const a1 = Math.PI * 2 - gap
+    interior(ctx, palette, p.detailWeight)
+    ctx.beginPath()
+    for (let i = 0; i < nL; i++) {
+      const t = (i + 1) / (nL + 1)
+      // pegadas al extremo exterior del arco, según el lado del ojo
+      const a = side.dir > 0 ? a1 - t * (a1 - a0) * 0.3 : a0 + t * (a1 - a0) * 0.3
+      const px = Math.cos(a) * rx
+      const py = ecy + Math.sin(a) * ry
+      const dl = Math.hypot(px, py - ecy) || 1
+      ctx.moveTo(px, py)
+      ctx.lineTo(px + (px / dl) * len, py + ((py - ecy) / dl) * len)
+    }
+    ctx.stroke()
   }
 
   // --- copia B: la MISMA elipse recortada CON el ojo ----------------------

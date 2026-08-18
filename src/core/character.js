@@ -13,6 +13,7 @@ import * as eyes from '../parts/eyes.js'
 import * as nose from '../parts/nose.js'
 import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
+import * as cheeks from '../parts/cheeks.js'
 import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
 import { bandsOf } from './params.js'
@@ -33,6 +34,7 @@ const DECLARED = {
   nose: bandsOf(nose.PARAMS),
   mouth: bandsOf(mouth.PARAMS),
   chin: bandsOf(chin.PARAMS),
+  cheeks: bandsOf(cheeks.PARAMS),
   glasses: bandsOf(glasses.PARAMS),
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
@@ -70,6 +72,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     nose: nose.randomize(rng.fork(6), bandFor('nose')),
     mouth: mouth.randomize(rng.fork(7), bandFor('mouth')),
     chin: chin.randomize(rng.fork(9), bandFor('chin')),
+    cheeks: cheeks.randomize(rng.fork(14), bandFor('cheeks')),
     glasses: glasses.randomize(rng.fork(10), bandFor('glasses')),
     palette: palettes.randomize(rng.fork(11), bands.palette),
   }
@@ -84,7 +87,12 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   const p = (name) => ({ ...character[name], ...(overrides[name] || {}) })
 
   const headP = p('head')
-  const geo = head.build(frame, headP)
+  const hairP = p('hair')
+  // El moño crece POR ENCIMA de la coronilla y la cabeza llena el marco casi hasta
+  // arriba: sin ceder un poco de fill, moño y palillos se pintarían fuera del lienzo.
+  // La geisha de referencia funciona exactamente así — cabeza más pequeña, aire encima.
+  const conMono = hairP.bun && hairP.mode === 'solid'
+  const geo = head.build(frame, conMono ? { ...headP, fill: headP.fill * 0.86 } : headP)
   const { faceBox } = geo
 
   // --- alturas, TODAS antes de dibujar ------------------------------------
@@ -102,7 +110,6 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // sitio físico para el pelo lateral y acaban montándose. Ceden primero los laterales,
   // que son decorativos; el ojo solo se estrecha si el lateral ya está en su mínimo.
   const eyesP0 = p('eyes')
-  const hairP = p('hair')
   // Y si al lateral no le queda sitio decente, no se dibuja: mejor sin patilla que con
   // un hilo de tinta bajando por el borde de la cara.
   const room = 0.5 - eyesP0.spacing / 2 - SIDE_MARGIN
@@ -196,6 +203,10 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     palette,
     rng.fork(6)
   )
+
+  // 8b. mejillas: rubor o pecas, donde acaba la nariz — ahí viven en las referencias.
+  //     Antes de la boca (los labios pisan al rubor si se rozan) y de las gafas.
+  cheeks.draw(ctx, faceBox, p('cheeks'), palette, rng.fork(14), noseKeepOut.y1)
 
   // 9. boca, siempre por debajo de donde acaba la nariz (sombra incluida)
   const mouthP = p('mouth')

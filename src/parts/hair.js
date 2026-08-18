@@ -74,6 +74,12 @@ export const HAIR_PARAMS = {
   parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
   partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
 
+  // --- moño: bola sobre la coronilla, con palillos opcionales --------------
+  // El de la geisha. Los palillos son dos trazos de acento que asoman por DETRÁS.
+  bun: { type: 'bool', p: 0.02, label: 'Probabilidad de moño' },
+  bunSize: { min: 0.08, max: 0.3, range: [0.13, 0.2], step: 0.005, label: 'Tamaño del moño' },
+  bunPins: { type: 'bool', p: 0.55, label: 'Palillos en el moño' },
+
   // --- melena: masa trasera, cae por DETRÁS de cabeza y orejas -------------
   // La probabilidad base es baja: quién la lleva lo deciden los arquetipos.
   backHair: { type: 'bool', p: 0.12, label: 'Probabilidad de melena' },
@@ -296,7 +302,10 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // Los picos salen sobre la NORMAL local del casquete: verticales en la coronilla,
   // tumbados en las sienes, igual que crece el pelo.
   const n = Math.max(4, Math.round(p.topSpikes) * 2)
-  const spike = headBox.w * p.topSpikeDepth
+  // Con melena o moño, la coronilla va LISA: los pinchos sobre una masa que cae larga
+  // (o bajo una bola de moño) se leen como dos peinados a la vez. La cresta queda
+  // para quien no lleva ninguno de los dos.
+  const spike = p.backHair || p.bun ? 0 : headBox.w * p.topSpikeDepth
   const dome = resample(crown, n)
   for (let i = 0; i <= n; i++) {
     let { x, y } = dome[i]
@@ -368,6 +377,29 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     ctx.fill(path)
     for (const s of sides) if (s) ctx.fill(s)
     ctx.restore()
+  }
+
+  // --- moño: palillos detrás, bola encima, y el casquete cierra la base ----
+  if (p.bun) {
+    const br = headBox.w * p.bunSize
+    const by = topY - br * 0.55
+    if (p.bunPins) {
+      ctx.save()
+      ctx.strokeStyle = palette.accent
+      ctx.lineWidth = Math.max(4, headBox.w * 0.013)
+      ctx.lineCap = 'round'
+      for (const dir of [-1, 1]) {
+        ctx.beginPath()
+        ctx.moveTo(cx + dir * br * 0.15, by + br * 0.2)
+        ctx.lineTo(cx + dir * br * 2.4, by - br * 1.15)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+    ctx.fillStyle = palette.solid
+    ctx.beginPath()
+    ctx.ellipse(cx, by, br, br * 0.78, 0, 0, Math.PI * 2)
+    ctx.fill()
   }
 
   ctx.fillStyle = palette.solid
