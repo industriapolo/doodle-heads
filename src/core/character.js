@@ -15,9 +15,27 @@ import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
 import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
+import { bandsOf } from './params.js'
 import * as palettes from '../style/palettes.js'
 import * as archetypes from './archetypes.js'
 import { applyFinish } from '../style/finish.js'
+
+// Las bandas DECLARADAS de cada parte, para distinguir «el panel no lo ha tocado» de
+// «el panel lo ha dirigido». El panel persiste TODAS las bandas, movidas o no: sin este
+// diff, pisaría el overlay del arquetipo entero con puros valores de fábrica y los
+// botones de arquetipo no harían nada.
+const DECLARED = {
+  head: bandsOf(head.PARAMS),
+  ears: bandsOf(ears.PARAMS),
+  hair: bandsOf(hair.PARAMS),
+  brows: bandsOf(brows.PARAMS),
+  eyes: bandsOf(eyes.PARAMS),
+  nose: bandsOf(nose.PARAMS),
+  mouth: bandsOf(mouth.PARAMS),
+  chin: bandsOf(chin.PARAMS),
+  glasses: bandsOf(glasses.PARAMS),
+}
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -29,9 +47,17 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
   const rng = makeRng(seed)
   // El arquetipo pone bandas por parte DEBAJO de las del panel: correlaciona rasgos
   // (melena + ceja fina + sin barba llegan juntos) sin quitarle el mando a los sliders.
+  // «Debajo» significa: una banda del panel solo pisa al arquetipo si difiere de la
+  // declarada — donde está de fábrica, manda el arquetipo.
   const arch = archetypes.randomize(rng.fork(12), bands.arquetipo)
   const overlay = archetypes.BANDS[arch.arquetipo] || {}
-  const bandFor = (k) => ({ ...(overlay[k] || {}), ...(bands[k] || {}) })
+  const bandFor = (k) => {
+    const touched = {}
+    for (const [name, b] of Object.entries(bands[k] || {})) {
+      if (!same(b, DECLARED[k]?.[name])) touched[name] = b
+    }
+    return { ...(overlay[k] || {}), ...touched }
+  }
   return {
     seed,
     paletteName,
