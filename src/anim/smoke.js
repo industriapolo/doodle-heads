@@ -5,8 +5,8 @@
 // arriba se deshace. Dos senos a frecuencias distintas para que el vaivén no sea
 // metrónomo, y una deriva lateral fija para que no suba en columna.
 
-const HEIGHT = 118 // unidades lógicas de subida
-const STEPS = 16
+const HEIGHT = 185 // unidades lógicas de subida
+const STEPS = 24 // más tramos al ser más larga, o la ondulación sale poligonal
 
 /**
  * @param tip   {x, y} — la punta del cigarro, de mouthGeo.smoke
@@ -26,9 +26,9 @@ export function drawSmoke(ctx, tip, t, palette, phase = 0) {
     const f = i / STEPS
     const y = tip.y - f * HEIGHT
     const sway =
-      Math.sin(phase + t * 0.0016 + f * 4.2) * 11 * f ** 0.8 +
-      Math.sin(phase * 2 + t * 0.0009 + f * 9) * 4 * f
-    const x = tip.x + sway + f * 7
+      Math.sin(phase + t * 0.0016 + f * 5) * 14 * f ** 0.8 +
+      Math.sin(phase * 2 + t * 0.0009 + f * 10) * 5 * f
+    const x = tip.x + sway + f * 9
     if (i === 0) ctx.moveTo(x, y)
     else ctx.lineTo(x, y)
   }
