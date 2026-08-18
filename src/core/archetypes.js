@@ -42,7 +42,7 @@ export const BANDS = {
       bun: { p: 0.3 },
       beardCoverage: [0, 0],
       topSpikeDepth: [0, 0.06],
-      fringeShape: { pico: 1, curva: 3, 'curva-picos': 2 },
+      fringeShape: { pico: 1, curva: 2, 'curva-picos': 1.5, cortinas: 2.5 },
       sideburn: [0, 0],
       sideLength: [0.4, 0.85],
     },

@@ -39,12 +39,14 @@ export const HAIR_PARAMS = {
   sideTaper: { min: 0, max: 1, range: [0.1, 0.6], step: 0.05, label: 'Estrechamiento' },
   sideburn: { min: 0, max: 0.45, range: [0, 0.18], step: 0.01, label: 'Patilla (bajo la oreja)' },
   sideJag: { min: 0, max: 0.09, range: [0, 0.008], step: 0.002, label: 'Dentado del borde interior' },
-  // Los tres acabados de flequillo salen de la MISMA linea base: `pico` es el zigzag de
-  // siempre, `curva` la arquea y quita las puas, y `curva-picos` arquea y deja puas
-  // cortas. No es geometria nueva, es modular dos numeros.
+  // Los acabados de flequillo salen de la MISMA linea base: `pico` es el zigzag de
+  // siempre, `curva` la arquea y quita las puas, `curva-picos` arquea y deja puas
+  // cortas, y `cortinas` es la raya al medio de la fumadora — dos diagonales casi
+  // rectas que caen del pico hacia las sienes. No es geometria nueva, es modular la
+  // caida y dos numeros.
   fringeShape: {
-    options: ['pico', 'curva', 'curva-picos'],
-    pool: { pico: 2, curva: 2, 'curva-picos': 2 },
+    options: ['pico', 'curva', 'curva-picos', 'cortinas'],
+    pool: { pico: 2, curva: 2, 'curva-picos': 2, cortinas: 1 },
     label: 'Acabado del flequillo',
   },
   // Positivo = el centro BAJA (pico de viuda), negativo = sube (arco). Antes la
@@ -73,6 +75,14 @@ export const HAIR_PARAMS = {
   fringeShadow: { min: 0, max: 0.09, range: [0.015, 0.035], step: 0.002, label: 'Sombra proyectada' },
   parting: { min: 0, max: 0.35, range: [0.1, 0.17], step: 0.01, label: 'Fuerza de la raya' },
   partingAngle: { min: -70, max: 70, range: [-70, 70], step: 5, unit: '°', label: 'Ángulo de la raya' },
+
+  // --- mechones: rayitas CLARAS dentro de la masa (la referencia morada) ---
+  // Líneas largas casi verticales, con la deriva del barrido, en blanco translúcido —
+  // el mismo truco de la raya. Opcionales: la mayoría de masas van planas.
+  strands: { type: 'bool', p: 0.25, label: 'Probabilidad de mechones' },
+  strandAlpha: { min: 0.04, max: 0.4, range: [0.08, 0.18], step: 0.01, label: 'Claridad del mechón' },
+  strandSpacing: { min: 0.03, max: 0.15, range: [0.05, 0.09], step: 0.005, label: 'Separación de mechones' },
+  strandWeight: { min: 1, max: 8, range: [2.2, 3.5], step: 0.1, label: 'Grosor del mechón' },
 
   // --- moño: bola sobre la coronilla, con palillos opcionales --------------
   // El de la geisha. Los palillos son dos trazos de acento que asoman por DETRÁS.
@@ -231,7 +241,34 @@ export function drawBack(ctx, geo, p, palette, rng) {
 
   ctx.fillStyle = palette.solid
   ctx.fill(path)
+  // los mechones también caen por la melena — en la morada las franjas más claras
+  // están justo ahí, en el pelo que cae
+  if (p.strands) strands(ctx, path, headBox, p, rng, 0)
   return path
+}
+
+/**
+ * Los mechones: líneas largas y claras recortadas a una masa. `slant` es la deriva
+ * horizontal total a lo largo de la caída — la pone el barrido del flequillo.
+ */
+function strands(ctx, zone, headBox, p, rng, slant) {
+  ctx.save()
+  ctx.clip(zone)
+  ctx.strokeStyle = `rgba(255,255,255,${p.strandAlpha})`
+  ctx.lineWidth = p.strandWeight
+  ctx.lineCap = 'round'
+  ctx.setLineDash([])
+  const step = headBox.w * p.strandSpacing
+  const top = headBox.y - headBox.h * 0.6
+  const bottom = headBox.bottom + headBox.h * 0.8
+  ctx.beginPath()
+  for (let x = headBox.x - headBox.w * 0.4; x < headBox.right + headBox.w * 0.4; x += step) {
+    const jx = x + (rng.next() - 0.5) * step * 0.6
+    ctx.moveTo(jx, top)
+    ctx.lineTo(jx + slant, bottom)
+  }
+  ctx.stroke()
+  ctx.restore()
 }
 
 /**
@@ -274,7 +311,9 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const deepest = faceBox.h * (p.fringeDepth + p.fringeShadow)
   const maxFringeY = (limits.hairBottom ?? Infinity) - deepest - faceBox.h * 0.02
   const fringeY = Math.min(faceBox.y + faceBox.h * p.fringeY, maxFringeY)
-  const sideY = fringeY + faceBox.h * p.sideDrop
+  // unas cortinas sin caída no existen: suelo de sideDrop para que la M se lea
+  const cortinas = p.fringeShape === 'cortinas'
+  const sideY = fringeY + faceBox.h * (cortinas ? Math.max(p.sideDrop, 0.18) : p.sideDrop)
 
   // UNA sola línea base para la silueta de arriba y para el flequillo.
   //
@@ -285,10 +324,13 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   //
   // `u` va de -1 (izquierda) a +1 (derecha). La caída usa u⁴: se concentra en las
   // sienes en vez de hundir también el centro, pero sin el escalón que dejaba u⁶.
-  const bow = p.fringeShape === 'pico' ? 0 : faceBox.h * p.fringeBow
+  // En `cortinas` la caída es |u|^1.25 — dos diagonales casi rectas con el pico en
+  // la raya; el barrido (tilt) desplaza la raya del centro, como en la fumadora.
+  const bow = p.fringeShape === 'pico' || cortinas ? 0 : faceBox.h * p.fringeBow
   const tilt = faceBox.h * p.fringeTilt
+  const caida = cortinas ? (u) => Math.abs(u) ** 1.25 : (u) => u ** 4
   const baseline = (u) =>
-    fringeY + (sideY - fringeY) * u ** 4 + bow * (1 - u * u) + tilt * u
+    fringeY + (sideY - fringeY) * caida(u) + bow * (1 - u * u) + tilt * u
 
   // Costuras: donde la línea base toca los lados del casquete. Con tope por arriba —
   // que un barrido extremo no suba una costura por encima de la coronilla y deje al
@@ -340,9 +382,12 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   const spikes = Math.max(2, Math.round(p.fringeSpikes))
   const depth = faceBox.h * p.fringeDepth
   // `curva` arquea la línea base y apaga las púas; `curva-picos` arquea y las deja
-  // cortas. En modo curva hacen falta más tramos o el arco se ve poligonal.
-  const spikeMul = p.fringeShape === 'curva' ? 0 : p.fringeShape === 'curva-picos' ? 0.42 : 1
-  const steps = p.fringeShape === 'curva' ? Math.max(spikes * 2, 28) : spikes * 2
+  // cortas; `cortinas` va lisa — sus diagonales no llevan dentado. En los modos
+  // suaves hacen falta más tramos o la curva se ve poligonal (y el pico de la raya
+  // necesita caer en un vértice: los tramos pares lo garantizan en u=0).
+  const suave = p.fringeShape === 'curva' || cortinas
+  const spikeMul = suave ? 0 : p.fringeShape === 'curva-picos' ? 0.42 : 1
+  const steps = suave ? Math.max(spikes * 2, 28) : spikes * 2
   for (let i = 0; i <= steps; i++) {
     const t = 1 - i / steps // 1 → 0 (derecha a izquierda)
     const u = 2 * t - 1 // -1 izquierda, 0 centro, +1 derecha
@@ -395,6 +440,7 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   }
 
   // --- moño: palillos detrás, bola encima, y el casquete cierra la base ----
+  let bunPath = null
   if (p.bun) {
     const br = headBox.w * p.bunSize
     const by = topY - br * 0.55
@@ -411,10 +457,10 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
       }
       ctx.restore()
     }
+    bunPath = new Path2D()
+    bunPath.ellipse(cx, by, br, br * 0.78, 0, 0, Math.PI * 2)
     ctx.fillStyle = palette.solid
-    ctx.beginPath()
-    ctx.ellipse(cx, by, br, br * 0.78, 0, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.fill(bunPath)
   }
 
   ctx.fillStyle = palette.solid
@@ -427,6 +473,15 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   ctx.clip(geo.path)
   for (const s of sides) if (s) ctx.fill(s)
   ctx.restore()
+
+  // --- mechones sobre el casquete (y el moño), con la deriva del barrido ---
+  if (p.strands) {
+    const zona = new Path2D()
+    zona.addPath(path)
+    if (bunPath) zona.addPath(bunPath)
+    const slant = Math.tan((p.fringeTilt * 55 * Math.PI) / 180) * headBox.h
+    strands(ctx, zona, headBox, p, rng, slant)
+  }
 
   // --- raya: división diagonal plana, más clara. No es un degradado ------
   // Confinada POR ENCIMA del flequillo: es un brillo de coronilla, y con costuras
