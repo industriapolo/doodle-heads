@@ -12,11 +12,11 @@
   }
   header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
   h1 { font-size: 14px; font-weight: 600; margin: 0 8px 0 0; letter-spacing: .05em; text-transform: uppercase; }
-  button {
+  button, select {
     background: #2c3036; color: #d6d9dc; border: 1px solid #3b4149; border-radius: 4px;
     padding: 6px 11px; font: inherit; font-size: 11px; cursor: pointer;
   }
-  button:hover { background: #363b42; }
+  button:hover, select:hover { background: #363b42; }
   #fps { margin-left: auto; color: #6d7379; font-size: 11px; font-variant-numeric: tabular-nums; }
   /* Cards a hueso: sin gap, sin radio — con esquinas redondeadas asomarían rendijas de
      fondo entre celdas contiguas. El tamaño de celda puede variar; los huecos no.
@@ -50,6 +50,7 @@
   <button id="regen">regenerar todos</button>
   <button id="pause">pausar</button>
   <button id="saved">guardados: 0 · copiar</button>
+  <select id="estilo" title="De dónde salen las bandas de estilo"></select>
   <span id="fps"></span>
 </header>
 <div id="grid"></div>
@@ -63,16 +64,60 @@ import { makeCharacter, draw, paletteFor } from './src/core/character.js'
 import { getPalette } from './src/style/palettes.js'
 import { makeActor, startRig, overridesFor } from './src/anim/rig.js'
 import { drawSmoke } from './src/anim/smoke.js'
+import { CONFIGS } from './previews/configs.js'
 
 const COUNT = 30
 const CELL = 320 // resolución de dibujo; el CSS lo escala al hueco del grid
 
-// Si has estado afinando en compose, el grid final usa TUS bandas. Si no, las
-// declaradas en cada módulo.
-let bands = {}
-try {
-  bands = JSON.parse(localStorage.getItem('doodle-bands:compose') || '{}') || {}
-} catch {}
+// --- fuente de estilo -------------------------------------------------------
+// El selector «estilo» dice de dónde salen las bandas, porque hay tres fuentes y la
+// diferencia era invisible:
+//   · composer  — lo último afinado en compose.html. OJO: vive en localStorage, que es
+//     POR ORIGEN (localhost:8080 y :8137 son almacenes distintos) y se lee al cargar —
+//     afinar en compose pide recargar el index.
+//   · una configuración con nombre (previews/configs.js) — viaja con el repo, no
+//     depende de origen ni de navegador. Fuente de verdad recomendada.
+//   · por defecto — las bandas declaradas en cada módulo (composer vacío).
+const ESTILO_KEY = 'doodle-estilo:index'
+const estiloEl = document.getElementById('estilo')
+
+function composerBands() {
+  try {
+    return JSON.parse(localStorage.getItem('doodle-bands:compose') || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+
+function resolveBands(choice) {
+  if (CONFIGS[choice]) return CONFIGS[choice].bands
+  return composerBands()
+}
+
+{
+  const hasComposer = Object.keys(composerBands()).length > 0
+  const auto = document.createElement('option')
+  auto.value = ''
+  auto.textContent = hasComposer ? 'estilo: composer' : 'estilo: por defecto'
+  estiloEl.append(auto)
+  for (const [n, c] of Object.entries(CONFIGS)) {
+    const o = document.createElement('option')
+    o.value = n
+    o.textContent = `estilo: ${c.label || n}`
+    estiloEl.append(o)
+  }
+  const saved = localStorage.getItem(ESTILO_KEY)
+  if (saved && CONFIGS[saved]) estiloEl.value = saved
+}
+
+let bands = resolveBands(estiloEl.value)
+
+estiloEl.addEventListener('change', () => {
+  localStorage.setItem(ESTILO_KEY, estiloEl.value)
+  bands = resolveBands(estiloEl.value)
+  // mismas seeds, bandas nuevas: cambia el estilo sin cambiar de personajes
+  for (const a of actors) reseed(a, a.seed)
+})
 
 const fallback = getPalette('magenta')
 // El aislamiento de cada cara vive AQUÍ, dentro del dibujo: 7% de margen por lado, en
