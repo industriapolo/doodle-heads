@@ -25,28 +25,42 @@ export const PARAMS = {
 
 export const randomize = randomizerFor(PARAMS)
 
+/**
+ * `moodCurve` (−1..+1) y `moodOpen` (0..1) son los canales de ánimo del rig, como los
+ * moodTilt/moodLift de las cejas: deltas SOBRE el tipo base del personaje, solo dibujo.
+ * Convención de curva: positivo = el centro BAJA (sonrisa ⌣), negativo = sube (mueca ⌢).
+ * Con cigarrillo, los labios lo sujetan: la apertura se anula y la curva se atenúa —
+ * el fumador expresa con las cejas. Además así la punta (y el humo) no se mueve.
+ */
 export function draw(ctx, faceBox, p, palette, rng) {
   const mx = faceBox.cx + faceBox.w * p.offsetX
   const my = faceBox.y + faceBox.h * p.offsetY
   const w = faceBox.w * p.width
 
+  const open = p.cigarette ? 0 : (p.moodOpen ?? 0)
+  const curve = (p.moodCurve ?? 0) * (p.cigarette ? 0.4 : 1)
+
   interior(ctx, palette, p.lineWeight)
 
   const path = new Path2D()
-  switch (p.type) {
-    case 'frown':
-      path.moveTo(mx - w / 2, my)
-      path.quadraticCurveTo(mx, my + w * 0.55, mx + w / 2, my)
-      break
-    case 'tiny-o':
-      path.ellipse(mx, my, w * 0.36, w * 0.44, 0, 0, Math.PI * 2)
-      // relleno: es una boca abierta, no un aro
-      ctx.fillStyle = palette.line
-      ctx.fill(path)
-      break
-    default:
-      path.moveTo(mx - w / 2, my)
-      path.lineTo(mx + w / 2, my)
+  if (p.type === 'tiny-o') {
+    // ya es una boca abierta: el ánimo solo la abre un poco más
+    path.ellipse(mx, my, w * 0.36, w * 0.44 * (1 + open * 0.5), 0, 0, Math.PI * 2)
+    ctx.fillStyle = palette.line
+    ctx.fill(path)
+  } else if (open > 0.06) {
+    // apertura de sorpresa: la línea se convierte en un óvalo relleno que crece con
+    // el canal — a poca apertura es casi la línea, a tope es un tiny-o
+    path.ellipse(mx, my, w * (0.5 - 0.15 * open), w * (0.05 + 0.42 * open), 0, 0, Math.PI * 2)
+    ctx.fillStyle = palette.line
+    ctx.fill(path)
+  } else {
+    // la curva del tipo base ('frown') y la del ánimo son el MISMO número: el ánimo
+    // empuja la que ya hay en vez de sustituirla
+    const bow = (p.type === 'frown' ? 0.55 : 0) + curve * 0.55
+    path.moveTo(mx - w / 2, my)
+    if (Math.abs(bow) > 0.03) path.quadraticCurveTo(mx, my + w * bow, mx + w / 2, my)
+    else path.lineTo(mx + w / 2, my)
   }
   ctx.stroke(path)
 

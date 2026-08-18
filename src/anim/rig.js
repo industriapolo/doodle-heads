@@ -6,9 +6,10 @@
 //  · el parpadeo dura ~120ms cada 2-7s, así que en un frame cualquiera hay una o dos
 //    caras animándose de treinta. Las demás se saltan enteras.
 //  · la mirada solo se mueve durante la transición, ~380ms cada 3-10s.
-//  · el ánimo (cejas) solo se mueve durante su transición, ~700ms cada 4-12s — y la
-//    mayoría de los cambios son VOLVER al neutro: el personaje vive alrededor de su
-//    expresión base y hace excursiones, no va saltando de mueca en mueca.
+//  · el ánimo (cejas y boca, un solo estado) solo se mueve durante su transición,
+//    ~700ms cada 4-12s — y la mayoría de los cambios son VOLVER al neutro: el
+//    personaje vive alrededor de su expresión base y hace excursiones, no va
+//    saltando de mueca en mueca.
 //
 // La flotación se quitó: movía las cards y hacía que se solaparan entre sí.
 //
@@ -28,14 +29,18 @@ const MOOD_EASE = 700 // las cejas se mueven despacio: rápido se lee como tic
 // solo re-blitea su cara cacheada + una línea, el coste por tic es ridículo.
 const SMOKE_STEP = 40
 
-// Las excursiones de ánimo, en los dos canales de brows.js: grados de inclinación
-// (positivo = ceño) y subida en fracción de faceBox.h (negativo = cejas arriba).
+// Las excursiones de ánimo. Cejas y boca son UN estado, no dos: cada ánimo define sus
+// cuatro canales a la vez y la coordinación sale sola. Cejas: grados de inclinación
+// (positivo = ceño) y subida en fracción de faceBox.h (negativo = arriba). Boca:
+// curva (positivo = sonrisa ⌣, negativo = mueca ⌢) y apertura 0..1 — con cigarrillo
+// la propia boca los atenúa/anula (mouth.js), no hace falta tratarlo aquí.
 const MOODS = [
-  { tilt: [5, 12], lift: [0, 0.01] }, // ceño
-  { tilt: [-10, -5], lift: [0, 0.008] }, // caído
-  { tilt: [-4, 0], lift: [-0.03, -0.018] }, // sorpresa leve
-  { tilt: [-2, 2], lift: [-0.012, -0.006] }, // atención
+  { tilt: [5, 12], lift: [0, 0.01], curve: [-0.55, -0.2], open: [0, 0] }, // ceño
+  { tilt: [-10, -5], lift: [0, 0.008], curve: [-0.4, -0.1], open: [0, 0] }, // caído
+  { tilt: [-4, 0], lift: [-0.03, -0.018], curve: [0, 0], open: [0.4, 0.75] }, // sorpresa
+  { tilt: [-2, 2], lift: [-0.012, -0.006], curve: [0.15, 0.5], open: [0, 0] }, // atención
 ]
+const NEUTRAL = { tilt: 0, lift: 0, curve: 0, open: 0 }
 
 /**
  * Estado de animación de un personaje. El desfase inicial sale de su seed: sin eso los
@@ -56,7 +61,7 @@ export function makeActor(seed, extra = {}) {
     gazeTo: 0,
     gazeAt: null,
     gazeNext: rng.range(0, GAZE_GAP[1]),
-    mood: { tilt: 0, lift: 0 },
+    mood: { ...NEUTRAL },
     moodFrom: null,
     moodTo: null,
     moodAt: null,
@@ -114,15 +119,15 @@ export function advance(a, t) {
     }
   }
 
-  // --- ánimo (cejas) ----------------------------------------------------
+  // --- ánimo (cejas + boca) ---------------------------------------------
   if (a.moodAt === null) {
     if (t >= a.moodNext) {
-      const enNeutro = a.mood.tilt === 0 && a.mood.lift === 0
+      const enNeutro = Object.keys(NEUTRAL).every((k) => a.mood[k] === 0)
       // desde una excursión casi siempre se vuelve al neutro; desde el neutro, a veces
       // ni eso — el personaje se queda quieto y solo se reprograma el reloj
       let target = null
       if (!enNeutro) {
-        target = a.rng.next() < 0.75 ? { tilt: 0, lift: 0 } : moodTarget(a.rng)
+        target = a.rng.next() < 0.75 ? { ...NEUTRAL } : moodTarget(a.rng)
       } else if (a.rng.next() < 0.5) {
         target = moodTarget(a.rng)
       }
@@ -142,17 +147,16 @@ export function advance(a, t) {
       a.moodNext = t + a.rng.range(...MOOD_GAP)
     } else {
       const e = easeInOut(phase)
-      a.mood = {
-        tilt: a.moodFrom.tilt + (a.moodTo.tilt - a.moodFrom.tilt) * e,
-        lift: a.moodFrom.lift + (a.moodTo.lift - a.moodFrom.lift) * e,
-      }
+      a.mood = Object.fromEntries(
+        Object.keys(NEUTRAL).map((k) => [k, a.moodFrom[k] + (a.moodTo[k] - a.moodFrom[k]) * e])
+      )
     }
   }
 }
 
 function moodTarget(rng) {
   const m = MOODS[Math.floor(rng.next() * MOODS.length)]
-  return { tilt: rng.range(...m.tilt), lift: rng.range(...m.lift) }
+  return Object.fromEntries(Object.keys(NEUTRAL).map((k) => [k, rng.range(...m[k])]))
 }
 
 /**
@@ -175,7 +179,9 @@ export function startRig(actors, redraw) {
 
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
-      const sig = `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|${a.mood.lift.toFixed(4)}`
+      const sig =
+        `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|` +
+        `${a.mood.lift.toFixed(4)}|${a.mood.curve.toFixed(3)}|${a.mood.open.toFixed(3)}`
       const faceChanged = sig !== a.drawn
       const smokeDue = a.smokeTip !== null && t - a.smokeAt >= SMOKE_STEP
       if (faceChanged || smokeDue) {
@@ -199,5 +205,6 @@ export function overridesFor(a) {
   return {
     eyes: { blink: a.blink, pupilX: a.gaze },
     brows: { moodTilt: a.mood.tilt, moodLift: a.mood.lift },
+    mouth: { moodCurve: a.mood.curve, moodOpen: a.mood.open },
   }
 }
