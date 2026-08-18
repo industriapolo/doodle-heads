@@ -82,11 +82,13 @@ export const HAIR_PARAMS = {
 
   // --- melena: masa trasera, cae por DETRÁS de cabeza y orejas -------------
   // La probabilidad base es baja: quién la lleva lo deciden los arquetipos.
+  // El largo arranca claramente POR DEBAJO de la barbilla: con las puntas a su altura
+  // el dentado se leía como barba. Y puntas más finas — como caen en la fumadora.
   backHair: { type: 'bool', p: 0.12, label: 'Probabilidad de melena' },
-  backLength: { min: 0.85, max: 1.6, range: [1.02, 1.38], step: 0.01, label: 'Largo de la melena' },
+  backLength: { min: 0.85, max: 1.6, range: [1.12, 1.42], step: 0.01, label: 'Largo de la melena' },
   backWidth: { min: 0, max: 0.2, range: [0.05, 0.13], step: 0.005, label: 'Vuelo de la melena' },
-  backTips: { min: 2, max: 12, range: [4, 9], step: 1, int: true, label: 'Nº de puntas' },
-  backTipDepth: { min: 0, max: 0.3, range: [0.08, 0.2], step: 0.01, label: 'Largo de las puntas' },
+  backTips: { min: 2, max: 14, range: [5, 10], step: 1, int: true, label: 'Nº de puntas' },
+  backTipDepth: { min: 0, max: 0.3, range: [0.06, 0.16], step: 0.01, label: 'Largo de las puntas' },
 }
 
 // La barba tiene su propio modo: es una superficie distinta del pelo y no tiene por qué
@@ -293,7 +295,9 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   // casquete sin donde cortar — y por abajo, que no invadan la zona de mandíbula.
   const seam = (u) =>
     Math.min(Math.max(baseline(u), headBox.y + o + 6), headBox.y + headBox.h * 0.72)
-  const crown = shellBetween(geo.pts, geo.radii, o, seam(-1), seam(1), 'crown')
+  const yL = seam(-1)
+  const yR = seam(1)
+  const crown = shellBetween(geo.pts, geo.radii, o, yL, yR, 'crown')
   if (!crown) return beard ? { beard } : null
 
   const path = new Path2D()
@@ -372,9 +376,20 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   if (shOff > 0.5) {
     ctx.save()
     ctx.clip(geo.path)
-    ctx.translate(0, shOff)
     ctx.fillStyle = palette.skinDeep
+    // La sombra del casquete solo puede caer en la FRENTE, por encima de las costuras.
+    // Con costuras profundas (melena, barrido fuerte), la copia desplazada del borde
+    // LATERAL entraba en la cara por donde la mandíbula se estrecha y pintaba tiras
+    // de sombra junto a las orejas — patillas fantasma.
+    ctx.save()
+    const frente = new Path2D()
+    frente.rect(-4000, -4000, 8000, 4000 + Math.min(yL, yR))
+    ctx.clip(frente)
+    ctx.translate(0, shOff)
     ctx.fill(path)
+    ctx.restore()
+    // los laterales sí proyectan la suya entera: son piezas de cara, no de coronilla
+    ctx.translate(0, shOff)
     for (const s of sides) if (s) ctx.fill(s)
     ctx.restore()
   }
@@ -414,9 +429,14 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   ctx.restore()
 
   // --- raya: división diagonal plana, más clara. No es un degradado ------
+  // Confinada POR ENCIMA del flequillo: es un brillo de coronilla, y con costuras
+  // profundas (melena, barrido fuerte) el triángulo pintaba de gris media masa.
   if (p.parting > 0.01) {
     ctx.save()
     ctx.clip(path)
+    const coronilla = new Path2D()
+    coronilla.rect(-4000, -4000, 8000, 4000 + fringeY)
+    ctx.clip(coronilla)
     const a = (p.partingAngle * Math.PI) / 180
     const r = headBox.w * 2
     const px = cx + Math.sin(a) * headBox.w * 0.12
