@@ -95,10 +95,8 @@ function resolveBands(choice) {
 }
 
 {
-  const hasComposer = Object.keys(composerBands()).length > 0
   const auto = document.createElement('option')
   auto.value = ''
-  auto.textContent = hasComposer ? 'estilo: composer' : 'estilo: por defecto'
   estiloEl.append(auto)
   for (const [n, c] of Object.entries(CONFIGS)) {
     const o = document.createElement('option')
@@ -110,14 +108,39 @@ function resolveBands(choice) {
   if (saved && CONFIGS[saved]) estiloEl.value = saved
 }
 
+function syncAutoLabel() {
+  estiloEl.options[0].textContent =
+    Object.keys(composerBands()).length > 0 ? 'estilo: composer' : 'estilo: por defecto'
+}
+syncAutoLabel()
+
 let bands = resolveBands(estiloEl.value)
 
-estiloEl.addEventListener('change', () => {
-  localStorage.setItem(ESTILO_KEY, estiloEl.value)
+function applyEstilo() {
+  syncAutoLabel()
   bands = resolveBands(estiloEl.value)
   // mismas seeds, bandas nuevas: cambia el estilo sin cambiar de personajes
   for (const a of actors) reseed(a, a.seed)
+}
+
+estiloEl.addEventListener('change', () => {
+  localStorage.setItem(ESTILO_KEY, estiloEl.value)
+  applyEstilo()
 })
+
+// En modo composer, los retoques del panel tienen que llegar EN VIVO: el composer
+// persiste cada movimiento de slider, y `storage` avisa a las demás pestañas del
+// origen. Volver a la pestaña (visibilitychange) o a la ventana (focus) repesca lo
+// que ese evento no cubra; el diff evita re-sortear 30 caras cuando no cambió nada.
+window.addEventListener('storage', (e) => {
+  if (e.key === 'doodle-bands:compose' && !estiloEl.value) applyEstilo()
+})
+const repescar = () => {
+  if (estiloEl.value) return
+  if (JSON.stringify(composerBands()) !== JSON.stringify(bands)) applyEstilo()
+}
+document.addEventListener('visibilitychange', repescar)
+window.addEventListener('focus', repescar)
 
 const fallback = getPalette('magenta')
 // El aislamiento de cada cara vive AQUÍ, dentro del dibujo: 7% de margen por lado, en
