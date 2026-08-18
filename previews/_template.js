@@ -260,7 +260,9 @@ function mount(opts) {
         l.classList.toggle('on', cb.checked)
         l.append(cb, document.createTextNode(opt))
         cb.addEventListener('change', () => {
-          const base = def.pool?.[opt] ?? 1
+          // `|| 1` y no `?? 1`: las opciones opt-in declaran peso 0 (labios, lapiz,
+          // ceja fina) y con `??` marcar su casilla las dejaba en 0 — apagadas
+          const base = def.pool?.[opt] || 1
           pool[opt] = cb.checked ? base : 0
           l.classList.toggle('on', cb.checked)
           sync()

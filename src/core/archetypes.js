@@ -56,6 +56,8 @@ export const BANDS = {
     },
     mouth: {
       type: { line: 2, frown: 1, 'tiny-o': 0.5, labios: 4 },
+      width: [0.09, 0.19],
+      lipFull: [0.65, 0.95],
     },
     cheeks: {
       type: { nada: 2, rubor: 2, pecas: 1 },

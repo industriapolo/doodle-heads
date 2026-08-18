@@ -52,7 +52,9 @@ export function draw(ctx, faceBox, p, palette, rng) {
     // Tinta plana sin contorno, como las masas. El ánimo tuerce las COMISURAS
     // (curve > 0 las sube: sonrisa) y la apertura hincha la panza inferior — un
     // labio de verdad no se abre en O sin romper el dibujo.
-    const lw = w * 1.15
+    // Más anchos que la boca de línea: en la referencia morada los labios ocupan
+    // bastante más que la boquita mínima de los hombres.
+    const lw = w * 1.45
     const hUp = lw * 0.17 * p.lipFull
     const hLo = lw * 0.24 * p.lipFull * (1 + open * 0.45)
     const yC = -curve * lw * 0.18 // las comisuras

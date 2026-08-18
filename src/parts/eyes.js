@@ -227,29 +227,6 @@ function eye(ctx, side, w, sag, p, palette) {
     ctx.restore()
   }
 
-  // --- pestañas: sobre la mitad exterior del pliegue ----------------------
-  // Del MISMO arco de la copia A (misma elipse, mismos radios): así se mueven con el
-  // pliegue si algún radio cambia. Apuntan por la radial de la elipse, hacia fuera.
-  if (p.lashes) {
-    const nL = Math.max(1, Math.round(p.lashCount))
-    const len = w * p.lashLen
-    const a0 = Math.PI + gap
-    const a1 = Math.PI * 2 - gap
-    interior(ctx, palette, p.detailWeight)
-    ctx.beginPath()
-    for (let i = 0; i < nL; i++) {
-      const t = (i + 1) / (nL + 1)
-      // pegadas al extremo exterior del arco, según el lado del ojo
-      const a = side.dir > 0 ? a1 - t * (a1 - a0) * 0.3 : a0 + t * (a1 - a0) * 0.3
-      const px = Math.cos(a) * rx
-      const py = ecy + Math.sin(a) * ry
-      const dl = Math.hypot(px, py - ecy) || 1
-      ctx.moveTo(px, py)
-      ctx.lineTo(px + (px / dl) * len, py + ((py - ecy) / dl) * len)
-    }
-    ctx.stroke()
-  }
-
   // --- copia B: la MISMA elipse recortada CON el ojo ----------------------
   // Cierra las comisuras por dentro. Sin recorte angular: aquí interesa justo lo que
   // deje la intersección. Y contra el blanco VISIBLE, no el de reposo — es un rasgo
@@ -275,6 +252,24 @@ function eye(ctx, side, w, sag, p, palette) {
   chord.moveTo(-half, 0)
   chord.lineTo(half, 0)
   ctx.stroke(chord)
+
+  // --- pestañas: ANCLADAS A LA CUERDA, en su mitad exterior ---------------
+  // Son parte del párpado, no del pliegue: viven sobre la línea horizontal del ojo
+  // (los ticks de la geisha) y, como van dentro del marco desplazado por `chordY`,
+  // bajan con el párpado al parpadear.
+  if (p.lashes) {
+    const nL = Math.max(1, Math.round(p.lashCount))
+    const len = w * p.lashLen
+    interior(ctx, palette, p.detailWeight)
+    ctx.beginPath()
+    for (let i = 0; i < nL; i++) {
+      // repartidas por la mitad exterior de la cuerda, hacia la sien
+      const x = side.dir * half * (0.45 + (0.45 * (i + 1)) / nL)
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x + side.dir * len * 0.45, -len)
+    }
+    ctx.stroke()
+  }
   ctx.restore()
 
   ctx.restore()
