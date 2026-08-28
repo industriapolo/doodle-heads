@@ -42,7 +42,9 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 
 ## Cómo se trabaja
 
-- `python3 serve.py 8137` — NUNCA `python3 -m http.server` (caché, ver CLAUDE.md).
+- `python3 serve.py` — arranca en el 8137, que es el puerto de siempre (ya es el
+  default; no hace falta pasarlo). NUNCA `python3 -m http.server` (caché, ver
+  CLAUDE.md), y nunca dos puertos a la vez: `localStorage` es por origen.
 - `previews/compose.html` — panel completo. `previews/hair.html` — pelo/barba
   aislados. `head`, `eyes`, `brows`, `mouth` y `hatching` — partes sueltas.
   `index.html` — rejilla viva. En `previews/_archivo/` queda `eye-lab.html`: es el

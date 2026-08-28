@@ -7,6 +7,10 @@ revalidar: editas un módulo, recargas, y el navegador sigue ejecutando el viejo
 imports de namespace eso no da error de carga, da `undefined` en una propiedad y una
 página en blanco a mitad de arranque.
 
+El puerto por defecto es fijo a propósito. `localStorage` es por ORIGEN: si el panel de
+composición y el index acaban en puertos distintos, miran almacenes distintos y el index
+deja de sincronizarse con el panel sin dar ningún error. Un solo puerto, siempre el mismo.
+
 Uso:  python3 serve.py [puerto]
 """
 
@@ -37,12 +41,21 @@ class NoCacheHandler(SimpleHTTPRequestHandler):
         super().log_message(fmt, *args)
 
 
+# El puerto de siempre del proyecto. Ver el docstring: cambiarlo parte el localStorage
+# compartido entre el panel de composición y el index.
+PORT = 8137
+
+
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else PORT
     handler = partial(NoCacheHandler, directory=".")
     with ThreadingHTTPServer(("127.0.0.1", port), handler) as httpd:
         print(f"doodle-heads → http://localhost:{port}/previews/compose.html")
+        print(f"       index → http://localhost:{port}/index.html")
         print("(sin caché: edita un módulo y recarga normal, sin Cmd+Shift+R)")
+        if port != PORT:
+            print(f"OJO: {PORT} es el puerto de siempre. localStorage es por origen, así que")
+            print(f"     en el {port} el index no ve las bandas guardadas desde el {PORT}.")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
