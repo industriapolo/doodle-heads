@@ -1,6 +1,15 @@
 <!doctype html>
 <meta charset="utf-8">
 <script type="module">
+// ARCHIVADO (ago 2026). Esta construcción YA VIVE EN `src/parts/eyes.js` — ahí es donde
+// se toca. `previews/eyes.html` es la preview viva del módulo.
+//
+// Se guarda como documento, no como herramienta: el laboratorio tiene su propia copia de
+// PARAMS y en el momento en que alguien afine el ojo aquí, afinará una copia muerta. El
+// texto de abajo es el razonamiento con el que se llegó a la construcción, y es la razón
+// de no borrarlo; el resumen canónico está en CLAUDE.md, «Construcción del ojo».
+//
+// ---------------------------------------------------------------------------
 // LABORATORIO — construcción nueva del ojo, aislada. No toca eyes.js.
 //
 // El esquema:
@@ -15,9 +24,9 @@
 // distintos — bajar la cuerda o subir el arco — y los dos colapsaban el blanco a cero.
 // Ahora `blink` cierra y `blinkPivot` decide hacia dónde: 0 arriba, 1 abajo.
 
-import { mountPreview } from './_template.js'
-import { interior } from '../src/style/stroke.js'
-import { sample } from '../src/core/params.js'
+import { mountPreview } from '../_template.js'
+import { interior } from '../../src/style/stroke.js'
+import { sample } from '../../src/core/params.js'
 
 const PARAMS = {
   construccion: { options: ['no', 'si'], pool: { no: 1, si: 0 }, label: 'Ver la elipse entera' },
@@ -268,8 +277,8 @@ mountPreview({
   cell: 300,
   inset: 0.02,
   refs: [
-    '../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
-    '../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
+    '../../referencias/tumblr_nk2zjbwVVF1qbb5vqo1_1280.jpg',
+    '../../referencias/tumblr_nn95pohTcC1qbb5vqo1_1280.jpg',
   ],
 })
 </script>

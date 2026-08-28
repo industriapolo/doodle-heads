@@ -44,8 +44,11 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 
 - `python3 serve.py 8137` — NUNCA `python3 -m http.server` (caché, ver CLAUDE.md).
 - `previews/compose.html` — panel completo. `previews/hair.html` — pelo/barba
-  aislados. `previews/eye-lab.html` y demás — partes sueltas. `index.html` — rejilla
-  viva.
+  aislados. `head`, `eyes`, `brows`, `mouth` y `hatching` — partes sueltas.
+  `index.html` — rejilla viva. En `previews/_archivo/` queda `eye-lab.html`: es el
+  laboratorio con el que se diseñó el ojo, con su propia copia de PARAMS. Esa
+  construcción ya vive en `eyes.js` y la preview viva es `eyes.html`, así que el
+  laboratorio se lee, no se toca.
 - Ciclo de dirección de arte: afinar bandas en compose → «copiar rangos» → pegar a
   Claude con un nombre → queda como configuración en `previews/configs.js`.
 - Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude.
