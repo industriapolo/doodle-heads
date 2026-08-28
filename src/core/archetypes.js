@@ -26,6 +26,15 @@ export const randomize = randomizerFor(PARAMS)
 //  · cara más estrecha y barbilla más redonda — ratio abajo, bottomRadius arriba
 //  · melena trasera casi siempre; barba nunca; sin patilla bajo la oreja
 //  · ceja fina de arco (el marcador más fuerte de las refs), silueta de pelo suave
+//
+// El pelo de la mujer es SIEMPRE `solid`, y eso no es una preferencia de estilo: `drawBack`
+// y el moño exigen corona sólida y no dibujan nada sin ella. Con `radial` en el pool, una de
+// cada seis mujeres sorteaba melena o moño invisibles — el marcador principal del arquetipo
+// perdido en silencio, sin error y sin hueco en el dibujo que lo delatara (medido: 6,7 % de
+// TODOS los personajes con `backHair` invisible, 2,1 % con moño invisible).
+//
+// La alternativa era que la melena no exigiera corona sólida; CLAUDE.md la descarta («peluca
+// flotando»), y las cuatro referencias de mujer son de masa, ninguna de rayitas.
 export const BANDS = {
   clasico: {
     hair: { backHair: { p: 0.04 } }, // el rockero existe, pero es raro
@@ -37,7 +46,7 @@ export const BANDS = {
       jawInset: [0, 0.12],
     },
     hair: {
-      mode: { solid: 5, radial: 1, directional: 0, bald: 0 },
+      mode: { solid: 6, radial: 0, directional: 0, bald: 0 },
       backHair: { p: 0.85 },
       bun: { p: 0.3 },
       beardCoverage: [0, 0],
