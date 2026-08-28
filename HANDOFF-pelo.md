@@ -59,8 +59,11 @@ casquete (`topY + 4`) — si lo hiciera, la masa se invertiría y el relleno se 
 
 - Sin flotación (se retiró de `rig.js`: movía las cards y se solapaban).
 - Cards a hueso: sin gap ni radios en el grid.
-- Marco de dibujo a `0.99` (antes `0.88`): cabezas ~14% más grandes. Una cresta muy
-  larga en una cabeza muy alta puede rozar el borde del lienzo; asumido.
+- Marco de dibujo ampliado (venía de `0.88`): cabezas más grandes. Aquella sesión lo
+  subió a `0.99` y las crestas largas rozaban el borde del lienzo; después se echó
+  atrás. **El valor vigente en `index.html` es `0.86` del lienzo, con 7 % de margen por
+  lado** — el aislamiento entre caras vive dentro del dibujo, en unidades lógicas, no en
+  el CSS del grid.
 
 ## Guardarraíles que siguen vigentes
 

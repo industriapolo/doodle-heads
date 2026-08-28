@@ -24,8 +24,15 @@ sigue corriendo el viejo — y con imports de namespace eso no da error de carga
 ## Arquitectura
 
 1. **Un módulo por parte.** `src/parts/*.js`, uno por rasgo. Nunca un monolito.
-2. **Una preview por módulo.** `previews/*.js` renderiza ~30 variantes + sliders. El estilo se
-   itera ahí, aislado, antes de componer.
+2. **Una preview por módulo.** `previews/*.html` renderiza ~30 variantes + sliders. El estilo
+   se itera ahí, aislado, antes de componer.
+
+   Con preview propia: `head`, `hair` (pelo+barba), `eyes`, `brows`, `mouth` y `hatching`.
+   Nariz, orejas, barbilla, mejillas, gafas y paleta **no la tienen**: se afinan desde
+   `compose.html`, que ya monta sus sliders. No es deuda — son rasgos que solo se juzgan
+   en la cara entera: una nariz aislada no dice nada sobre si cae bien entre los ojos, y
+   la paleta se ve en el conjunto o no se ve. La regla es «ningún módulo sin sliders», no
+   «un fichero por módulo».
 3. **Params serializables.** Un personaje completo = un objeto plano de números y strings.
 4. **Estilo centralizado.** Colores y grosores viven en `src/style/`. Ninguna parte los hardcodea.
 
