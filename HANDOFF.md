@@ -51,6 +51,10 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   laboratorio con el que se diseñó el ojo, con su propia copia de PARAMS. Esa
   construcción ya vive en `eyes.js` y la preview viva es `eyes.html`, así que el
   laboratorio se lee, no se toca.
+- `node --test` desde la raíz — determinismo, contrato de PARAMS y estadística de
+  arquetipos sobre 2000 seeds. Sin dependencias. Cubre el SORTEO, no el dibujo; lo
+  geométrico sigue siendo el ray-casting en la consola de compose. `node --test test/`
+  NO vale en Node 25 (el directorio como posicional revienta): sin argumentos.
 - Ciclo de dirección de arte: afinar bandas en compose → «copiar rangos» → pegar a
   Claude con un nombre → queda como configuración en `previews/configs.js`.
 - Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude.
