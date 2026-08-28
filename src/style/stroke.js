@@ -1,10 +1,8 @@
 // Trazo y esquinas. Todos los grosores son absolutos en el espacio lógico 800×800:
 // el peso de línea uniforme es lo que hace que todo se lea como la misma mano.
 //
-// `wobble` está cerrado en 0 — los contornos de las referencias son vector limpio.
-// El aire de "hecho a mano" vive entero en el jitter de hatching.js, no aquí.
-
-export const WOBBLE = 0
+// No hay wobble: los contornos de las referencias son vector limpio. El aire de
+// "hecho a mano" vive entero en el jitter de hatching.js, no aquí.
 
 // Los grosores se pasan SIEMPRE como ancho absoluto en unidades del espacio de trabajo,
 // nunca como multiplicador de un peso compartido. Con multiplicadores encadenados, tocar
@@ -220,26 +218,4 @@ function cornerArc(P, V, N, r) {
 /** Ángulo de la normal exterior de la arista A→B (polígono horario, y hacia abajo). */
 function edgeNormalAngle(A, B) {
   return Math.atan2(-(B.x - A.x), B.y - A.y)
-}
-
-/** Traza una polilínea abierta suavizada por curvas cuadráticas (párpados, arrugas). */
-export function smoothPath(pts) {
-  const path = new Path2D()
-  if (pts.length < 2) return path
-  path.moveTo(pts[0].x, pts[0].y)
-  for (let i = 1; i < pts.length - 1; i++) {
-    const m = mid(pts[i], pts[i + 1])
-    path.quadraticCurveTo(pts[i].x, pts[i].y, m.x, m.y)
-  }
-  const last = pts[pts.length - 1]
-  path.lineTo(last.x, last.y)
-  return path
-}
-
-/** Rellena y contornea una silueta de una sola vez. */
-export function fillAndStroke(ctx, path, fillColor, palette, width = WEIGHT.outline) {
-  ctx.fillStyle = fillColor
-  ctx.fill(path)
-  outline(ctx, palette, width)
-  ctx.stroke(path)
 }

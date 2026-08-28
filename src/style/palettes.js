@@ -168,7 +168,3 @@ export function getPalette(name) {
 export const PALETTES = Object.fromEntries(
   PALETTE_NAMES.map((n) => [n, { ...getPalette(n), label: PRESETS[n].label }])
 )
-
-export function pickPalette(rng) {
-  return PALETTES[rng.pick(PALETTE_NAMES)]
-}

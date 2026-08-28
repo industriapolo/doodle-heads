@@ -144,8 +144,10 @@ La historia de por qué (dos generaciones de fallos con una cúpula elíptica) e
 
 ## Decisiones de estilo cerradas
 
-- **`wobble` = 0.** Los contornos de las refs son vector limpio. El aire de "hecho a mano" vive
-  entero en el jitter interno de `hatching.js` (ángulo y largo por raya), no en la silueta.
+- **Sin wobble en la silueta.** Los contornos de las refs son vector limpio. El aire de "hecho
+  a mano" vive entero en el jitter interno de `hatching.js` (ángulo y largo por raya), no en la
+  silueta. Hubo una constante `WOBBLE = 0` en `stroke.js`: se borró por muerta — la decisión es
+  no tener el parámetro, no tenerlo a cero.
 - **El color de línea varía por paleta.** No asumir negro: en `magenta` la línea es plum,
   en `verde-noche` es negra. En el sistema paramétrico eso es un solo número
   (`lineSat`), no dos paletas distintas.

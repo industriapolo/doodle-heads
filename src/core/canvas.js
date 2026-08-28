@@ -53,8 +53,3 @@ export function box(x, y, w, h) {
     bottom: y + h,
   }
 }
-
-/** Sub-caja en coordenadas relativas (0..1) de otra caja. */
-export function subBox(parent, fx, fy, fw, fh) {
-  return box(parent.x + fx * parent.w, parent.y + fy * parent.h, fw * parent.w, fh * parent.h)
-}

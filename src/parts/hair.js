@@ -396,7 +396,7 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
     const base = Math.max(baseline(u), topY + 4)
     // Las púas se concentran en un lado, como los picos de la silueta, en vez de
     // repartirse por igual: en las referencias son dos o tres grandes, no una fila.
-    const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1 // eslint-disable-line
+    const lado = p.spikeSide === 'izquierda' ? t : p.spikeSide === 'derecha' ? 1 - t : 1
     const bias = 1 - p.spikeAsym * (1 - lado * lado)
     const tip =
       i % 2 === 1

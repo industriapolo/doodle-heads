@@ -47,17 +47,6 @@ export function sample(PARAMS, rng, bands = {}) {
   return out
 }
 
-/** Valores por defecto, para usar un módulo suelto sin sortear nada. */
-export function defaults(PARAMS) {
-  const out = {}
-  for (const [name, def] of Object.entries(PARAMS)) {
-    if (def.options) out[name] = def.default ?? def.options[0]
-    else if (def.type === 'bool') out[name] = def.default ?? (def.p ?? 0) > 0.5
-    else out[name] = def.default ?? mid(def.range || [def.min, def.max])
-  }
-  return out
-}
-
 /** Crea el `randomize(rng)` de un módulo desde su PARAMS. */
 export function randomizerFor(PARAMS) {
   return (rng, bands) => sample(PARAMS, rng, bands)
@@ -80,6 +69,5 @@ export function exportBands(PARAMS, bands) {
 }
 
 const uniformPool = (options) => Object.fromEntries(options.map((o) => [o, 1]))
-const mid = ([a, b]) => (a + b) / 2
 const round = (v) => +Number(v).toFixed(4)
 const key = (n) => (/^[a-zA-Z_$][\w$]*$/.test(n) ? n : JSON.stringify(n))
