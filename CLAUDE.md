@@ -78,6 +78,13 @@ export function draw(ctx, box, params, palette, rng) { ... }
 previews dirige las 30 celdas sin tocar el código. El botón **copiar rangos** escupe las
 bandas afinadas para fijarlas aquí.
 
+La banda declarada es el **punto de referencia**: el panel y las configuraciones guardan
+solo lo que **difiere** de ella (`touchedBands`, en `params.js`), y eso es exactamente lo
+que pisa al arquetipo — donde el panel no ha tocado nada, manda el overlay del arquetipo.
+Escribir una banda de fábrica es apagar el arquetipo en ese parámetro sin decirlo. La
+tolerancia es medio paso de slider, que es lo que el navegador cuadricula él solo al
+abrir el panel; por debajo de eso la diferencia no la ha puesto una mano.
+
 `character.js` solo pide `randomize()` a cada parte y compone. No conoce los rangos.
 
 ### Construcción del ojo

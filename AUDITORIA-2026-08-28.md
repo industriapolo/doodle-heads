@@ -12,11 +12,15 @@ El proyecto está sano y es coherente con su propia arquitectura: un módulo por
 
 `drawBack` y el moño exigen `mode: 'solid'`, pero el overlay de `mujer` deja `radial: 1` en el pool de modo (`archetypes.js:40`). Resultado medido: un 6,7 % de todos los personajes lleva `backHair: true` invisible y un 2,1 % un moño invisible; dicho de otro modo, una de cada seis mujeres pierde el marcador principal del arquetipo. Decisión tuya: o `radial: 0` en el overlay de mujer (lo más simple, coherente con las cuatro refs, todas de masa), o que la melena no exija corona sólida (CLAUDE.md lo descarta: «peluca flotando»).
 
-### 2. La trampa panel/arquetipo es más fina de lo que dice el HANDOFF (alta)
+### 2. La trampa panel/arquetipo es más fina de lo que dice el HANDOFF (alta) — CERRADO (29 ago 2026)
 
 El diff contra las bandas declaradas es exacto (`JSON.stringify`). Medido: con `backHair.p = 0.12` (fábrica) las mujeres llevan melena el 85 %; con `p = 0.12000001` cae al 10 %. Cualquier roce de un slider, o cambiar un `range` en el código con bandas viejas en `localStorage`, pisa el arquetipo sin ninguna señal. Además `configs.js` guarda TODAS las bandas (`poster-granulado` incluye `head.ratio: [0.58, 0.82]`, que es fábrica): en cuanto cambies un rango declarado, esa config lo «toca» y anula el arquetipo en ese parámetro.
 
 Propuesta: que el panel persista y exporte solo lo que difiere de lo declarado (el `declared()` ya existe en `_template.js`), marcando visualmente las filas tocadas con un botón de reset por fila. Con eso el diff en `character.js` deja de ser una trampa y pasa a ser el contrato.
+
+**Cerrado el 29 ago 2026.** La comparación vive ahora en `touchedBands` (`src/core/params.js`), una sola, y la usan `character.js`, el panel y las configuraciones. Con tolerancia: medio paso de slider en los numéricos —que es lo que el navegador cuadricula él solo al asignar el valor de un `input[type=range]`, y lo que hacía nacer tocadas a `hair.fringeShadow` y `glasses.bridgeDrop`—, 1e-6 en las probabilidades, exacta en los pesos. El panel persiste y exporta solo el diff, marca cada fila tocada con un punto y le pone un ↺; al cargar, un almacén viejo se migra pasándolo por la misma función (medido en compose: 4.350 bytes con las 173 bandas → 31 con el único toque de verdad, y las claves obsoletas fuera). `poster-granulado` migrada de 148 bandas a 46 —`head.ratio` incluido—, y la regla de carga de una config (manda sobre los módulos que NOMBRA; los que no nombra no se tocan) escrita en la cabecera de `configs.js`.
+
+La medida que abría este hallazgo se da la vuelta: con `backHair.p + 1e-8` la melena en mujeres se queda en 84,9 %, no cae al 10 %. Queda fijado en `test/character.test.mjs` («diff panel / arquetipo»), junto con medio paso de slider, una clave obsoleta de un `localStorage` viejo, y la otra mitad del contrato — con `p: 0.5` el panel tiene que seguir mandando. La regla suelta se prueba en `test/params.test.mjs`, que además barre los módulos reales para que ninguna banda declarada nazca marcada como tocada.
 
 ### 3. La verificación vive fuera del repo (media)
 

@@ -14,7 +14,8 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 - **Arquetipos** (`src/core/archetypes.js`): `clasico`/`mujer` correlacionan partes
   poniendo bandas DEBAJO de las del panel. Regla clave: una banda del panel solo pisa
   al arquetipo si difiere de la declarada del módulo — donde está de fábrica, manda el
-  arquetipo. Mujer = melena/moño/cortinas + ceja fina + labios + pestañas + rubor/pecas
+  arquetipo — y como el panel ya solo guarda lo que difiere, «de fábrica» y «no tocado»
+  son lo mismo. Mujer = melena/moño/cortinas + ceja fina + labios + pestañas + rubor/pecas
   + cara estrecha, todo sesgos, nada muros.
 - **Rig** (`src/anim/rig.js`): parpadeo, mirada, y ánimo de 10 estados (un solo estado
   con 5 canales: cejas tilt/lift/raise + boca curve/open) — mayoría del tiempo en
@@ -23,9 +24,10 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   apertura y atenúa la curva.
 - **Estilo global en la paleta**: color paramétrico HSL, grano+viñeta
   (`src/style/finish.js`), trazo `lapiz` opt-in (dash+alpha+repaso, en `stroke.js`).
-- **Configuraciones** (`previews/configs.js`): juegos de bandas con nombre —
-  «Póster granulado» + los 4 esquemas clásicos (solo color). Desplegable en los
-  paneles y en el index.
+- **Configuraciones** (`previews/configs.js`): DIFFS con nombre contra las bandas
+  declaradas — «Póster granulado» + los 4 esquemas clásicos (solo color). Desplegable en
+  los paneles y en el index. Cargar una manda sobre los módulos que NOMBRA (se resetean
+  a declarado y se les aplica su diff); los que no nombra se quedan como estén.
 - **Index**: grid responsive a prueba de pantalla (el canvas fluye como imagen; el
   aire vive dentro del dibujo), selector de fuente de estilo (composer en vivo /
   configuración con nombre), seeds guardados con ★ y copiar al portapapeles.
@@ -64,9 +66,17 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 
 ## Trampas conocidas (no reaprender por las malas)
 
-- **Panel vs arquetipo**: el panel persiste TODAS las bandas; el diff contra las
-  declaradas (en `character.js`) es lo que deja respirar al arquetipo. Si un rasgo
-  opt-in "no sale", mirar si una banda del panel difiere de fábrica y lo pisa.
+- **Panel vs arquetipo**: el panel y las configuraciones guardan SOLO lo que difiere de
+  la banda declarada por el módulo (`touchedBands` en `params.js`), y ese diff es lo
+  único que pisa al arquetipo — donde el panel está de fábrica, manda el overlay. Si un
+  rasgo opt-in "no sale", mirar qué filas del panel llevan punto magenta: son las
+  tocadas, y una de ellas lo está pisando. El ↺ de la fila la devuelve a fábrica.
+  Escribir una banda de fábrica dentro de una config apaga el arquetipo en ese parámetro
+  sin decirlo: por eso «copiar rangos» exporta solo lo tocado.
+  (Hasta ago 2026 el panel persistía TODAS las bandas y el diff era un `JSON.stringify`
+  exacto: sumar 1e-8 a una probabilidad hundía la melena en mujeres del 85 % al 10 %, y
+  medio paso de slider hacía lo mismo sin que nadie tocara nada. Cerrado — hallazgo 2 de
+  `AUDITORIA-2026-08-28.md`, con test en `test/character.test.mjs`.)
 - **Opciones opt-in con peso 0** (labios, ceja fina, lápiz, cortinas en hombres): el
   panel les da peso 1 al marcarlas (`|| 1`, no `?? 1` — hubo bug).
 - **setupCanvas fija width/height inline en px**: cualquier host que quiera canvas
