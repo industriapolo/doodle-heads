@@ -1,7 +1,20 @@
 // Configuraciones del composer: juegos de bandas con nombre, capturados con «copiar
-// rangos» y guardados aquí para poder volver a ellos. El desplegable «configuración»
-// del panel los vuelca en los sliders — solo las claves que la config define, así que
-// una config puede ser parcial (los esquemas de color de abajo solo traen `palette`).
+// rangos» y guardados aquí para poder volver a ellos. El desplegable «configuración» del
+// panel los vuelca en los sliders y desde ahí se afina.
+//
+// Son DIFFS contra las bandas declaradas por cada módulo, no juegos completos. Una banda
+// que coincide con la de fábrica no se escribe: en `character.js` una banda solo pisa al
+// arquetipo si difiere de la declarada, así que copiar valores de fábrica dentro de una
+// config es apagar el arquetipo en ese parámetro sin decirlo. `poster-granulado` nació
+// como volcado completo del panel y traía 148 bandas, de las que 102 eran de fábrica
+// —`head.ratio: [0.58, 0.82]` entre ellas—; migrada al diff son 46.
+//
+// REGLA DE CARGA: una config manda sobre los MÓDULOS QUE NOMBRA. Esos se devuelven a lo
+// declarado y encima se aplica su diff; los que no nombra se quedan como estén. Por eso
+// los cuatro esquemas de color siguen siendo parciales (solo tocan `palette`) y
+// `poster-granulado` es completo para los módulos que lista. Un módulo cuyo diff queda
+// vacío no se lista: no tiene nada que decir, y listarlo solo serviría para arrastrar al
+// arquetipo a fábrica.
 //
 // Formato: bandas por módulo, como las guarda el panel — numérico [lo, hi],
 // lista { opción: peso }, booleano { p }.
@@ -20,15 +33,12 @@ export const CONFIGS = {
         skinSat: [63, 96],
         skinLight: [70, 98],
         shadowStep: [9.5, 15.5],
-        shadowSat: [-11.5, -11.5],
         lineLight: [11, 22],
         lineSat: [23, 44],
         lineHueShift: [31, 42],
         accentHue: [0, 418],
         accentSat: [79, 84],
         accentLight: [38, 53],
-        eyeCornerSat: [6, 6],
-        eyeCornerLight: [-5, -5],
         bgHue: [0, 420],
         bgSat: [30, 68],
         bgLight: [31, 62],
@@ -40,155 +50,53 @@ export const CONFIGS = {
         sketchAlpha: [1, 1],
       },
       head: {
-        lineWeight: [1.4, 3.3],
-        ratio: [0.58, 0.82],
-        topRadius: [0.36, 0.5],
-        bottomRadius: [0.02, 0.04],
-        jawInset: [0, 0.22],
-        chinHeight: [0.11, 0.21],
         asymmetry: [0.025, 0.045],
-        shadowSide: { none: 0, left: 1, right: 0 },
-        shadowWidth: [0.13, 0.45],
         fill: [0.84, 0.94],
+        lineWeight: [1.4, 3.3],
       },
       ears: {
-        lineWeight: [1.7, 3.6],
-        size: [0.05, 0.1],
         eyeAlign: [-0.01, 0.01],
         stretch: [0.9, 1.6],
         innerSize: [0.33, 0.58],
-        innerSweep: [140, 360],
-        innerRotation: [-180, -180],
         innerRise: [-0.28, 0.34],
-        innerShade: { si: 3, no: 1 },
         innerTone: { media: 0, fuerte: 1 },
+        lineWeight: [1.7, 3.6],
       },
       eyes: {
+        eyeWidth: [0.25, 0.39],
+        browGap: [0.015, 0.105],
+        pupilSize: [0.06, 0.19],
         lineWeight: [2.7, 3.4],
         detailWeight: [1.8, 1.8],
-        eyeWidth: [0.25, 0.39],
-        depth: [0.025, 0.115],
-        tilt: [-2, 1],
-        spacing: [0.1, 0.18],
-        offsetY: [0.34, 0.46],
-        browGap: [0.015, 0.105],
-        ringRx: [0.68, 0.8],
-        ringRy: [0.42, 0.56],
-        ringCy: [0.2, 0.36],
-        gapAngle: [24, 38],
-        innerCopy: { si: 1, no: 0 },
-        bagLines: [0, 2],
-        bagStep: [0.1, 0.16],
-        shadow: { p: 0.35 },
-        shadowRing: [1, 2],
-        shadowTone: { media: 3, fuerte: 1 },
-        pupilSize: [0.06, 0.19],
-        pupilX: [-0.75, 1],
-        sclera: { white: 1, accent: 0 },
-        cornerShade: { si: 1, no: 0 },
-        blink: [0, 0],
-        blinkPivot: [0, 0.15],
       },
       nose: {
-        lineWeight: [2.7, 2.7],
-        type: { recta: 2, escalon: 1 },
         stepWidth: [0.035, 0.095],
         stepDrop: [0.03, 0.1],
-        startY: [0.15, 0.36],
-        length: [0.29, 0.52],
-        hookWidth: [0.025, 0.14],
-        hookSide: { left: 1, right: 1 },
-        curlRadius: [0.28, 0.45],
-        curlSweep: [170, 215],
-        curlCorner: [32, 52],
-        shadowDepth: [0.45, 0.7],
-        offsetX: [-0.025, 0.025],
-        tilt: [-3.5, 3.5],
+        lineWeight: [2.7, 2.7],
       },
       mouth: {
-        lineWeight: [3.6, 3.6],
         type: { line: 3, frown: 2, 'tiny-o': 0 },
-        width: [0.05, 0.18],
-        offsetY: [0.76, 0.92],
-        offsetX: [-0.1, 0.1],
-        cigarette: { p: 0.45 },
-        cigAngle: [8, 45],
-        cigLength: [0.22, 0.27],
-      },
-      chin: {
-        lineWeight: [2.9, 2.9],
-        type: { x: 4, crease: 2, none: 2 },
-        size: [0.018, 0.046],
-        offsetY: [0.9, 1],
-        offsetX: [-0.02, 0.02],
-        rotation: [-12, 12],
-      },
-      glasses: {
-        lineWeight: [3.8, 3.8],
-        glasses: { p: 0.28 },
-        shape: { rect: 2, redonda: 2 },
-        lensWidth: [1.12, 1.4],
-        lensAspect: [0.55, 0.85],
-        lensOffsetY: [0.1, 0.4],
-        corner: [0.08, 0.3],
-        bridgeDrop: [-0.1, 0.16],
-        temple: { si: 3, no: 1 },
       },
       hair: {
-        hairWeight: [2.2, 2.2],
-        beardWeight: [2.2, 2.2],
-        mode: { solid: 3, radial: 2, directional: 0, bald: 1 },
         hairline: [0.11, 0.32],
-        hairDensity: [0, 0.29],
-        hairAngle: [15, 60],
-        hairOriginY: [0.95, 1.35],
-        overhang: [0.01, 0.035],
-        fringeY: [-0.05, -0.05],
-        sideDrop: [0.02, 0.14],
-        sideWidth: [0.085, 0.2],
-        sideLength: [0.28, 0.75],
-        sideTaper: [0.1, 0.6],
-        sideburn: [0, 0.18],
-        sideJag: [0, 0.008],
         fringeShape: { pico: 2, curva: 2, 'curva-picos': 2 },
         fringeBow: [0.065, 0.195],
-        fringeTilt: [-0.16, 0.16],
-        fringeSpikes: [9, 16],
         fringeDepth: [0.015, 0.095],
-        topSpikes: [5, 12],
         topSpikeDepth: [0, 0.172],
-        spikeSide: { ambos: 2, izquierda: 1, derecha: 1 },
         spikeAsym: [0.05, 1],
-        fringeShadow: [0.016, 0.036],
-        parting: [0.1, 0.17],
-        partingAngle: [-70, 70],
-        beardStyle: { rayitas: 3, masa: 2 },
-        beardMode: { radial: 1, directional: 2 },
-        beardCoverage: [0, 0.95],
-        beardTop: [0.52, 0.82],
-        beardDensity: [0.28, 0.58],
-        beardAngle: [-12, 10],
-        beardOriginY: [-1.3, -0.35],
-        beardOverhang: [0.005, 0.03],
         beardJags: [10, 12],
-        beardJagDepth: [0.02, 0.05],
       },
       brows: {
-        preset: { neutral: 3, cansado: 3, molesto: 2, sorpresa: 1 },
-        width: [0.22, 0.47],
-        thickness: [0.06, 0.17],
-        gap: [0.115, 0.18],
-        offsetY: [0.04, 0.27],
         tilt: [-4, 2],
         asymmetry: [7.5, 12],
-        shadow: [0.25, 0.5],
       },
     },
   },
 }
 
-// Los cuatro esquemas clásicos, como configuraciones de SOLO color: cargan el bloque
-// Color y no tocan nada más. Sustituyen al viejo desplegable de paletas del composer.
+// Los cuatro esquemas clásicos, como configuraciones de SOLO color: nombran `palette` y
+// nada más, así que devuelven el bloque Color a lo declarado, le aplican su diff, y dejan
+// el resto del panel donde estaba. Sustituyen al viejo desplegable de paletas del composer.
 for (const [name, preset] of Object.entries(PRESETS)) {
   CONFIGS[`esquema-${name}`] = {
     label: `esquema ${preset.label}`,

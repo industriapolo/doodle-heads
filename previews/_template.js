@@ -450,10 +450,15 @@ function mount(opts) {
     renderAll()
   })
 
-  // --- configuraciones: juegos completos de bandas con nombre ---------------
+  // --- configuraciones: diffs con nombre -----------------------------------
   // Como el cargador de presets de paleta, pero para TODO el panel: vuelca las bandas
   // guardadas (previews/configs.js) y desde ahí se afina. Solo aplica las claves que
   // esta preview conoce, así la misma config sirve en compose y en previews parciales.
+  //
+  // La unidad de carga es el MÓDULO, no el parámetro: los que la config nombra se
+  // devuelven a lo declarado y encima se aplica su diff; los que no nombra no se tocan.
+  // Sin ese reseteo, cargar dos configs seguidas dejaría mezclados los parámetros que
+  // la segunda no menciona, y no habría forma de volver a ninguna de las dos.
   const cfgEl = document.getElementById('cfg')
   if (configs && Object.keys(configs).length) {
     cfgEl.style.display = ''
@@ -470,11 +475,12 @@ function mount(opts) {
     cfgEl.addEventListener('change', () => {
       const c = configs[cfgEl.value]
       if (!c) return
-      // copia, no referencia: los controles mutan las bandas en sitio y sin esto
-      // afinarían la CONFIG en memoria en vez de la sesión
       for (const k of Object.keys(bands)) {
         if (!c.bands[k]) continue
-        for (const [pname, b] of Object.entries(c.bands[k]))
+        bands[k] = bandsOf(defsByKey[k])
+        // copia, no referencia: los controles mutan las bandas en sitio y sin esto
+        // afinarían la CONFIG en memoria en vez de la sesión
+        for (const [pname, b] of Object.entries(touchedBands(defsByKey[k], c.bands[k])))
           bands[k][pname] = Array.isArray(b) ? [...b] : { ...b }
       }
       persist()
