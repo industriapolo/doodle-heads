@@ -21,6 +21,36 @@ import * as palettes from '../style/palettes.js'
 import * as archetypes from './archetypes.js'
 import { applyFinish } from '../style/finish.js'
 
+// Carril de PRNG de cada parte. `rng.fork(salt)` es función pura de (seed, salt), así que
+// estos números son parte del formato de las seeds guardadas: cambiar uno cambia esa parte
+// en TODOS los personajes ya guardados. Son intocables — solo se añaden (el siguiente libre
+// es el 15).
+//
+// Estaban escritos a mano y por duplicado entre `makeCharacter` y `draw`. Repetir uno por
+// descuido correlaciona el sorteo de una parte con el jitter de dibujo de otra, y nada avisa:
+// sale una cara plausible, solo que dos rasgos que deberían ser independientes se mueven
+// juntos.
+//
+// Que una parte use el MISMO salt al sortear y al dibujar sí es deliberado: el jitter de
+// dibujo va en el carril de esa parte. `hairBack` y `hairMass` tienen el suyo porque son dos
+// masas distintas del mismo módulo, y solo existen en `draw`.
+export const SALT = {
+  arquetipo: 12,
+  head: 1,
+  ears: 2,
+  hair: 3,
+  brows: 4,
+  eyes: 5,
+  nose: 6,
+  mouth: 7,
+  chin: 9,
+  glasses: 10,
+  palette: 11,
+  hairBack: 13,
+  hairMass: 8,
+  cheeks: 14,
+}
+
 // Las bandas DECLARADAS de cada parte, para distinguir «el panel no lo ha tocado» de
 // «el panel lo ha dirigido». El panel persiste TODAS las bandas, movidas o no: sin este
 // diff, pisaría el overlay del arquetipo entero con puros valores de fábrica y los
@@ -51,7 +81,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
   // (melena + ceja fina + sin barba llegan juntos) sin quitarle el mando a los sliders.
   // «Debajo» significa: una banda del panel solo pisa al arquetipo si difiere de la
   // declarada — donde está de fábrica, manda el arquetipo.
-  const arch = archetypes.randomize(rng.fork(12), bands.arquetipo)
+  const arch = archetypes.randomize(rng.fork(SALT.arquetipo), bands.arquetipo)
   const overlay = archetypes.BANDS[arch.arquetipo] || {}
   const bandFor = (k) => {
     const touched = {}
@@ -64,17 +94,17 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     seed,
     paletteName,
     arquetipo: arch.arquetipo,
-    head: head.randomize(rng.fork(1), bandFor('head')),
-    ears: ears.randomize(rng.fork(2), bandFor('ears')),
-    hair: hair.randomize(rng.fork(3), bandFor('hair')),
-    brows: brows.randomize(rng.fork(4), bandFor('brows')),
-    eyes: eyes.randomize(rng.fork(5), bandFor('eyes')),
-    nose: nose.randomize(rng.fork(6), bandFor('nose')),
-    mouth: mouth.randomize(rng.fork(7), bandFor('mouth')),
-    chin: chin.randomize(rng.fork(9), bandFor('chin')),
-    cheeks: cheeks.randomize(rng.fork(14), bandFor('cheeks')),
-    glasses: glasses.randomize(rng.fork(10), bandFor('glasses')),
-    palette: palettes.randomize(rng.fork(11), bands.palette),
+    head: head.randomize(rng.fork(SALT.head), bandFor('head')),
+    ears: ears.randomize(rng.fork(SALT.ears), bandFor('ears')),
+    hair: hair.randomize(rng.fork(SALT.hair), bandFor('hair')),
+    brows: brows.randomize(rng.fork(SALT.brows), bandFor('brows')),
+    eyes: eyes.randomize(rng.fork(SALT.eyes), bandFor('eyes')),
+    nose: nose.randomize(rng.fork(SALT.nose), bandFor('nose')),
+    mouth: mouth.randomize(rng.fork(SALT.mouth), bandFor('mouth')),
+    chin: chin.randomize(rng.fork(SALT.chin), bandFor('chin')),
+    cheeks: cheeks.randomize(rng.fork(SALT.cheeks), bandFor('cheeks')),
+    glasses: glasses.randomize(rng.fork(SALT.glasses), bandFor('glasses')),
+    palette: palettes.randomize(rng.fork(SALT.palette), bands.palette),
   }
 }
 
@@ -155,16 +185,16 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   }
 
   // 0. melena: la masa trasera cae por detrás de TODO — cabeza, orejas y patillas
-  hair.drawBack(ctx, geo, hairP, palette, rng.fork(13))
+  hair.drawBack(ctx, geo, hairP, palette, rng.fork(SALT.hairBack))
 
   // 1. orejas — DETRÁS de la cabeza (pero delante de la melena, como en las refs)
-  ears.draw(ctx, geo, { ...earsP, offsetY: earsY }, palette, rng.fork(2))
+  ears.draw(ctx, geo, { ...earsP, offsetY: earsY }, palette, rng.fork(SALT.ears))
 
   // 2. cabeza: relleno + sombra plana + contorno
   head.paint(ctx, geo, headP, palette)
 
   // 3. pelo texturado y barba, recortados a la silueta y topados por la ceja
-  hair.draw(ctx, geo, hairP, palette, rng.fork(3), { hairBottom: browGeo.top, noseKeepOut })
+  hair.draw(ctx, geo, hairP, palette, rng.fork(SALT.hair), { hairBottom: browGeo.top, noseKeepOut })
 
   // 4. re-trazo del contorno: impide que el hatching se coma la silueta.
   //    Va aquí y no al final porque todo el hatching ya está puesto, y porque la masa
@@ -180,14 +210,14 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //    masa necesita la nariz (anatomía) y el borde bajo de la oreja (vuela por fuera
   //    de la silueta y sin tope pintaría sobre el lóbulo).
   const earBottom = faceBox.y + faceBox.h * (earsY + ears.halfHeight(faceBox, earsP))
-  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(8), {
+  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(SALT.hairMass), {
     hairBottom: browGeo.top,
     noseKeepOut,
     earBottom,
   })
 
   // 7. ojos
-  const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(5))
+  const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(SALT.eyes))
 
   // 8. nariz, arrancando en el entrecejo.
   //
@@ -201,18 +231,18 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     faceBox,
     { ...noseP, startY: noseStart, length: noseLen, offsetX: offX, tilt: noseTilt },
     palette,
-    rng.fork(6)
+    rng.fork(SALT.nose)
   )
 
   // 8b. mejillas: rubor o pecas, donde acaba la nariz — ahí viven en las referencias.
   //     Antes de la boca (los labios pisan al rubor si se rozan) y de las gafas.
-  cheeks.draw(ctx, faceBox, p('cheeks'), palette, rng.fork(14), noseKeepOut.y1)
+  cheeks.draw(ctx, faceBox, p('cheeks'), palette, rng.fork(SALT.cheeks), noseKeepOut.y1)
 
   // 9. boca, siempre por debajo de donde acaba la nariz (sombra incluida)
   const mouthP = p('mouth')
   const noseEnd = (noseGeo.endY - faceBox.y) / faceBox.h
   const mouthY = clamp(Math.max(mouthP.offsetY, noseEnd + 0.04), 0.68, 0.95)
-  const mouthGeo = mouth.draw(ctx, faceBox, { ...mouthP, offsetY: mouthY }, palette, rng.fork(7))
+  const mouthGeo = mouth.draw(ctx, faceBox, { ...mouthP, offsetY: mouthY }, palette, rng.fork(SALT.mouth))
 
   // 10. hoyuelo de la barbilla: en la punta del mentón, pero SIEMPRE por debajo de la
   //     boca. Su banda arrancaba en 0.90 y la boca llega a 0.95, así que podía salir
@@ -223,7 +253,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     faceBox,
     { ...chinP, offsetY: clamp(Math.max(chinP.offsetY, mouthY + 0.04), 0.84, 0.98) },
     palette,
-    rng.fork(9)
+    rng.fork(SALT.chin)
   )
 
   // 11. gafas: DESPUÉS de la nariz, porque se apoyan en ella. Reciben la geometría de
