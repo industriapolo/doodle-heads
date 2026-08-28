@@ -17,7 +17,8 @@
 //    no existe en `options` no da error: da un slider mentiroso o un peso que se ignora.
 //  · arquetipo — lo que habría cazado el hallazgo 1 de la auditoría: rasgos sorteados
 //    que luego no se dibujan.
-//  · diff panel/arquetipo — no verifica que esté bien; deja escrito que hoy es frágil.
+//  · diff panel/arquetipo — que una banda de fábrica no pueda hacerse pasar por
+//    dirección de arte y borrar el sesgo del arquetipo (hallazgo 2 de la auditoría).
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
@@ -210,12 +211,14 @@ describe(`arquetipo, con bandas de fábrica (${N} seeds)`, () => {
 // ---------------------------------------------------------------------------
 
 describe('diff panel / arquetipo', () => {
-  // HALLAZGO 2 de la auditoría. NO se arregla aquí: estos tests solo dejan escrito cómo
-  // se comporta hoy, para que la sesión que lo arregle tenga contra qué comparar.
+  // HALLAZGO 2 de la auditoría, ya cerrado. Lo que se prueba aquí es la regla que hace
+  // respirar al arquetipo: una banda del panel solo lo pisa si DIFIERE de la declarada
+  // por el módulo, con la tolerancia de `touchedBands`.
   //
-  // El mecanismo: `character.js` compara cada banda del panel con la declarada por el
-  // módulo (`JSON.stringify` exacto). Las que coinciden se consideran «no tocadas» y
-  // dejan pasar al arquetipo; cualquier otra lo pisa.
+  // Antes la comparación era un `JSON.stringify` exacto, y ese «solo si difiere» era una
+  // trampa: sumar 1e-8 a una probabilidad — invisible en el panel, imposible de hacer a
+  // propósito — devolvía la melena a la probabilidad de fábrica y borraba el sesgo del
+  // arquetipo sin un solo error. Estos tests son los que impiden que vuelva.
   const melenaPct = (bands) => {
     let mujeres = 0
     let melena = 0
@@ -228,35 +231,59 @@ describe('diff panel / arquetipo', () => {
     return (100 * melena) / mujeres
   }
 
+  const FABRICA = bandsOf(hair.PARAMS)
+  const REFERENCIA = melenaPct(undefined) // sin bandas: el arquetipo manda, ~85 %
+
   it('pasar las bandas de fábrica es igual que no pasar nada (±3 puntos)', () => {
-    const sinBandas = melenaPct(undefined)
-    const conFabrica = melenaPct({ hair: bandsOf(hair.PARAMS) })
+    const conFabrica = melenaPct({ hair: FABRICA })
     assert.ok(
-      Math.abs(sinBandas - conFabrica) <= 3,
-      `sin bandas ${sinBandas.toFixed(1)} % vs fábrica ${conFabrica.toFixed(1)} %`
+      Math.abs(REFERENCIA - conFabrica) <= 3,
+      `sin bandas ${REFERENCIA.toFixed(1)} % vs fábrica ${conFabrica.toFixed(1)} %`
     )
   })
 
-  it('un roce mínimo del slider tumba el arquetipo, y nada avisa', () => {
-    // La trampa, medida. Un cambio en el séptimo decimal — invisible en el panel, e
-    // imposible de hacer a propósito — devuelve la melena a la probabilidad de fábrica
-    // y borra el sesgo del arquetipo sin un solo error.
-    //
-    // SI ESTE TEST SE PONE ROJO, lo más probable es que el hallazgo 2 esté arreglado
-    // (el panel persistiendo solo el diff contra lo declarado). En ese caso no lo
-    // parchees: bórralo, y quita la trampa del HANDOFF.
-    const fabrica = bandsOf(hair.PARAMS)
-    const rozado = { hair: { ...fabrica, backHair: { p: fabrica.backHair.p + 1e-8 } } }
-    const conArquetipo = melenaPct({ hair: fabrica })
+  it('un roce de 1e-8 NO tumba el arquetipo: la melena sigue donde estaba', () => {
+    // El caso exacto que medía la auditoría: 85 % → 10 % al sumar 1e-8. Hoy no se mueve.
+    const rozado = { hair: { ...FABRICA, backHair: { p: FABRICA.backHair.p + 1e-8 } } }
     const pisado = melenaPct(rozado)
     assert.ok(
-      conArquetipo - pisado > 30,
-      `el roce debería hundir la melena y solo la mueve de ${conArquetipo.toFixed(1)} % ` +
-        `a ${pisado.toFixed(1)} %`
+      Math.abs(REFERENCIA - pisado) <= 3,
+      `el roce de 1e-8 movió la melena de ${REFERENCIA.toFixed(1)} % a ${pisado.toFixed(1)} %`
     )
     console.log(
-      `      · melena en mujeres: ${conArquetipo.toFixed(1)} % con arquetipo, ` +
-        `${pisado.toFixed(1)} % tras rozar el slider`
+      `      · melena en mujeres: ${REFERENCIA.toFixed(1)} % de fábrica, ` +
+        `${pisado.toFixed(1)} % tras rozar el slider con 1e-8`
     )
+  })
+
+  it('medio paso de slider tampoco: es lo que cuadricula el navegador', () => {
+    // `input.value = 0.015` con paso 0.002 vuelve como 0.016. Esa banda no la ha tocado
+    // nadie, y antes contaba como dirección de arte igual que un tirón del slider.
+    const medio = hair.PARAMS.sideLength.step / 2
+    const [lo, hi] = FABRICA.sideLength
+    const bands = { hair: { ...FABRICA, sideLength: [lo + medio, hi - medio] } }
+    const pisado = melenaPct(bands)
+    assert.ok(
+      Math.abs(REFERENCIA - pisado) <= 3,
+      `medio paso movió la melena de ${REFERENCIA.toFixed(1)} % a ${pisado.toFixed(1)} %`
+    )
+  })
+
+  it('un cambio de verdad SÍ pisa al arquetipo', () => {
+    // La otra mitad del contrato, y la razón de ser del diff: el panel manda. Con la
+    // melena bajada a mano al 50 %, el 85 % del arquetipo tiene que caer.
+    const dirigido = { hair: { ...FABRICA, backHair: { p: 0.5 } } }
+    const pisado = melenaPct(dirigido)
+    assert.ok(
+      REFERENCIA - pisado > 20,
+      `bajar backHair.p a 0.5 solo movió la melena de ${REFERENCIA.toFixed(1)} % ` +
+        `a ${pisado.toFixed(1)} % — el panel dejó de mandar`
+    )
+  })
+
+  it('una clave que ya no existe en el módulo no pisa nada', () => {
+    // El `localStorage` de hace tres versiones. Antes entraba entera en el sorteo.
+    const viejo = { hair: { ...FABRICA, parametroBorrado: [0, 1] } }
+    assert.ok(Math.abs(REFERENCIA - melenaPct(viejo)) <= 3)
   })
 })

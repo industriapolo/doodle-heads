@@ -16,7 +16,7 @@ import * as chin from '../parts/chin.js'
 import * as cheeks from '../parts/cheeks.js'
 import * as glasses from '../parts/glasses.js'
 import { makeRng } from './prng.js'
-import { bandsOf } from './params.js'
+import { touchedBands } from './params.js'
 import * as palettes from '../style/palettes.js'
 import * as archetypes from './archetypes.js'
 import { applyFinish } from '../style/finish.js'
@@ -51,23 +51,26 @@ export const SALT = {
   cheeks: 14,
 }
 
-// Las bandas DECLARADAS de cada parte, para distinguir «el panel no lo ha tocado» de
-// «el panel lo ha dirigido». El panel persiste TODAS las bandas, movidas o no: sin este
-// diff, pisaría el overlay del arquetipo entero con puros valores de fábrica y los
+// El PARAMS de cada parte, para poder preguntar qué bandas vienen DIRIGIDAS y cuáles
+// están de fábrica (`touchedBands`). Sin esa distinción, un panel que persiste todas las
+// bandas pisaría el overlay del arquetipo entero con puros valores de fábrica y los
 // botones de arquetipo no harían nada.
-const DECLARED = {
-  head: bandsOf(head.PARAMS),
-  ears: bandsOf(ears.PARAMS),
-  hair: bandsOf(hair.PARAMS),
-  brows: bandsOf(brows.PARAMS),
-  eyes: bandsOf(eyes.PARAMS),
-  nose: bandsOf(nose.PARAMS),
-  mouth: bandsOf(mouth.PARAMS),
-  chin: bandsOf(chin.PARAMS),
-  cheeks: bandsOf(cheeks.PARAMS),
-  glasses: bandsOf(glasses.PARAMS),
+//
+// La comparación NO se hace aquí: vive en params.js, y la usan también el panel (qué
+// persiste, qué exporta) y las configuraciones. Tienen que decir lo mismo o el generador
+// miente — el panel guardaría como dirección de arte algo que aquí cuenta como fábrica.
+const PARAMS_OF = {
+  head: head.PARAMS,
+  ears: ears.PARAMS,
+  hair: hair.PARAMS,
+  brows: brows.PARAMS,
+  eyes: eyes.PARAMS,
+  nose: nose.PARAMS,
+  mouth: mouth.PARAMS,
+  chin: chin.PARAMS,
+  cheeks: cheeks.PARAMS,
+  glasses: glasses.PARAMS,
 }
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 /**
  * Un personaje completo = un objeto plano. Serializable, reproducible, mutable.
@@ -83,13 +86,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
   // declarada — donde está de fábrica, manda el arquetipo.
   const arch = archetypes.randomize(rng.fork(SALT.arquetipo), bands.arquetipo)
   const overlay = archetypes.BANDS[arch.arquetipo] || {}
-  const bandFor = (k) => {
-    const touched = {}
-    for (const [name, b] of Object.entries(bands[k] || {})) {
-      if (!same(b, DECLARED[k]?.[name])) touched[name] = b
-    }
-    return { ...(overlay[k] || {}), ...touched }
-  }
+  const bandFor = (k) => ({ ...(overlay[k] || {}), ...touchedBands(PARAMS_OF[k], bands[k]) })
   return {
     seed,
     paletteName,
