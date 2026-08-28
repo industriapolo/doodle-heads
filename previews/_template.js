@@ -6,11 +6,20 @@
 //
 // Los parámetros de lista no admiten banda: llevan una casilla por opción.
 // Los booleanos tampoco: llevan un slider de probabilidad.
+//
+// En memoria las bandas están COMPLETAS (declaradas + lo tocado); lo que sale del panel
+// —lo que persiste y lo que exporta «copiar rangos»— es solo el DIFF contra lo declarado.
+// Esa asimetría es el contrato entero:
+//   · `character.js` deja pasar al arquetipo justo donde el panel no ha tocado nada, así
+//     que persistir bandas de fábrica equivale a borrar el arquetipo en silencio.
+//   · cambiar un `range` en un módulo se ve en el panel con solo recargar, en vez de
+//     quedar enterrado bajo una copia vieja en `localStorage`.
+// Lo tocado se marca con un punto en la etiqueta y lleva su propio ↺.
 
 import { makeRng, randomSeed } from '../src/core/prng.js'
 import { setupCanvas, clear, box, LOGICAL } from '../src/core/canvas.js'
 import { PALETTES, PALETTE_NAMES, DEFAULT_PALETTE } from '../src/style/palettes.js'
-import { bandsOf, exportBands } from '../src/core/params.js'
+import { bandsOf, exportBands, touchedBands } from '../src/core/params.js'
 
 const CSS = `
   :root { color-scheme: dark; }
@@ -41,6 +50,15 @@ const CSS = `
   .row .head { display:flex; align-items:baseline; gap:6px; font-size:11px; color:#a8aeb5; margin-bottom:3px; }
   .row .head .val { margin-left:auto; color:#e8ebee; font-variant-numeric:tabular-nums; font-size:10px; }
   .row.fixed .head .val { color:#E5117F; }
+  /* Tocada = difiere de la banda declarada por el módulo. Discreto a propósito: lo que
+     se lee de un vistazo es CUÁNTAS filas llevan punto, no cuál. */
+  .row.touched .head .lab::before { content:'•'; color:#E5117F; margin-right:4px; }
+  .row .undo {
+    padding:0 4px; margin-left:6px; font-size:11px; line-height:1.3; border-radius:3px;
+    background:none; border:none; color:#6d7379; visibility:hidden;
+  }
+  .row .undo:hover { background:none; color:#E5117F; }
+  .row.touched .undo { visibility:visible; }
 
   .dual { position:relative; height:20px; }
   .dual .track { position:absolute; top:8px; left:0; right:0; height:4px; background:#343a41; border-radius:2px; }
@@ -177,16 +195,35 @@ function mount(opts) {
   }
 
   // --- bandas -------------------------------------------------------------
+  // En memoria, completas: declaradas + lo tocado. Fuera, solo el diff.
   const declared = () =>
     Object.fromEntries(Object.entries(defsByKey).map(([k, defs]) => [k, bandsOf(defs)]))
+  const declaredOne = (k, name) => bandsOf({ [name]: defsByKey[k][name] })[name]
+  const isTouched = (k, name) =>
+    name in touchedBands({ [name]: defsByKey[k][name] }, { [name]: bands[k][name] })
+
+  /** Lo que difiere de lo declarado, por módulo. Los módulos sin nada tocado no salen. */
+  const diff = () => {
+    const out = {}
+    for (const [k, defs] of Object.entries(defsByKey)) {
+      const d = touchedBands(defs, bands[k])
+      if (Object.keys(d).length) out[k] = d
+    }
+    return out
+  }
+
   let bands = declared()
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || 'null')
-    if (saved) for (const k of Object.keys(bands)) if (saved[k]) Object.assign(bands[k], saved[k])
+    // `touchedBands` en la carga es también la MIGRACIÓN: un almacén viejo trae todas las
+    // bandas, y las que coinciden con lo declarado se caen aquí. Las que difieren se
+    // quedan — no hay forma de distinguirlas de un toque de verdad, y para eso está
+    // «rangos por defecto». Las claves que el módulo ya no declara se van con ellas.
+    if (saved) for (const k of Object.keys(bands)) Object.assign(bands[k], touchedBands(defsByKey[k], saved[k]))
   } catch {}
 
   const persist = () => {
-    try { localStorage.setItem(STORE, JSON.stringify(bands)) } catch {}
+    try { localStorage.setItem(STORE, JSON.stringify(diff())) } catch {}
   }
 
   // --- grid ---------------------------------------------------------------
@@ -241,17 +278,28 @@ function mount(opts) {
     const head = document.createElement('div')
     head.className = 'head'
     const label = document.createElement('span')
+    label.className = 'lab'
     label.textContent = def.label || name
     const val = document.createElement('span')
     val.className = 'val'
-    head.append(label, val)
+    // Un ↺ por fila, no solo el «rangos por defecto» global: sin él, deshacer un tanteo
+    // obliga a acertar el valor de fábrica a ojo — y fallar por un paso deja la fila
+    // tocada, que es justo lo que le quita el mando al arquetipo.
+    const undo = document.createElement('button')
+    undo.className = 'undo'
+    undo.textContent = '↺'
+    undo.title = 'volver a la banda declarada por el módulo'
+    head.append(label, val, undo)
     row.append(head)
+    // Se recalcula en cada `sync`, que es el único sitio donde se escribe la banda.
+    const markTouched = () => row.classList.toggle('touched', isTouched(groupName, name))
 
     // --- lista: casilla por opción ---
     if (def.options) {
       const wrap = document.createElement('div')
       wrap.className = 'opts'
       const pool = bands[groupName][name]
+      const boxes = []
       for (const opt of def.options) {
         const l = document.createElement('label')
         const cb = document.createElement('input')
@@ -267,14 +315,28 @@ function mount(opts) {
           l.classList.toggle('on', cb.checked)
           sync()
         })
+        boxes.push([opt, cb, l])
         wrap.append(l)
       }
       row.append(wrap)
       const sync = () => {
         const on = def.options.filter((o) => (pool[o] ?? 0) > 0)
         val.textContent = on.length === def.options.length ? 'todas' : `${on.length}/${def.options.length}`
+        markTouched()
         commit()
       }
+      undo.addEventListener('click', () => {
+        // EN SITIO: las casillas guardan esta misma referencia. Reasignar `bands[k][name]`
+        // las dejaría escribiendo en un pool huérfano.
+        const d = declaredOne(groupName, name)
+        for (const k of Object.keys(pool)) delete pool[k]
+        Object.assign(pool, d)
+        for (const [opt, cb, l] of boxes) {
+          cb.checked = (pool[opt] ?? 0) > 0
+          l.classList.toggle('on', cb.checked)
+        }
+        sync()
+      })
       sync()
       return row
     }
@@ -297,9 +359,14 @@ function mount(opts) {
         fill.style.left = '0%'
         fill.style.width = p * 100 + '%'
         val.textContent = Math.round(p * 100) + '%'
+        markTouched()
         commit()
       }
       input.addEventListener('input', sync)
+      undo.addEventListener('click', () => {
+        input.value = declaredOne(groupName, name).p
+        sync()
+      })
       sync()
       return row
     }
@@ -337,10 +404,17 @@ function mount(opts) {
       const u = def.unit || ''
       val.textContent = a === b ? `${fmt(a)}${u}` : `${fmt(a)} – ${fmt(b)}${u}`
       row.classList.toggle('fixed', a === b)
+      markTouched()
       commit()
     }
     lo.addEventListener('input', () => sync('lo'))
     hi.addEventListener('input', () => sync('hi'))
+    undo.addEventListener('click', () => {
+      const d = declaredOne(groupName, name)
+      lo.value = d[0]
+      hi.value = d[1]
+      sync()
+    })
     sync()
     return row
   }
@@ -427,10 +501,18 @@ function mount(opts) {
 
   const outEl = document.getElementById('out')
   document.getElementById('copy').addEventListener('click', () => {
-    // se exporta por MÓDULO, no por bloque del panel: un bloque puede mezclar varios
-    const code = Object.entries(defsByKey)
-      .map(([k, defs]) => `// ── ${k}.js ──\n${exportBands(defs, bands[k])}`)
+    // se exporta por MÓDULO, no por bloque del panel: un bloque puede mezclar varios.
+    // Y solo lo tocado: volcar bandas de fábrica en un `range` es fijar por escrito algo
+    // que nadie decidió, y en una configuración además borra el arquetipo en ese
+    // parámetro. Lo que no sale es lo que sigue mandando el módulo.
+    const cuerpo = Object.entries(defsByKey)
+      .map(([k, defs]) => [k, exportBands(defs, touchedBands(defs, bands[k]))])
+      .filter(([, body]) => body)
+      .map(([k, body]) => `// ── ${k}.js ──\n${body}`)
       .join('\n\n')
+    const code =
+      '// solo bandas que difieren de las declaradas\n\n' +
+      (cuerpo || '// (nada tocado: el panel está entero de fábrica)')
     outEl.value = code
     outEl.style.display = 'block'
     outEl.select()
