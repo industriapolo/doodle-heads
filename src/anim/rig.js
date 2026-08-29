@@ -197,6 +197,12 @@ export function makeActor(seed, extra = {}) {
     reactE: 0,
     bounce: 0,
     expr: { ...NEUTRAL, eyeOpen: 1, cigDrop: 0 },
+    // La frase que está diciendo, si la hay: `{ t0, phrase }` con `t0` en ms del reloj
+    // del rig. La pone el HOST — el rig no sabe que eso suena, solo que mientras dura
+    // manda en la boca. Se descuelga sola al acabar.
+    speech: null,
+    talkOpen: 0,
+    talkDrop: 0,
     // el humo: fase propia (que treinta volutas no ondulen a coro) y reloj de tic.
     // `smokeTip` lo rellena el redraw del host cuando la cara tiene cigarro.
     smokeTip: null,
@@ -406,7 +412,38 @@ export function advance(a, t) {
     a.reactE = 0
     a.expr = exprDeAnimo(a)
   }
+
+  // --- habla: la frase manda en la boca mientras dura --------------------
+  // Se mezcla con MÁXIMO, no sustituyendo: si el personaje está a mitad de una sorpresa
+  // con la boca abierta, hablar no puede cerrársela. Y va sobre `expr`, que es lo que se
+  // dibuja, así que `overridesFor` y la firma de repintado no se enteran de que existe
+  // otro origen — la boca tampoco: le llega `moodOpen` y no pregunta de dónde viene.
+  a.talkOpen = 0
+  a.talkDrop = 0
+  if (a.speech) {
+    const u = (t - a.speech.t0) / 1000 // la frase viene en SEGUNDOS; el rig cuenta en ms
+    const f = a.speech.phrase
+    if (u >= f.dur || u < 0) {
+      a.speech = null
+    } else {
+      for (const sy of f.syllables) {
+        if (u < sy.t || u >= sy.t + sy.dur) continue
+        a.talkOpen = sy.open * bocaSilaba((u - sy.t) / sy.dur)
+        break
+      }
+      // El cigarrillo se descuelga durante toda la frase, no solo en las sílabas: no se
+      // habla sujetando el pitillo con los labios y soltándolo entre sílaba y sílaba.
+      a.talkDrop = Math.max(0, Math.min(1, u / 0.08, (f.dur - u) / 0.2))
+    }
+  }
+  if (a.talkOpen > a.expr.open) a.expr.open = a.talkOpen
+  if (a.talkDrop > a.expr.cigDrop) a.expr.cigDrop = a.talkDrop
 }
+
+// La boca dentro de una sílaba: abre rápido, aguanta y cierra algo más lento. No es la
+// envolvente exacta del sonido —esa vive en speech.js— pero sigue su forma, que es lo que
+// hace que el labio parezca la causa del ruido y no un acompañamiento.
+const bocaSilaba = (k) => (k < 0.25 ? k / 0.25 : k > 0.65 ? (1 - k) / 0.35 : 1)
 
 // Los canales que se DIBUJAN. `eyeOpen` va aquí y no en NEUTRAL porque su reposo es 1,
 // no 0: es un multiplicador de la apertura del ojo, no un delta.

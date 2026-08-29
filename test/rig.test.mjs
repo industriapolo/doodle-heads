@@ -573,6 +573,93 @@ describe('el doble parpadeo de la atención', () => {
 
 // ---------------------------------------------------------------------------
 
+describe('la boca sigue a la frase', () => {
+  // Una frase de juguete: tres sílabas de 200 ms con 100 ms de silencio entre ellas.
+  // Tiempos en SEGUNDOS, como los devuelve voice.js.
+  const FRASE = {
+    syllables: [
+      { t: 0, dur: 0.2, open: 1, pitch: 200, pitchEnd: 200, onset: 'pop', vowel: 0.5 },
+      { t: 0.3, dur: 0.2, open: 0.5, pitch: 200, pitchEnd: 200, onset: 'none', vowel: 0.5 },
+      { t: 0.6, dur: 0.2, open: 0.8, pitch: 200, pitchEnd: 200, onset: 'noise', vowel: 0.5 },
+    ],
+    dur: 0.8,
+  }
+  const hablando = (seed = 5, t0 = 1000) => {
+    const a = makeActor(seed)
+    advance(a, 0)
+    a.moodNext = 1e9
+    a.speech = { t0, phrase: FRASE }
+    return a
+  }
+  /** talkOpen en un instante dado (en ms del rig). */
+  const en = (a, t) => { advance(a, t); return a.talkOpen }
+
+  it('la boca se abre en cada sílaba y se cierra entre ellas', () => {
+    const a = hablando()
+    // en medio de cada sílaba, abierta; en los silencios, cerrada
+    assert.ok(en(a, 1100) > 0.9, 'la primera sílaba no abre la boca')
+    assert.equal(en(a, 1250), 0, 'la boca no se cierra entre sílabas')
+    assert.ok(Math.abs(en(a, 1400) - 0.5) < 0.01, 'la segunda sílaba no respeta su `open`')
+    assert.equal(en(a, 1550), 0)
+    assert.ok(Math.abs(en(a, 1700) - 0.8) < 0.01)
+  })
+
+  it('al acabar la frase la boca vuelve a cero y se descuelga sola', () => {
+    const a = hablando()
+    for (let t = 1000; t <= 1799; t += 16) advance(a, t)
+    assert.ok(a.speech !== null, 'se soltó antes de acabar')
+    advance(a, 1800)
+    assert.equal(a.talkOpen, 0)
+    assert.equal(a.speech, null, 'el host tendría que limpiarlo a mano')
+  })
+
+  it('la boca abre y cierra DENTRO de la sílaba, no a saltos', () => {
+    const a = hablando()
+    const traza = []
+    for (let t = 1000; t <= 1200; t += 8) traza.push(en(a, t))
+    assert.ok(traza[0] < 0.2, 'empieza ya abierta del todo')
+    assert.ok(Math.max(...traza) > 0.95, 'no llega a abrirse')
+    assert.ok(traza[traza.length - 1] < 0.3, 'no acaba de cerrarse')
+  })
+
+  it('hablar no le cierra la boca a una reacción que ya la tenía abierta', () => {
+    // Se mezcla por máximo: una sorpresa a media frase no puede quedar en un balbuceo.
+    const a = hablando()
+    react(a, 'sorpresa', 1000)
+    advance(a, 1120) // ataque cumplido, y en el silencio de la primera sílaba... no
+    const conReaccion = a.expr.open
+    const b = hablando()
+    react(b, 'sorpresa', 1000)
+    advance(b, 1250) // silencio entre sílabas: talkOpen = 0
+    assert.ok(b.expr.open > 0.3, `la reacción se perdió en el silencio: ${b.expr.open}`)
+    assert.ok(conReaccion > 0.3)
+  })
+
+  it('el cigarrillo se descuelga durante toda la frase, silencios incluidos', () => {
+    const a = hablando()
+    advance(a, 1250) // entre sílabas
+    assert.ok(a.expr.cigDrop > 0.9, `cigDrop = ${a.expr.cigDrop} en el silencio`)
+    advance(a, 1810)
+    assert.equal(a.expr.cigDrop, 0, 'el pitillo no vuelve a su sitio al acabar')
+  })
+
+  it('overridesFor no distingue de dónde viene la boca abierta', () => {
+    const a = hablando()
+    advance(a, 1100)
+    assert.equal(overridesFor(a).mouth.moodOpen, a.expr.open)
+    assert.ok(overridesFor(a).mouth.moodOpen > 0.9)
+  })
+
+  it('una frase en el pasado no deja la boca colgada', () => {
+    const a = hablando(5, 100)
+    advance(a, 5000)
+    assert.equal(a.speech, null)
+    assert.equal(a.talkOpen, 0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
 describe('advance', () => {
   it('es determinista: mismo actor, misma línea de tiempo, mismo estado', () => {
     const paso = (a) => { for (let t = 0; t <= 30000; t += 16) advance(a, t) }
