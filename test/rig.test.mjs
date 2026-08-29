@@ -9,7 +9,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { makeActor, advance, startRig, overridesFor } from '../src/anim/rig.js'
+import { makeActor, advance, startRig, overridesFor, react, MOOD_NAMES } from '../src/anim/rig.js'
 
 /** Cola de rAF gobernada por el test: `tick(t)` corre un frame en el instante `t`. */
 function fakeRaf() {
@@ -245,6 +245,97 @@ describe('mirada con objetivo externo', () => {
     const a = makeActor(9)
     for (let t = 0; t <= 30000; t += FRAME) advance(a, t)
     assert.equal(a.gazeY, 0, 'algo movió la vertical sin que nadie se lo pidiera')
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('react', () => {
+  const enNeutro = (a) => Object.values(a.mood).every((v) => v === 0)
+  /** Corre la animación hasta `hasta`, sin objetivo de mirada. */
+  const hasta = (a, desde, fin) => { for (let t = desde; t <= fin; t += 16) advance(a, t) }
+
+  it('los nombres del mapa del host existen', () => {
+    // Si un ánimo se renombra, esto se pone rojo aquí y no en silencio en el index.
+    for (const n of ['atención', 'sorpresa', 'alegría', 'neutro']) {
+      assert.ok(MOOD_NAMES.includes(n), `'${n}' ya no es un ánimo`)
+    }
+  })
+
+  it('arranca la excursión en el acto, sin esperar al reloj', () => {
+    const a = makeActor(5)
+    advance(a, 0)
+    assert.ok(enNeutro(a))
+    assert.equal(react(a, 'sorpresa', 1000), true)
+    assert.equal(a.moodAt, 1000)
+    hasta(a, 1016, 1000 + 800) // MOOD_EASE = 700
+    assert.ok(!enNeutro(a), 'la cara no se movió')
+    // sorpresa = cejas arriba (lift negativo) y boca abierta
+    assert.ok(a.mood.lift < 0, `lift=${a.mood.lift}`)
+    assert.ok(a.mood.open > 0.3, `open=${a.mood.open}`)
+  })
+
+  it("'neutro' devuelve la cara a reposo", () => {
+    const a = makeActor(5)
+    advance(a, 0)
+    react(a, 'alegría', 1000)
+    hasta(a, 1016, 1800)
+    assert.ok(!enNeutro(a))
+    react(a, 'neutro', 1800)
+    hasta(a, 1816, 2600)
+    assert.ok(enNeutro(a), `se quedó en ${JSON.stringify(a.mood)}`)
+  })
+
+  it('reaccionar a mitad de otro gesto no da un salto', () => {
+    // Es el caso real: entrar, salir y volver a entrar en una celda más rápido que los
+    // 700 ms de la transición.
+    const a = makeActor(5)
+    advance(a, 0)
+    react(a, 'enfado', 1000)
+    hasta(a, 1016, 1300) // a mitad de camino
+    const medio = { ...a.mood }
+    react(a, 'alegría', 1300)
+    advance(a, 1316)
+    for (const k of Object.keys(medio)) {
+      const d = Math.abs(a.mood[k] - medio[k])
+      assert.ok(d < 0.08, `el canal ${k} saltó ${d.toFixed(3)} al cambiar de ánimo`)
+    }
+  })
+
+  it('tras reaccionar, el personaje vuelve solo al neutro', () => {
+    // Una reacción no puede dejarlo anclado en una mueca: el reloj de ánimo tiene que
+    // seguir corriendo y devolverlo a reposo por su cuenta.
+    const a = makeActor(5)
+    advance(a, 0)
+    react(a, 'susto', 1000)
+    hasta(a, 1016, 1800)
+    assert.ok(!enNeutro(a))
+    // No se le exige estar en reposo en un instante cualquiera —el personaje sigue
+    // haciendo sus propias excursiones, que es lo que se quiere— sino PASAR por él.
+    let volvio = false
+    for (let t = 1816; t <= 60000 && !volvio; t += 16) {
+      advance(a, t)
+      if (enNeutro(a)) volvio = true
+    }
+    assert.ok(volvio, 'se quedó anclado en la mueca de la reacción')
+  })
+
+  it('un nombre que no existe no toca nada', () => {
+    const a = makeActor(5)
+    advance(a, 0)
+    react(a, 'alegría', 1000)
+    hasta(a, 1016, 1800)
+    const antes = { ...a.mood, moodAt: a.moodAt }
+    assert.equal(react(a, 'euforia', 1800), false)
+    assert.deepEqual({ ...a.mood, moodAt: a.moodAt }, antes)
+  })
+
+  it('sin `t`, usa el último instante que vio el actor', () => {
+    // El host tiene rig.now(), pero desde consola es cómodo no pasarlo.
+    const a = makeActor(5)
+    advance(a, 4321)
+    react(a, 'duda')
+    assert.equal(a.moodAt, 4321)
   })
 })
 

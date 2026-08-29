@@ -3,13 +3,21 @@
 //
 // La clave de rendimiento no es cachear capas, es NO REPINTAR lo que no ha cambiado:
 //
-//  · el parpadeo dura ~120ms cada 2-7s, así que en un frame cualquiera hay una o dos
-//    caras animándose de treinta. Las demás se saltan enteras.
+//  · el parpadeo dura ~120ms cada 2-7s.
 //  · la mirada solo se mueve durante la transición, ~380ms cada 3-10s.
 //  · el ánimo (cejas y boca, un solo estado) solo se mueve durante su transición,
 //    ~700ms cada 4-12s — y la mayoría de los cambios son VOLVER al neutro: el
 //    personaje vive alrededor de su expresión base y hace excursiones, no va
 //    saltando de mueca en mueca.
+//
+// En reposo eso son 3,9 caras repintadas por frame de treinta, medido sobre 120 s. Aquí
+// ponía «una o dos», que era optimismo: sumar los tres ciclos da un 13 % de ocupación por
+// cara, o sea ~4 de 30. El número no ha cambiado con la mirada al puntero — se midió con
+// la firma de repintado con `gazeY` y sin él, y sale idéntico.
+//
+// Con el puntero moviéndose es otra historia: cambian las treinta miradas a la vez, así
+// que se repintan las treinta. Eso cuesta 10,4 ms por frame gracias a la caché de capas
+// estáticas del host (la cara entera serían 52).
 //
 // La flotación se quitó: movía las cards y hacía que se solaparan entre sí.
 //
@@ -43,19 +51,26 @@ const SMOKE_STEP = 40
 // sonrisa ⌣, negativo = mueca ⌢) y `open` 0..1 — con cigarrillo la propia boca los
 // atenúa/anula (mouth.js), no hace falta tratarlo aquí.
 // Un canal omitido en un ánimo queda en [0, 0].
+//
+// El `name` no es decoración: es lo que deja al host pedir una reacción concreta
+// (`react`) sin conocer los números. El host sabe «esto merece atención»; qué es la
+// atención en grados de ceja lo sigue sabiendo solo este fichero.
 const MOODS = [
-  { tilt: [5, 12], lift: [0, 0.01], curve: [-0.55, -0.2] }, // ceño
-  { tilt: [12, 17], lift: [0.004, 0.014], curve: [-0.8, -0.5] }, // enfado
-  { tilt: [-10, -5], lift: [0, 0.008], curve: [-0.4, -0.1] }, // caído
-  { tilt: [-14, -9], lift: [0.006, 0.016], curve: [-0.6, -0.35] }, // tristeza
-  { tilt: [-4, 0], lift: [-0.03, -0.018], open: [0.4, 0.75] }, // sorpresa
-  { tilt: [-6, -2], lift: [-0.038, -0.028], curve: [0, 0.1], open: [0.75, 1] }, // susto
-  { tilt: [-2, 2], lift: [-0.012, -0.006], curve: [0.15, 0.5] }, // atención
-  { tilt: [-3, 1], lift: [-0.02, -0.008], curve: [0.5, 0.85], open: [0, 0.15] }, // alegría
-  { tilt: [0, 4], curve: [-0.35, -0.1], raise: [0.028, 0.048], mirror: true }, // duda
-  { tilt: [-2, 2], lift: [-0.006, 0], curve: [0.3, 0.6], raise: [0.022, 0.04], mirror: true }, // picardía
+  { name: 'ceño', tilt: [5, 12], lift: [0, 0.01], curve: [-0.55, -0.2] },
+  { name: 'enfado', tilt: [12, 17], lift: [0.004, 0.014], curve: [-0.8, -0.5] },
+  { name: 'caído', tilt: [-10, -5], lift: [0, 0.008], curve: [-0.4, -0.1] },
+  { name: 'tristeza', tilt: [-14, -9], lift: [0.006, 0.016], curve: [-0.6, -0.35] },
+  { name: 'sorpresa', tilt: [-4, 0], lift: [-0.03, -0.018], open: [0.4, 0.75] },
+  { name: 'susto', tilt: [-6, -2], lift: [-0.038, -0.028], curve: [0, 0.1], open: [0.75, 1] },
+  { name: 'atención', tilt: [-2, 2], lift: [-0.012, -0.006], curve: [0.15, 0.5] },
+  { name: 'alegría', tilt: [-3, 1], lift: [-0.02, -0.008], curve: [0.5, 0.85], open: [0, 0.15] },
+  { name: 'duda', tilt: [0, 4], curve: [-0.35, -0.1], raise: [0.028, 0.048], mirror: true },
+  { name: 'picardía', tilt: [-2, 2], lift: [-0.006, 0], curve: [0.3, 0.6], raise: [0.022, 0.04], mirror: true },
 ]
 const NEUTRAL = { tilt: 0, lift: 0, curve: 0, open: 0, raise: 0 }
+
+/** Los ánimos que entiende `react`, más 'neutro'. */
+export const MOOD_NAMES = [...MOODS.map((m) => m.name), 'neutro']
 
 /**
  * Estado de animación de un personaje. El desfase inicial sale de su seed: sin eso los
@@ -209,11 +224,41 @@ export function advance(a, t) {
 }
 
 function moodTarget(rng) {
-  const m = MOODS[Math.floor(rng.next() * MOODS.length)]
+  return moodValues(MOODS[Math.floor(rng.next() * MOODS.length)], rng)
+}
+
+/** Un ánimo concreto, con sus canales sorteados dentro de sus bandas. */
+function moodValues(m, rng) {
   const t = Object.fromEntries(Object.keys(NEUTRAL).map((k) => [k, rng.range(...(m[k] || [0, 0]))]))
   // la ceja arqueada no tiene lado bueno: se sortea
   if (m.mirror && rng.next() < 0.5) t.raise = -t.raise
   return t
+}
+
+/**
+ * Reaccionar AHORA: arranca la excursión a un ánimo con nombre sin esperar al reloj.
+ *
+ * Es la única puerta del host al ánimo, y es deliberadamente estrecha: entra un nombre,
+ * no unos grados de ceja. El index sabe que pasar el ratón por encima «merece atención»;
+ * cuánto se levanta una ceja para eso sigue viviendo aquí.
+ *
+ * Usa la misma mecánica que una excursión sorteada (moodFrom/moodTo y MOOD_EASE), así que
+ * arranca DESDE donde esté la cara: reaccionar a mitad de otro gesto no da un salto. Al
+ * acabar, `advance` reprograma el reloj de ánimo solo, y de ahí el personaje vuelve al
+ * neutro por su cuenta como siempre — una reacción no lo deja anclado en una mueca.
+ *
+ * @param name  uno de MOOD_NAMES. 'neutro' devuelve la cara a reposo.
+ * @returns false si el nombre no existe, sin tocar nada.
+ */
+export function react(a, name, t = a.lastT ?? 0) {
+  const target =
+    name === 'neutro' ? { ...NEUTRAL } : MOODS.find((m) => m.name === name)
+  if (!target) return false
+  a.moodAt = t
+  a.moodFrom = a.mood
+  a.moodTo = name === 'neutro' ? target : moodValues(target, a.rng)
+  a.moodNext = t + MOOD_EASE
+  return true
 }
 
 /**
