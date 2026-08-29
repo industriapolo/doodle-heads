@@ -30,19 +30,28 @@ export const PARAMS = {
 
 export const randomize = randomizerFor(PARAMS)
 
+// Lo que cae el cigarrillo cuando se despega del labio, en grados. Hacia abajo: colgando.
+const CIG_DROP_ANGLE = 25
+
 /**
  * `moodCurve` (−1..+1) y `moodOpen` (0..1) son los canales de ánimo del rig, como los
  * moodTilt/moodLift de las cejas: deltas SOBRE el tipo base del personaje, solo dibujo.
  * Convención de curva: positivo = el centro BAJA (sonrisa ⌣), negativo = sube (mueca ⌢).
- * Con cigarrillo, los labios lo sujetan: la apertura se anula y la curva se atenúa —
- * el fumador expresa con las cejas. Además así la punta (y el humo) no se mueve.
+ * Con cigarrillo, los labios lo sujetan: en la DERIVA la apertura se anula y la curva se
+ * atenúa — el fumador expresa con las cejas, y así la punta (y el humo) no se mueve.
+ *
+ * `cigDrop` (0..1) es lo que rompe ese trato, y solo lo abre una REACCIÓN: el cigarrillo
+ * se despega del labio y cae 25°, y la boca puede abrirse por debajo. Sin esto, la mitad
+ * de las caras —el cigarro sale en 2 de cada 3 referencias— se quedaban sin reacción de
+ * boca justo cuando más se las estaba mirando. Sin cigarrillo el canal no pinta nada.
  */
 export function draw(ctx, faceBox, p, palette, rng) {
   const mx = faceBox.cx + faceBox.w * p.offsetX
   const my = faceBox.y + faceBox.h * p.offsetY
   const w = faceBox.w * p.width
 
-  const open = p.cigarette ? 0 : (p.moodOpen ?? 0)
+  const drop = p.cigarette ? Math.min(1, Math.max(0, p.cigDrop ?? 0)) : 0
+  const open = p.cigarette ? (p.moodOpen ?? 0) * drop : (p.moodOpen ?? 0)
   const curve = (p.moodCurve ?? 0) * (p.cigarette ? 0.4 : 1)
 
   interior(ctx, palette, p.lineWeight)
@@ -91,8 +100,9 @@ export function draw(ctx, faceBox, p, palette, rng) {
 
   if (!p.cigarette) return { smoke: null }
 
-  // cigarrillo: palito blanco con punta de acento, saliendo de la comisura
-  const a = (p.cigAngle * Math.PI) / 180
+  // cigarrillo: palito blanco con punta de acento, saliendo de la comisura.
+  // Al despegarse cae 25°: es el gesto: la boca se abre y el pitillo se descuelga.
+  const a = ((p.cigAngle + CIG_DROP_ANGLE * drop) * Math.PI) / 180
   const len = faceBox.w * p.cigLength
   const thick = Math.max(5, faceBox.w * 0.022)
   const x0 = mx + w * 0.45

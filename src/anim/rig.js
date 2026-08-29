@@ -88,8 +88,9 @@ export const MOOD_NAMES = MOODS.map((m) => m.name)
 //    borrarle el humor de fondo al personaje.
 //  · amplitudes ×2.5 en `lift` — la ceja es lo que más se lee de lejos. `tilt` y `curve`
 //    se quedan igual: subirlos hacía muecas de payaso.
-//  · dos canales que la deriva no tiene: `eyeOpen` (abre o cierra el ojo) y `bounce`
-//    (un golpe de escala del dibujo entero, que lo pinta el host).
+//  · canales que la deriva no tiene: `eyeOpen` (abre o cierra el ojo), `bounce` (un golpe
+//    de escala del dibujo entero, que lo pinta el host) y `cigDrop` (el cigarrillo se
+//    despega del labio, ver mouth.js).
 //
 // `hold: Infinity` es la atención: dura mientras el ratón esté encima, y la suelta la
 // dispara el host con react(a, 'neutro').
@@ -103,6 +104,8 @@ const REACTIONS = [
     lift: [-0.03, -0.015],
     curve: [0.15, 0.5],
     eyeOpen: 1.15,
+    // el fumador que solo mira no se despega el cigarro de los labios
+    cigDrop: 0,
   },
   {
     name: 'sorpresa',
@@ -115,6 +118,7 @@ const REACTIONS = [
     eyeOpen: 1.4,
     bounce: 0.06,
     bounceDur: 250,
+    cigDrop: 1,
   },
   {
     name: 'alegría',
@@ -130,6 +134,7 @@ const REACTIONS = [
     bounce: 0.04,
     bounceDur: 300,
     rebote: true,
+    cigDrop: 0.7,
   },
 ]
 
@@ -179,7 +184,7 @@ export function makeActor(seed, extra = {}) {
     reactE0: 1,
     reactE: 0,
     bounce: 0,
-    expr: { ...NEUTRAL, eyeOpen: 1 },
+    expr: { ...NEUTRAL, eyeOpen: 1, cigDrop: 0 },
     // el humo: fase propia (que treinta volutas no ondulen a coro) y reloj de tic.
     // `smokeTip` lo rellena el redraw del host cuando la cara tiene cigarro.
     smokeTip: null,
@@ -376,8 +381,8 @@ export function advance(a, t) {
 
 // Los canales que se DIBUJAN. `eyeOpen` va aquí y no en NEUTRAL porque su reposo es 1,
 // no 0: es un multiplicador de la apertura del ojo, no un delta.
-const EXPR_KEYS = ['tilt', 'lift', 'curve', 'open', 'raise', 'eyeOpen']
-const exprDeAnimo = (a) => ({ ...a.mood, eyeOpen: 1 })
+const EXPR_KEYS = ['tilt', 'lift', 'curve', 'open', 'raise', 'eyeOpen', 'cigDrop']
+const exprDeAnimo = (a) => ({ ...a.mood, eyeOpen: 1, cigDrop: 0 })
 const mezcla = (A, B, k) =>
   Object.fromEntries(EXPR_KEYS.map((n) => [n, lerp(A[n], B[n], k)]))
 
@@ -432,6 +437,7 @@ export function react(a, name, t = a.lastT ?? 0) {
     open: a.rng.range(...(d.open || [0, 0])),
     raise: a.rng.range(...(d.raise || [0, 0])),
     eyeOpen: d.eyeOpen ?? 1,
+    cigDrop: d.cigDrop ?? 0,
   }
   return true
 }
@@ -482,7 +488,8 @@ export function startRig(actors, redraw) {
       const sig =
         `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.gazeY.toFixed(3)}|${a.expr.tilt.toFixed(2)}|` +
         `${a.expr.lift.toFixed(4)}|${a.expr.curve.toFixed(3)}|${a.expr.open.toFixed(3)}|` +
-        `${a.expr.raise.toFixed(4)}|${a.expr.eyeOpen.toFixed(3)}|${a.bounce.toFixed(4)}`
+        `${a.expr.raise.toFixed(4)}|${a.expr.eyeOpen.toFixed(3)}|${a.expr.cigDrop.toFixed(3)}|` +
+        a.bounce.toFixed(4)
       const faceChanged = sig !== a.drawn
       const smokeDue = a.smokeTip !== null && now - a.smokeAt >= SMOKE_STEP
       if (faceChanged || smokeDue) {
@@ -531,6 +538,6 @@ export function overridesFor(a) {
   return {
     eyes: { blink: a.blink, pupilX: a.gaze, pupilY: a.gazeY, eyeOpen: a.expr.eyeOpen },
     brows: { moodTilt: a.expr.tilt, moodLift: a.expr.lift, moodRaise: a.expr.raise },
-    mouth: { moodCurve: a.expr.curve, moodOpen: a.expr.open },
+    mouth: { moodCurve: a.expr.curve, moodOpen: a.expr.open, cigDrop: a.expr.cigDrop },
   }
 }
