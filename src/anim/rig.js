@@ -173,20 +173,43 @@ function moodTarget(rng) {
 /**
  * Arranca el bucle compartido.
  *
+ * EL RELOJ ES SUYO, no el del navegador. `requestAnimationFrame` cuenta desde que cargó
+ * el documento y no se detiene nunca; el rig cuenta desde su propio arranque y se para
+ * cuando se pausa. La diferencia no es cosmética: `makeActor` reparte los desfases
+ * iniciales en milisegundos de ese reloj, así que veinte segundos de pausa dejaban TODAS
+ * las citas —parpadeo, mirada, ánimo— en el pasado, y en el primer frame tras reanudar
+ * los treinta parpadeaban a coro (medido: 30/30 parpadeando, 27/30 moviendo la mirada,
+ * 20/30 cambiando de humor). Luego se volvían a dispersar solos, que es lo que lo hacía
+ * difícil de ver: parecía un pestañeo colectivo y ya está.
+ *
+ * `redraw` recibe también el tiempo del rig, no el del navegador: el humo se mide con
+ * `a.smokeAt` en esa misma escala y con la del navegador la voluta pegaría un salto en
+ * cada reanudación.
+ *
  * @param actors  lista de estados creados con makeActor. Cada uno debe traer `canvas`.
  * @param redraw  (actor, t, faceChanged) => void — se llama cuando el actor cambió de
  *                verdad, o en el tic de humo (faceChanged=false: basta re-blitear la
  *                cara cacheada y pintar la voluta encima)
- * @returns una función para parar
+ * @returns {{ now, running, pause, resume, stop }} el mando del bucle. `now()` es el
+ *          reloj del rig, que es el que hay que pasarle a `react`.
  */
 export function startRig(actors, redraw) {
   let raf = 0
-  let alive = true
+  let corriendo = true
+  let vivo = true
+  // `base` es el instante de rAF en el que arrancó el tramo actual, y `acumulado` el
+  // tiempo de rig de los tramos anteriores. Reanudar vuelve a anclar `base`, así que la
+  // pausa no cuenta como tiempo de animación.
+  let base = null
+  let acumulado = 0
+  let now = 0
 
   const frame = (t) => {
-    if (!alive) return
+    if (!corriendo) return
+    if (base === null) base = t
+    now = acumulado + (t - base)
     for (const a of actors) {
-      advance(a, t)
+      advance(a, now)
 
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
@@ -195,20 +218,39 @@ export function startRig(actors, redraw) {
         `${a.mood.lift.toFixed(4)}|${a.mood.curve.toFixed(3)}|${a.mood.open.toFixed(3)}|` +
         a.mood.raise.toFixed(4)
       const faceChanged = sig !== a.drawn
-      const smokeDue = a.smokeTip !== null && t - a.smokeAt >= SMOKE_STEP
+      const smokeDue = a.smokeTip !== null && now - a.smokeAt >= SMOKE_STEP
       if (faceChanged || smokeDue) {
         a.drawn = sig
-        if (smokeDue) a.smokeAt = t
-        redraw(a, t, faceChanged)
+        if (smokeDue) a.smokeAt = now
+        redraw(a, now, faceChanged)
       }
     }
     raf = requestAnimationFrame(frame)
   }
 
-  raf = requestAnimationFrame(frame)
-  return () => {
-    alive = false
+  const pause = () => {
+    if (!corriendo) return
+    corriendo = false
     cancelAnimationFrame(raf)
+    acumulado = now // congela el reloj donde se quedó
+    base = null
+  }
+  const resume = () => {
+    if (corriendo || !vivo) return
+    corriendo = true
+    raf = requestAnimationFrame(frame)
+  }
+
+  raf = requestAnimationFrame(frame)
+  return {
+    now: () => now,
+    running: () => corriendo,
+    pause,
+    resume,
+    stop: () => {
+      pause()
+      vivo = false
+    },
   }
 }
 
