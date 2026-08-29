@@ -57,19 +57,22 @@
   <h1>doodle-heads</h1>
   <button id="regen">regenerar todos</button>
   <button id="pause">pausar</button>
+  <button id="sonido">sonido: sí</button>
   <button id="saved">guardados: 0 · copiar</button>
   <select id="estilo" title="De dónde salen las bandas de estilo"></select>
   <span id="fps"></span>
 </header>
 <div id="grid"></div>
 <p class="hint">Los treinta miran al puntero. Pasa el ratón por encima de uno y te presta
-  atención; haz click y reacciona. ↻ le sortea una seed nueva, ★ lo guarda —
-  «guardados · copiar» pone la lista en el portapapeles.</p>
+  atención; haz click y te contesta, con su propia voz. ↻ le sortea una seed nueva,
+  ★ lo guarda — «guardados · copiar» pone la lista en el portapapeles.</p>
 
 <script type="module">
 import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
-import { randomSeed } from './src/core/prng.js'
-import { makeCharacter, drawStatic, drawLive, paletteFor } from './src/core/character.js'
+import { makeRng, randomSeed } from './src/core/prng.js'
+import { makeCharacter, drawStatic, drawLive, paletteFor, SALT } from './src/core/character.js'
+import { phrase } from './src/parts/voice.js'
+import { createSpeech } from './src/anim/speech.js'
 import { getPalette } from './src/style/palettes.js'
 import { makeActor, startRig, overridesFor, react, lookAtAll } from './src/anim/rig.js'
 import { drawSmoke } from './src/anim/smoke.js'
@@ -212,6 +215,7 @@ for (let i = 0; i < COUNT; i++) {
     // el sorteo va con el rng del actor: dos personajes no reaccionan igual al mismo
     // click, y el mismo personaje no siempre igual
     react(a, a.rng.next() < 0.5 ? 'sorpresa' : 'alegría', t)
+    hablar(a)
     // y los vecinos se giran a mirar. La caducidad la lleva el rig (`gazeHold`), que es
     // quien tiene reloj: el host no tiene tic propio con el que soltarlos.
     const c = centrosDeCelda()
@@ -243,6 +247,7 @@ function reseed(a, seed) {
   a.layout = null // ...y tira la caché de capas estáticas: son de ESTE personaje
   a.hasBase = false
   a.smokeTip = null
+  a.speech = null // y deja de mover la boca: esa frase era del anterior
 }
 
 let repaints = 0
@@ -394,6 +399,50 @@ window.addEventListener('pointermove', (e) => mirarA({ x: e.clientX, y: e.client
 // vagabundeo. `pointerleave` no burbujea, así que va en el <html>, no en window.
 document.documentElement.addEventListener('pointerleave', () => mirarA(null))
 window.addEventListener('blur', () => mirarA(null))
+
+// --- voz --------------------------------------------------------------------
+// El AudioContext se crea en el PRIMER click y se reutiliza. No al cargar: los
+// navegadores no dejan sonar uno que no venga de un gesto, y se quedaría mudo sin decir
+// por qué. Con el sonido apagado no se crea ninguno — quien lo tiene en «no» no tiene por
+// qué estrenar el audio de su navegador para nada.
+const SONIDO_KEY = 'doodle-sonido:index'
+let silencio = localStorage.getItem(SONIDO_KEY) === 'off'
+let speech = null
+
+function motor() {
+  if (!speech) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    speech = createSpeech(ctx)
+    speech.ctx = ctx
+  }
+  if (speech.ctx.state === 'suspended') speech.ctx.resume()
+  speech.setMuted(silencio)
+  return speech
+}
+
+// El turno de cada personaje: la frase 0, la 1, la 2… Va por seed, así que un personaje
+// re-sorteado empieza de cero y el mismo seed dice siempre lo mismo en el mismo turno.
+const turnos = new Map()
+
+function hablar(a) {
+  const k = turnos.get(a.seed) ?? 0
+  turnos.set(a.seed, k + 1)
+  const frase = phrase(a.character.voice, makeRng(a.seed).fork(SALT.voice).fork(k))
+  // La boca va aunque no se oiga: silenciar es bajar el volumen, no dejar de hablar.
+  a.speech = { t0: rig.now(), phrase: frase }
+  if (silencio && !speech) return
+  motor().speak(a.character.voice, frase, a.seed)
+}
+
+const sonidoBtn = document.getElementById('sonido')
+const syncSonido = () => (sonidoBtn.textContent = `sonido: ${silencio ? 'no' : 'sí'}`)
+syncSonido()
+sonidoBtn.addEventListener('click', () => {
+  silencio = !silencio
+  localStorage.setItem(SONIDO_KEY, silencio ? 'off' : 'on')
+  syncSonido()
+  if (speech) speech.setMuted(silencio)
+})
 
 const rig = startRig(actors, redraw)
 
