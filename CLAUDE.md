@@ -111,6 +111,13 @@ soldarse en un aro.
 el arco y el ojo acaba en recta a lo ancho completo, 1 baja la cuerda y acaba en el arco
 curvo. `depth` es solo la apertura en reposo.
 
+**Mirada: los dos ejes no son iguales, y no deben serlo.** El ojo es unas cuatro veces más
+ancho que hondo, así que la pupila recorre ~112 px lógicos de lado a lado y ~34 de arriba
+abajo. Eso ya es el «los ojos giran más de lo que suben»: volver a recortar la vertical en
+el host lo dejaba en 15 contra 112 y el eje no se leía. Los dos extremos verticales se
+miden igual —cuánto del diámetro se esconde bajo un párpado— con un suelo en píxeles para
+que una pupila pequeña no desaparezca al mirar arriba.
+
 Los recortes de la copia A y de la sombra van contra la forma **en reposo**, no la actual:
 contra la actual, al cerrarse no quedaría nada que recortar y saldría el aro entero
 rodeando un ojo cerrado. La copia B sí va contra el blanco **visible**, porque está sobre

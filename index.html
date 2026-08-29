@@ -305,8 +305,11 @@ function redraw(a, t = 0, faceChanged = true) {
 // apenas, así que se nota de dónde viene la atención. Con un normalizado por celda, las
 // treinta mirarían igual de fuerte y no señalaría nadie.
 //
-// La vertical va a la mitad: un ojo sube y baja mucho menos de lo que gira, y a tope
-// vertical la pupila se sale del blanco visible y parece un susto permanente.
+// La vertical NO se recorta aquí. La tentación es hacerlo —un ojo sube y baja mucho menos
+// de lo que gira— pero eso ya lo impone la geometría del ojo, que es cuatro veces más
+// ancho que hondo: medido, la pupila recorre 112 px lógicos de lado a lado y 33 de arriba
+// abajo. Recortar la `y` a la mitad encima de eso dejaba el eje vertical en 15 contra 112,
+// y el movimiento no se leía.
 const GAZE_REACH = 500
 const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v)
 
@@ -337,7 +340,7 @@ function mirarA(puntero) {
   for (let i = 0; i < actors.length; i++) {
     actors[i].gazeTarget = {
       x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
-      y: clamp1((puntero.y - c[i].y) / GAZE_REACH) * 0.5,
+      y: clamp1((puntero.y - c[i].y) / GAZE_REACH),
     }
   }
 }

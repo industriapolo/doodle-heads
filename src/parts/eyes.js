@@ -84,15 +84,26 @@ export const PARAMS = {
   pupilY: { min: -1, max: 1, range: [0, 0], step: 0.05, label: 'Mirada Y' },
 }
 
-// Dónde puede llegar la pupila, medido en radios de pupila:
-//  · en reposo se APOYA en la cuerda — asoma por debajo, con un 27,5 % de su diámetro ya
-//    tapado por el párpado. Eso no es un accidente, es la construcción del ojo.
-//  · hacia abajo, hasta que roza el arco del blanco.
-//  · hacia arriba, hasta esconder `PUPIL_HIDE` de su diámetro bajo el párpado. Se recorta
-//    contra el blanco visible, así que lo que queda es una uña de pupila pegada a la
-//    cuerda: eso es lo que se lee como ojo en blanco.
+// Dónde puede llegar la pupila. En reposo se APOYA en la cuerda — asoma por debajo, con
+// un 27,5 % de su diámetro ya tapado por el párpado. Eso no es un accidente, es la
+// construcción del ojo, y es también la razón de que este eje sea corto: el reposo ya
+// está pegado al tope de arriba.
+//
+// Los dos extremos se miden igual, por cuánto del diámetro se esconde bajo un párpado:
+// arriba bajo la cuerda, abajo bajo el arco. Medirlos de la misma forma es lo que evita
+// el desequilibrio que tenían: el de abajo colgaba de `sag − pr`, o sea de la geometría
+// del ojo, y el de arriba solo del radio de la pupila, así que el recorrido hacia abajo
+// era cuatro veces el de arriba y con ojos poco abiertos el de abajo directamente no
+// existía (17 de 400 caras sin un píxel de recorrido).
+//
+// El extremo de arriba lleva además un SUELO en píxeles, no en fracción: hay pupilas de
+// 2,5 px de radio, y esconderles el 82 % deja menos de un píxel asomando — el personaje
+// no se lee mirando arriba, se lee con los ojos en blanco. Con el suelo, una pupila
+// grande sube mucho y una diminuta no sube nada, que es lo honesto: no hay sitio.
 const PUPIL_REST = 0.45
-const PUPIL_HIDE = 0.72
+const PUPIL_HIDE_UP = 0.82
+const PUPIL_HIDE_DOWN = 0.3
+const PUPIL_MIN_CAP = 5 // px lógicos de pupila que siempre asoman por debajo del párpado
 
 export const randomize = randomizerFor(PARAMS)
 
@@ -129,14 +140,18 @@ function outside(path) {
  * si no, cerrar el ojo arrastraría la pupila hacia arriba y la mirada se movería sola con
  * cada pestañeo. Lo que se va con el párpado es el recorte, no la posición.
  *
- * Y hay que topar ese tope: con el ojo poco abierto y la pupila grande, `sag − pr` cae
- * por encima del reposo y «mirar abajo» subiría la pupila.
+ * Y hay que topar ese tope: con el ojo poco abierto y la pupila grande, el extremo de
+ * abajo cae por encima del reposo y «mirar abajo» subiría la pupila.
  */
 function pupilCy(pr, sag, pupilY = 0) {
   const reposo = pr * PUPIL_REST
   if (!pupilY) return reposo
-  const abajo = Math.max(reposo, sag - pr)
-  const arriba = pr * (1 - 2 * PUPIL_HIDE)
+  const abajo = Math.max(reposo, sag - pr * (1 - 2 * PUPIL_HIDE_DOWN))
+  // lo que asoma bajo el párpado en el tope de arriba: la fracción pedida, pero nunca
+  // menos que el suelo. `min` con el reposo porque a una pupila diminuta el suelo le pide
+  // más de lo que tiene y el extremo saldría por DEBAJO del reposo — mirar arriba bajaría.
+  const asoma = Math.max(PUPIL_MIN_CAP, 2 * pr * (1 - PUPIL_HIDE_UP))
+  const arriba = Math.min(reposo, asoma - pr)
   return reposo + (pupilY > 0 ? pupilY * (abajo - reposo) : -pupilY * (arriba - reposo))
 }
 
