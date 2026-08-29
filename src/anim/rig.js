@@ -366,13 +366,18 @@ export function advance(a, t) {
   a.bounce = 0
   if (a.reactAt !== null) {
     const d = a.reactDef
-    const u = t - a.reactAt
+    // Los tramos se miden con el reloj POR DELANTE. `advance` es una costura pública y
+    // nada impide llamarla con un instante anterior al arranque; sin este suelo, la
+    // cúbica del ataque extrapola —medido: −1e9 en `open`— y `mouth.js` revienta pidiendo
+    // una elipse de radio negativo. El reloj del rig no retrocede, pero el que lo gobierne
+    // desde fuera no tiene por qué saberlo.
+    const u = Math.max(0, t - a.reactAt)
     if (t >= a.reactHoldEnd) {
       if (a.reactHoldExpr === null) {
         a.reactHoldExpr = a.expr
         a.reactE0 = a.reactE
       }
-      const r = (t - a.reactHoldEnd) / d.release
+      const r = Math.max(0, (t - a.reactHoldEnd) / d.release)
       if (r >= 1) {
         // Se acabó. El reloj de la deriva se reprograma aquí y no antes: si no, la cita
         // vencida durante la reacción dispararía una excursión en el mismo frame en que

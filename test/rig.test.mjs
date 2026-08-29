@@ -405,6 +405,20 @@ describe('react: la envolvente', () => {
     assert.deepEqual({ expr: { ...a.expr }, reactAt: a.reactAt }, antes)
   })
 
+  it('un instante anterior al arranque no extrapola', () => {
+    // `advance` es una costura pública. Con un reloj que retrocede, la cúbica del ataque
+    // se disparaba a −1e9 en `open` y mouth.js reventaba pidiendo una elipse de radio
+    // negativo. El reloj del rig no retrocede; quien lo gobierne desde fuera puede.
+    const a = quieto()
+    react(a, 'sorpresa', 10000)
+    advance(a, 0)
+    for (const k of ['tilt', 'lift', 'curve', 'open', 'raise', 'eyeOpen', 'cigDrop']) {
+      assert.ok(Number.isFinite(a.expr[k]), `${k} = ${a.expr[k]}`)
+    }
+    assert.ok(a.expr.open >= 0 && a.expr.open <= 1, `open = ${a.expr.open}`)
+    assert.ok(a.reactE >= 0 && a.reactE <= 1, `envolvente = ${a.reactE}`)
+  })
+
   it('sin `t`, usa el último instante que vio el actor', () => {
     const a = quieto()
     advance(a, 4321)
