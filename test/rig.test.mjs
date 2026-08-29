@@ -123,6 +123,133 @@ describe('el reloj del rig es suyo, no el del navegador', () => {
 
 // ---------------------------------------------------------------------------
 
+describe('mirada con objetivo externo', () => {
+  const FRAME = 16
+  /** Corre `ms` de animación en frames de 16, devolviendo la traza de la mirada. */
+  const correr = (a, desde, ms, target) => {
+    const traza = []
+    for (let t = desde; t <= desde + ms; t += FRAME) {
+      a.gazeTarget = target
+      advance(a, t)
+      traza.push({ t, x: a.gaze, y: a.gazeY })
+    }
+    return traza
+  }
+
+  it('con objetivo fijo, la mirada llega en menos de 400 ms', () => {
+    // Desde el peor caso posible: cruzar el rango entero.
+    const a = makeActor(3)
+    advance(a, 0)
+    a.gaze = -1
+    a.gazeY = -1
+    const traza = correr(a, FRAME, 400, { x: 1, y: 1 })
+    const fin = traza[traza.length - 1]
+    assert.ok(Math.abs(fin.x - 1) < 0.05, `pupilX se quedó en ${fin.x.toFixed(3)}`)
+    assert.ok(Math.abs(fin.y - 1) < 0.05, `pupilY se quedó en ${fin.y.toFixed(3)}`)
+  })
+
+  it('persigue: se acerca siempre, nunca se pasa, y cada paso es menor que el anterior', () => {
+    // Un exponencial recorta una fracción fija de lo que le queda, así que el primer paso
+    // es el más grande (~0,25 cruzando el rango entero a 60fps) y a partir de ahí solo
+    // decrece. Eso es lo que se lee como perseguir: sale rápido y frena al llegar.
+    const a = makeActor(3)
+    advance(a, 0)
+    a.gaze = -1
+    const traza = correr(a, FRAME, 600, { x: 1, y: 0 })
+    let pasoPrevio = Infinity
+    for (let i = 1; i < traza.length; i++) {
+      const paso = traza[i].x - traza[i - 1].x
+      assert.ok(paso >= -1e-9, `retrocedió en t=${traza[i].t}`)
+      assert.ok(traza[i].x <= 1 + 1e-9, `se pasó del objetivo: ${traza[i].x}`)
+      assert.ok(paso <= pasoPrevio + 1e-9, `aceleró en t=${traza[i].t}`)
+      pasoPrevio = paso
+    }
+  })
+
+  it('el objetivo se sigue mientras se mueve', () => {
+    const a = makeActor(3)
+    advance(a, 0)
+    let t = FRAME
+    for (const x of [0.8, -0.8, 0.3]) {
+      for (let i = 0; i < 40; i++, t += FRAME) {
+        a.gazeTarget = { x, y: 0 }
+        advance(a, t)
+      }
+      assert.ok(Math.abs(a.gaze - x) < 0.05, `no alcanzó ${x}: ${a.gaze.toFixed(3)}`)
+    }
+  })
+
+  it('soltar el objetivo no da un salto, y devuelve la vertical al centro', () => {
+    const a = makeActor(3)
+    advance(a, 0)
+    const conObjetivo = correr(a, FRAME, 600, { x: 0.9, y: 0.9 })
+    const antes = { x: a.gaze, y: a.gazeY }
+    let t = conObjetivo[conObjetivo.length - 1].t
+
+    // La costura: el primer frame SIN objetivo. La horizontal no puede moverse NADA —
+    // el vagabundeo arranca desde donde esté y su cita queda reprogramada—, y la vertical
+    // solo puede empezar a bajar, que es el mismo suavizado con el que subió.
+    t += FRAME
+    a.gazeTarget = null
+    advance(a, t)
+    assert.equal(a.gaze, antes.x, `pupilX saltó ${(a.gaze - antes.x).toFixed(4)} al soltar`)
+    assert.ok(a.gazeY < antes.y && a.gazeY > antes.y - 0.2, `pupilY dio un tirón: ${antes.y} → ${a.gazeY}`)
+
+    // y la vertical baja sola al centro, sin pasarse
+    let previo = Math.abs(a.gazeY)
+    for (; t <= 3000; t += FRAME) {
+      a.gazeTarget = null
+      advance(a, t)
+      const ahora = Math.abs(a.gazeY)
+      assert.ok(ahora <= previo + 1e-9, `la vertical se pasó de largo en t=${t}`)
+      previo = ahora
+    }
+    assert.ok(Math.abs(a.gazeY) < 0.02, `la vertical se quedó en ${a.gazeY.toFixed(3)}`)
+  })
+
+  it('tras soltar, el vagabundeo vuelve a mover la mirada', () => {
+    // Si al soltar quedara una cita vencida, la sacada saldría en el mismo frame; y si no
+    // se reprogramara ninguna, el personaje se quedaría con la mirada congelada.
+    const a = makeActor(3)
+    advance(a, 0)
+    correr(a, FRAME, 600, { x: 0.9, y: 0 })
+    a.gazeTarget = null
+    advance(a, 632)
+    const alSoltar = a.gaze
+    let movio = false
+    for (let t = 648; t <= 20000; t += FRAME) {
+      advance(a, t)
+      if (Math.abs(a.gaze - alSoltar) > 0.05) { movio = true; break }
+    }
+    assert.ok(movio, 'la mirada se quedó congelada tras soltar el objetivo')
+  })
+
+  it('el objetivo se recorta a [-1, 1]', () => {
+    const a = makeActor(3)
+    advance(a, 0)
+    correr(a, FRAME, 800, { x: 5, y: -9 })
+    assert.ok(Math.abs(a.gaze - 1) < 0.05, `pupilX=${a.gaze}`)
+    assert.ok(Math.abs(a.gazeY + 1) < 0.05, `pupilY=${a.gazeY}`)
+  })
+
+  it('overridesFor manda los dos canales de mirada', () => {
+    const a = makeActor(3)
+    advance(a, 0)
+    correr(a, FRAME, 600, { x: -0.5, y: 0.4 })
+    const ov = overridesFor(a)
+    assert.equal(ov.eyes.pupilX, a.gaze)
+    assert.equal(ov.eyes.pupilY, a.gazeY)
+  })
+
+  it('sin objetivo, el vagabundeo es el de siempre y la vertical no se mueve', () => {
+    const a = makeActor(9)
+    for (let t = 0; t <= 30000; t += FRAME) advance(a, t)
+    assert.equal(a.gazeY, 0, 'algo movió la vertical sin que nadie se lo pidiera')
+  })
+})
+
+// ---------------------------------------------------------------------------
+
 describe('advance', () => {
   it('es determinista: mismo actor, misma línea de tiempo, mismo estado', () => {
     const paso = (a) => { for (let t = 0; t <= 30000; t += 16) advance(a, t) }

@@ -25,6 +25,11 @@ const BLINK_GAP = [2000, 7000] // entre parpadeos
 const BLINK_DUR = [100, 140] // lo que dura uno
 const GAZE_GAP = [3000, 10000]
 const GAZE_EASE = 380
+// Seguir al puntero NO es la transición programada: esa es una sacada, sale y llega. Un
+// objetivo externo se persigue, así que es un suavizado exponencial hacia donde esté
+// ahora mismo. La constante es el tiempo en el que se recorta la distancia a 1/e; con 100
+// ms, cruzar de −1 a +1 queda a menos de 0,05 del objetivo en 400 ms, que es el listón.
+const GAZE_FOLLOW = 100
 const MOOD_GAP = [4000, 12000] // entre cambios de ánimo
 const MOOD_EASE = 700 // las cejas se mueven despacio: rápido se lee como tic
 // El humo se mueve a 25fps, no a 60: es una voluta, no un proyectil — y como el fumador
@@ -71,6 +76,14 @@ export function makeActor(seed, extra = {}) {
     gazeTo: 0,
     gazeAt: null,
     gazeNext: rng.range(0, GAZE_GAP[1]),
+    // La vertical solo la mueve un objetivo externo: el vagabundeo es horizontal, como
+    // hasta ahora. Sin objetivo vuelve a cero ella sola.
+    gazeY: 0,
+    // Dónde mira, en [−1, 1] y coordenadas de la cara. Lo pone el HOST — el rig no sabe
+    // que existe un ratón, solo que a veces le dicen dónde mirar.
+    gazeTarget: null,
+    gazeHeld: false,
+    lastT: null,
     mood: { ...NEUTRAL },
     moodFrom: null,
     moodTo: null,
@@ -86,6 +99,7 @@ export function makeActor(seed, extra = {}) {
 }
 
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
+const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v || 0)
 
 /**
  * Avanza un actor a un instante dado. Exportada porque es la costura para gobernar el
@@ -93,6 +107,11 @@ const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
  * comprobar los tiempos sin depender de requestAnimationFrame.
  */
 export function advance(a, t) {
+  // El paso desde el frame anterior, que es lo que necesita el suavizado de la mirada.
+  // En el primer frame no hay paso: dt = 0 y nada se mueve.
+  const dt = a.lastT === null ? 0 : Math.max(0, t - a.lastT)
+  a.lastT = t
+
   // --- parpadeo ---------------------------------------------------------
   if (a.blinkAt === null) {
     if (t >= a.blinkFrom) {
@@ -112,20 +131,45 @@ export function advance(a, t) {
   }
 
   // --- mirada -----------------------------------------------------------
-  if (a.gazeAt === null) {
-    if (t >= a.gazeNext) {
-      a.gazeAt = t
-      a.gazeFrom = a.gaze
-      a.gazeTo = a.rng.range(-0.6, 0.6)
-    }
+  // Dos regímenes, y el paso de uno a otro no puede dar un salto: la mirada es lo que
+  // más delata un truco.
+  const k = 1 - Math.exp(-dt / GAZE_FOLLOW)
+  if (a.gazeTarget) {
+    // Persiguiendo un objetivo externo. Se cancela la sacada que hubiera en vuelo: el
+    // objetivo manda, y dejarla correr por debajo la devolvería de golpe al soltar.
+    a.gaze += (clamp1(a.gazeTarget.x) - a.gaze) * k
+    a.gazeY += (clamp1(a.gazeTarget.y) - a.gazeY) * k
+    a.gazeAt = null
+    a.gazeHeld = true
   } else {
-    const phase = (t - a.gazeAt) / GAZE_EASE
-    if (phase >= 1) {
-      a.gaze = a.gazeTo
-      a.gazeAt = null
-      a.gazeNext = t + a.rng.range(...GAZE_GAP)
+    if (a.gazeHeld) {
+      // Recién soltado. El vagabundeo arranca DESDE donde esté la mirada (`gazeFrom` es
+      // siempre `a.gaze`), así que no hay salto; lo único que hace falta es no disparar
+      // una sacada en el mismo frame con un `gazeNext` que quedó vencido mientras
+      // miraba. La pausa es fija a propósito: pedirle un número al rng aquí ataría la
+      // secuencia del actor a cuánto rato estuvo el ratón encima.
+      a.gazeHeld = false
+      a.gazeNext = t + GAZE_GAP[0]
+    }
+    // la vertical no la vagabundea nadie: vuelve al centro por el mismo suavizado, o el
+    // personaje se quedaría mirando al techo para siempre
+    if (a.gazeY) a.gazeY += -a.gazeY * k
+
+    if (a.gazeAt === null) {
+      if (t >= a.gazeNext) {
+        a.gazeAt = t
+        a.gazeFrom = a.gaze
+        a.gazeTo = a.rng.range(-0.6, 0.6)
+      }
     } else {
-      a.gaze = a.gazeFrom + (a.gazeTo - a.gazeFrom) * easeInOut(phase)
+      const phase = (t - a.gazeAt) / GAZE_EASE
+      if (phase >= 1) {
+        a.gaze = a.gazeTo
+        a.gazeAt = null
+        a.gazeNext = t + a.rng.range(...GAZE_GAP)
+      } else {
+        a.gaze = a.gazeFrom + (a.gazeTo - a.gazeFrom) * easeInOut(phase)
+      }
     }
   }
 
@@ -216,7 +260,7 @@ export function startRig(actors, redraw) {
       // Solo repinta si cambió algo que se dibuje. Redondear a 3 decimales evita
       // repintar por diferencias que no se ven.
       const sig =
-        `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.mood.tilt.toFixed(2)}|` +
+        `${a.blink.toFixed(3)}|${a.gaze.toFixed(3)}|${a.gazeY.toFixed(3)}|${a.mood.tilt.toFixed(2)}|` +
         `${a.mood.lift.toFixed(4)}|${a.mood.curve.toFixed(3)}|${a.mood.open.toFixed(3)}|` +
         a.mood.raise.toFixed(4)
       const faceChanged = sig !== a.drawn
@@ -259,7 +303,7 @@ export function startRig(actors, redraw) {
 /** Los overrides que este actor le pasa a character.draw. */
 export function overridesFor(a) {
   return {
-    eyes: { blink: a.blink, pupilX: a.gaze },
+    eyes: { blink: a.blink, pupilX: a.gaze, pupilY: a.gazeY },
     brows: { moodTilt: a.mood.tilt, moodLift: a.mood.lift, moodRaise: a.mood.raise },
     mouth: { moodCurve: a.mood.curve, moodOpen: a.mood.open },
   }

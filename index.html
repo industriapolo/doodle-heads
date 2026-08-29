@@ -267,10 +267,62 @@ function redraw(a, t = 0, faceChanged = true) {
   if (a.smokeTip) drawSmoke(a.ctx, a.smokeTip, t, a.palette, a.smokePhase)
 }
 
+// --- la mirada sigue al puntero --------------------------------------------
+// El rig no sabe que existe un ratón: solo sabe seguir un objetivo en [−1, 1]. Quien
+// traduce píxeles a eso es el host, aquí.
+//
+// La distancia de referencia es lo que hace que el coro se lea como coro: con 500 px, las
+// caras de alrededor del puntero se giran del todo y las del otro extremo de la pantalla
+// apenas, así que se nota de dónde viene la atención. Con un normalizado por celda, las
+// treinta mirarían igual de fuerte y no señalaría nadie.
+//
+// La vertical va a la mitad: un ojo sube y baja mucho menos de lo que gira, y a tope
+// vertical la pupila se sale del blanco visible y parece un susto permanente.
+const GAZE_REACH = 500
+const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v)
+
+// Los centros de celda se cachean: `getBoundingClientRect` fuerza layout, y a treinta por
+// evento de puntero eso es tirar el frame. Solo cambian al redimensionar o al hacer
+// scroll, que es cuando se invalidan.
+let centros = null
+const invalidarCentros = () => { centros = null }
+window.addEventListener('resize', invalidarCentros)
+window.addEventListener('scroll', invalidarCentros, { passive: true })
+
+function centrosDeCelda() {
+  if (!centros) {
+    centros = actors.map((a) => {
+      const r = a.canvas.getBoundingClientRect()
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    })
+  }
+  return centros
+}
+
+function mirarA(puntero) {
+  if (!puntero) {
+    for (const a of actors) a.gazeTarget = null
+    return
+  }
+  const c = centrosDeCelda()
+  for (let i = 0; i < actors.length; i++) {
+    actors[i].gazeTarget = {
+      x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
+      y: clamp1((puntero.y - c[i].y) / GAZE_REACH) * 0.5,
+    }
+  }
+}
+
+window.addEventListener('pointermove', (e) => mirarA({ x: e.clientX, y: e.clientY }))
+// Fuera de la ventana no hay a dónde mirar: se sueltan los treinta y vuelven a su
+// vagabundeo. `pointerleave` no burbujea, así que va en el <html>, no en window.
+document.documentElement.addEventListener('pointerleave', () => mirarA(null))
+window.addEventListener('blur', () => mirarA(null))
+
 const rig = startRig(actors, redraw)
 
 // para poder inspeccionar y gobernar la animación desde consola
-window.__rig = { actors, redraw, frame, rig }
+window.__rig = { actors, redraw, frame, rig, mirarA }
 
 document.getElementById('regen').addEventListener('click', () => {
   for (const a of actors) reseed(a, randomSeed())
