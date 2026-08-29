@@ -108,6 +108,11 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   el orden de las tiradas del rng (`sample` pide una por entrada, banda cerrada incluida),
   así que meterlo en medio corre la secuencia de todo lo que va detrás y repinta esa parte
   en todas las seeds guardadas.
+- **Una sombra es algo que le pasa a la PIEL**: `skinDeep` es más oscuro que la piel pero
+  más CLARO que la tinta, así que cualquier sombra pintada sobre la barba de masa no
+  oscurece — abre un agujero claro. La barba se pinta la primera de `drawMass` y las
+  sombras van después, así que hay que descontarla del recorte a mano (ya se hace con la
+  sombra proyectada del pelo). Con la barba de rayitas no pasa: ahí debajo hay piel.
 - **Blend modes sobre un canvas blitado**: el acabado (grano `overlay`, viñeta `multiply`)
   da unas pocas unidades distintas sobre un canvas que ha recibido un `drawImage` que
   sobre uno pintado del tirón. Invisible, pero es la razón de que el grano del index no

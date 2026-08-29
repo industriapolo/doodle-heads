@@ -421,6 +421,12 @@ export function drawMass(ctx, geo, p, palette, rng, limits = {}) {
   if (shOff > 0.5) {
     ctx.save()
     ctx.clip(geo.path)
+    // Y NUNCA sobre la barba de masa. Una sombra es algo que le pasa a la PIEL: sobre la
+    // tinta de la barba, `skinDeep` no oscurece nada — es más claro que la masa, así que
+    // abría dos tiras claras por los lados, como si la barba tuviera agujeros. La barba
+    // se pinta la primera de todo y estas sombras van después, así que hay que
+    // descontarla del recorte a mano.
+    if (beard) ctx.clip(outside(beard), 'evenodd')
     ctx.fillStyle = palette.skinDeep
     // La sombra del casquete solo puede caer en la FRENTE, por encima de las costuras.
     // Con costuras profundas (melena, barrido fuerte), la copia desplazada del borde
@@ -612,6 +618,14 @@ function sidePath(headBox, faceBox, p, dir, fringeY, lean, rng) {
 }
 
 /** Distancia de un punto al eje de la nariz, para apagar la barba a su alrededor. */
+/** El complemento de un path: todo menos él. Con evenodd, un rect enorme + el path. */
+function outside(path) {
+  const o = new Path2D()
+  o.rect(-4000, -4000, 8000, 8000)
+  o.addPath(path)
+  return o
+}
+
 function distanceToSegment(px, py, s) {
   const dx = s.x1 - s.x0
   const dy = s.y1 - s.y0
