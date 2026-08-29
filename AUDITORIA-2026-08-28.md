@@ -26,15 +26,23 @@ La medida que abría este hallazgo se da la vuelta: con `backHair.p + 1e-8` la m
 
 El test de cobertura por ray-casting de `HANDOFF-pelo.md` («0 fallos en 190 caras») existe solo como snippet de consola: no está en ningún fichero. Y no hay ningún test automatizable. El harness de esta auditoría demuestra que `makeCharacter` corre en Node sin canvas (solo hay que no tocar `document`), así que un `test/` con `node --test` cuesta poco: determinismo, rangos dentro de topes, pools con claves válidas, el diff panel/arquetipo, y la estadística de rasgos (que es lo que habría detectado el hallazgo 1). El test geométrico de masas puede vivir como `previews/_coverage.js` importable desde consola.
 
-### 4. Rendimiento: el coste por repintado es el del dibujo entero (media)
+### 4. Rendimiento: el coste por repintado es el del dibujo entero (media) — CERRADO (29 ago 2026)
 
 Cada cambio de cara (parpadeo ≈ 7 frames, ánimo ≈ 42, mirada ≈ 23) re-ejecuta `draw` completo, hatching incluido: `edgeField` crea un canvas, aplica `filter: blur` y hace `getImageData` por cada llamada a `hatch` (hasta dos por cara). Hoy el contador del index lo absorbe, y la decisión de diferir el cacheo de capas sigue siendo correcta; solo dejo apuntado dónde cortar cuando haga falta: las capas 0–4 (melena, orejas, cabeza, hatching, re-trazo) no dependen de ningún canal del rig, y la sombra de cejas es lo único animado que queda por debajo de las masas. Cachear 0–4 como offscreen por personaje es el 80 % del ahorro con el 20 % del trabajo.
 
 Nota aparte: `edgeField` depende de `ctx.filter`, que en Safari viejos no existe; ahí el edge fade desaparece en silencio. Irrelevante mientras la herramienta sea local en Chrome.
 
-### 5. El rig se sincroniza al reanudar (baja)
+**Cerrado el 29 ago 2026, por donde decía el propio hallazgo.** `character.js` exporta ahora `drawStatic` (capas 0–4) y `drawLive` (5–13), y `draw` se conserva como composición de las dos para que las previews y los tests no cambien. El index cachea la estática en un offscreen por personaje y la invalida solo en `reseed`. Medido sobre los 30: repintar las capas vivas cuesta 12 ms frente a 51,9 ms la cara entera, un 77 % menos. Eso es lo que da margen para que los treinta repinten a la vez cuando la mirada sigue al puntero — 10,4 ms por frame, techo de 96 fps.
+
+De paso quedó medida otra cifra que estaba mal en la documentación: en reposo no se animan «una o dos caras de treinta» sino 3,9. No es de este cambio; sumar los tres ciclos (parpadeo, mirada, ánimo) da un 13 % de ocupación por cara.
+
+### 5. El rig se sincroniza al reanudar (baja) — CERRADO (29 ago 2026)
 
 `makeActor` reparte los desfases iniciales en ms absolutos del reloj de rAF. Tras «pausar»/«reanudar», todos los temporizadores quedan en el pasado y los 30 parpadean, miran y cambian de ánimo en el mismo frame; luego se vuelven a dispersar. Arreglo: que `startRig` mida el tiempo desde su propio arranque, o que al reanudar desplace los `*From/*Next` por la duración de la pausa.
+
+**Cerrado el 29 ago 2026** por la primera de las dos vías. `startRig` cuenta desde su propio arranque y devuelve el mando del bucle (`{ now, running, pause, resume, stop }`) en vez de una función de parada; pausar congela el reloj y reanudar lo continúa. `redraw` recibe también ese tiempo, no el del navegador: el humo se mide con `a.smokeAt` en la misma escala y si no, la voluta pegaría un salto en cada reanudación.
+
+La cifra del hallazgo, verificada antes de tocar nada: en el primer frame tras reanudar, 30/30 parpadeando, 27/30 moviendo la mirada y 20/30 cambiando de humor. El test (`test/rig.test.mjs`) sustituye el rAF por una cola gobernada por el test, que es lo que permite mentirle al rig sobre el reloj del navegador, y se escribió en rojo antes del arreglo.
 
 ### 6. Deriva entre documentación y código (baja)
 

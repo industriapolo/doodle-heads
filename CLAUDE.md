@@ -173,8 +173,39 @@ La historia de por qué (dos generaciones de fallos con una cúpula elíptica) e
 ## Animación
 
 Un **único `requestAnimationFrame` compartido** recorre los ~30 personajes. Nunca un rAF por
-personaje. El cacheo de capas estáticas en offscreen canvas queda diferido hasta que el grid
-baje de 60fps.
+personaje. Y la regla de fondo no es cachear, es **no repintar lo que no ha cambiado**: en
+reposo se animan ~4 caras de 30 por frame y las otras 26 se saltan enteras.
+
+**El reloj es del rig, no del navegador.** `startRig` cuenta desde su propio arranque y
+devuelve `{ now, running, pause, resume, stop }`; pausar lo congela y reanudar lo continúa.
+Con el reloj de rAF, una pausa larga dejaba todas las citas vencidas y los treinta
+parpadeaban a coro al volver. `now()` es lo que hay que pasarle a `react`.
+
+**Dos funciones de dibujo, no una.** `character.js` exporta `drawStatic` (capas 0–4:
+melena, orejas, cabeza, hatching, re-trazo) y `drawLive` (5–13, todo lo que un canal del
+rig puede mover, más el acabado, que va sobre el lienzo entero). `draw` sigue existiendo
+como composición de las dos: las previews y los tests la usan tal cual.
+
+**La caché es del host, no del módulo.** El index guarda `drawStatic` en un offscreen por
+personaje y la invalida solo en `reseed`; en cada repintado blitea eso y ejecuta `drawLive`
+encima. Repintar las capas vivas de los 30 cuesta 10 ms; la cara entera, 52.
+
+Corolario del reparto: **el layout sale del personaje y solo del personaje**. Los overrides
+del rig son canales de DIBUJO, no de composición — si movieran el layout, la capa cacheada
+y la viva dejarían de cuadrar. Tenía que ser así porque las orejas son capa estática y
+cuelgan de la altura de los ojos.
+
+**Canales del rig.** Son params con banda `[0, 0]`: no se sortean, los mueve el rig por
+`overridesFor`. Hoy: `eyes.blink`, `eyes.pupilX`, `eyes.pupilY`, y los `mood*` de ceja y
+boca. Añadir uno pide declararlo **al final** de su PARAMS — el orden de declaración es el
+orden de las tiradas del rng, así que en medio corre la secuencia de todo lo que va detrás
+y repinta esa parte en todas las seeds guardadas.
+
+**El host manda los datos del mundo; el rig decide la cara.** El rig no sabe que existe un
+ratón: sabe seguir `a.gazeTarget` (un punto en [−1, 1], suavizado exponencial) y sabe
+`react(a, nombre, t)` (una excursión de ánimo con nombre, arrancando desde donde esté la
+cara). Traducir píxeles a eso, y decidir que un hover «merece atención», es del index.
+Cuánto se levanta una ceja para eso no sale nunca de `rig.js`.
 
 ## Escala de trabajo
 

@@ -17,11 +17,21 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   arquetipo — y como el panel ya solo guarda lo que difiere, «de fábrica» y «no tocado»
   son lo mismo. Mujer = melena/moño/cortinas + ceja fina + labios + pestañas + rubor/pecas
   + cara estrecha, todo sesgos, nada muros.
-- **Rig** (`src/anim/rig.js`): parpadeo, mirada, y ánimo de 10 estados (un solo estado
-  con 5 canales: cejas tilt/lift/raise + boca curve/open) — mayoría del tiempo en
-  neutro, excursiones con retorno. Humo del cigarro (`src/anim/smoke.js`): una línea
-  ondulante a 25fps sobre blit de la cara cacheada. Con cigarrillo, la boca anula la
-  apertura y atenúa la curva.
+- **Rig** (`src/anim/rig.js`): parpadeo, mirada, y ánimo de 10 estados con nombre (un
+  solo estado con 5 canales: cejas tilt/lift/raise + boca curve/open) — mayoría del
+  tiempo en neutro, excursiones con retorno. Reloj propio: `startRig` devuelve
+  `{ now, running, pause, resume, stop }` y pausar lo congela. Humo del cigarro
+  (`src/anim/smoke.js`): una línea ondulante a 25fps sobre blit de la cara cacheada. Con
+  cigarrillo, la boca anula la apertura y atenúa la curva.
+- **Interactividad del coro** (index): los treinta **miran al puntero**
+  (`a.gazeTarget`, suavizado exponencial; `eyes.pupilX`/`pupilY`), **reaccionan al
+  hover** (atención) y **al click** (sorpresa o alegría, a suertes). Re-sortear un
+  personaje ya no es el click: es el botón ↻ de su celda. El rig no sabe que existe un
+  ratón — el index traduce píxeles a objetivo y llama a `react(a, nombre, rig.now())`.
+- **Dibujo en dos mitades**: `drawStatic` (capas 0–4) y `drawLive` (5–13); el index
+  cachea la primera por personaje. `draw` sigue siendo la cara entera, y es lo que usan
+  las previews y los tests. Medido: repintar las capas vivas de los 30 cuesta 10 ms
+  frente a 52 la cara entera.
 - **Estilo global en la paleta**: color paramétrico HSL, grano+viñeta
   (`src/style/finish.js`), trazo `lapiz` opt-in (dash+alpha+repaso, en `stroke.js`).
 - **Configuraciones** (`previews/configs.js`): DIFFS con nombre contra las bandas
@@ -53,10 +63,18 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   laboratorio con el que se diseñó el ojo, con su propia copia de PARAMS. Esa
   construcción ya vive en `eyes.js` y la preview viva es `eyes.html`, así que el
   laboratorio se lee, no se toca.
-- `node --test` desde la raíz — determinismo, contrato de PARAMS y estadística de
-  arquetipos sobre 2000 seeds. Sin dependencias. Cubre el SORTEO, no el dibujo; lo
-  geométrico sigue siendo el ray-casting en la consola de compose. `node --test test/`
-  NO vale en Node 25 (el directorio como posicional revienta): sin argumentos.
+- `node --test` desde la raíz — determinismo, contrato de PARAMS, estadística de
+  arquetipos sobre 2000 seeds y los TIEMPOS del rig. Sin dependencias. Cubre el SORTEO y
+  la animación, no el dibujo; lo geométrico sigue siendo el ray-casting en la consola de
+  compose. `node --test test/` NO vale en Node 25 (el directorio como posicional
+  revienta): sin argumentos.
+- **Cómo se prueba la interactividad.** El rAF no dispara en el navegador de Claude, así
+  que ahí NO se ve moverse nada: la animación se comprueba simulándola —`advance(a, t)`
+  frame a frame, `react(a, nombre, t)`, `mirarA({x, y})` desde `window.__rig`— y midiendo
+  el estado, o con los tests de `test/rig.test.mjs`, que sustituyen el rAF por una cola
+  gobernada por el test. Lo que se mueve de verdad hay que mirarlo en Chrome: dejar
+  `python3 serve.py` levantado y abrir `index.html`. El contador de la cabecera es el
+  juez — fps y caras repintadas por frame.
 - Ciclo de dirección de arte: afinar bandas en compose → «copiar rangos» → pegar a
   Claude con un nombre → queda como configuración en `previews/configs.js`.
 - Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude.
@@ -83,7 +101,17 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   fluido debe pisar ese inline (el index lo hace). Fue LA causa de meses de "cards
   que se solapan".
 - **El rAF no dispara en el panel de navegador de Claude**: la animación se valida
-  simulando `advance(a, t)` a mano o en Chrome de verdad.
+  simulando `advance(a, t)` a mano o en Chrome de verdad. Ese panel además reporta
+  `innerWidth: 0`, así que el grid colapsa a una columna y las medidas de posición de
+  celda que salgan de ahí no valen para nada.
+- **Un canal nuevo del rig se declara AL FINAL de su PARAMS**: el orden de declaración es
+  el orden de las tiradas del rng (`sample` pide una por entrada, banda cerrada incluida),
+  así que meterlo en medio corre la secuencia de todo lo que va detrás y repinta esa parte
+  en todas las seeds guardadas.
+- **Blend modes sobre un canvas blitado**: el acabado (grano `overlay`, viñeta `multiply`)
+  da unas pocas unidades distintas sobre un canvas que ha recibido un `drawImage` que
+  sobre uno pintado del tirón. Invisible, pero es la razón de que el grano del index no
+  sea byte a byte el de compose. Sin acabado, el blit es exacto.
 - Verificación geométrica de masas: test de cobertura por ray-casting +
   `isPointInPath` en consola de compose (ver historia en `HANDOFF-pelo.md`).
 
