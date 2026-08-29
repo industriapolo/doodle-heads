@@ -202,17 +202,43 @@ del rig son canales de DIBUJO, no de composición — si movieran el layout, la 
 y la viva dejarían de cuadrar. Tenía que ser así porque las orejas son capa estática y
 cuelgan de la altura de los ojos.
 
-**Canales del rig.** Son params con banda `[0, 0]`: no se sortean, los mueve el rig por
-`overridesFor`. Hoy: `eyes.blink`, `eyes.pupilX`, `eyes.pupilY`, y los `mood*` de ceja y
-boca. Añadir uno pide declararlo **al final** de su PARAMS — el orden de declaración es el
-orden de las tiradas del rng, así que en medio corre la secuencia de todo lo que va detrás
-y repinta esa parte en todas las seeds guardadas.
+**Deriva y reacción son cosas distintas, y tienen tablas distintas.** `MOODS` es la
+deriva: lo que hacen treinta caras de fondo sin que canse — amplitudes del orden del 1 %
+de la altura de la cara y transiciones de 700 ms. `REACTIONS` es contestar a alguien:
+tabla aparte, envolvente propia (ataque rápido, sostenido, suelta lenta) y amplitudes 2,5×
+en la ceja. Calibrar las dos con los mismos números fue el error original: a los 100 ms de
+un click la cara llevaba un 4 % del recorrido y la reacción se perdía dentro de la deriva.
+
+Dos reglas que las mantienen separadas sin que se estorben: la suelta va al **ánimo vivo**,
+no al neutro —reaccionar no puede borrarle el humor de fondo al personaje— y mientras hay
+una reacción la deriva **no arranca excursiones nuevas** (la que esté en vuelo sí termina;
+cortarla daría el salto que la envolvente existe para evitar).
+
+`a.mood` es la deriva y `a.expr` es lo que se dibuja: de `expr` salen `overridesFor` y la
+firma de repintado.
+
+**Canales del rig.** Son params con banda cerrada: no se sortean, los mueve el rig por
+`overridesFor`. Hoy: `eyes.blink`, `eyes.pupilX`, `eyes.pupilY`, `eyes.eyeOpen`, los
+`mood*` de ceja y boca, y `mouth.cigDrop`. Ojo con el reposo: casi todos reposan en 0,
+pero `eyeOpen` reposa en **1** — es un multiplicador, no un delta. Añadir uno pide
+declararlo **al final** de su PARAMS — el orden de declaración es el orden de las tiradas
+del rng, así que en medio corre la secuencia de todo lo que va detrás y repinta esa parte
+en todas las seeds guardadas.
+
+**`bounce` no es un canal del personaje.** Es una transformación del lienzo entero
+—escala desde la barbilla— y por eso la aplica el HOST, a la estática y a la viva con la
+misma transformación, no `character.js`. Lo que se escala es el dibujo dentro del canvas:
+el DOM no se mueve nunca (mover las celdas fue la flotación que se quitó por solaparlas).
 
 **El host manda los datos del mundo; el rig decide la cara.** El rig no sabe que existe un
-ratón: sabe seguir `a.gazeTarget` (un punto en [−1, 1], suavizado exponencial) y sabe
-`react(a, nombre, t)` (una excursión de ánimo con nombre, arrancando desde donde esté la
-cara). Traducir píxeles a eso, y decidir que un hover «merece atención», es del index.
-Cuánto se levanta una ceja para eso no sale nunca de `rig.js`.
+ratón: sabe seguir `a.gazeTarget` (un punto en [−1, 1], suavizado exponencial), sabe
+`react(a, nombre, t)` (abrir la envolvente de una reacción con nombre) y sabe `lookAtAll`
+(el coro: quién de una lista de posiciones mira hacia un punto y por cuánto tiempo).
+Traducir píxeles a eso, y decidir que un hover «merece atención», es del index. Cuánto se
+levanta una ceja para eso no sale nunca de `rig.js`.
+
+Los objetivos de mirada con caducidad (`gazeHold`) los vence el rig, no el host: el reloj
+es suyo, y el host solo repinta cuando algo cambia — no tiene tic con el que soltarlos.
 
 ## Escala de trabajo
 

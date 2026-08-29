@@ -25,9 +25,16 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   cigarrillo, la boca anula la apertura y atenúa la curva.
 - **Interactividad del coro** (index): los treinta **miran al puntero**
   (`a.gazeTarget`, suavizado exponencial; `eyes.pupilX`/`pupilY`), **reaccionan al
-  hover** (atención) y **al click** (sorpresa o alegría, a suertes). Re-sortear un
-  personaje ya no es el click: es el botón ↻ de su celda. El rig no sabe que existe un
-  ratón — el index traduce píxeles a objetivo y llama a `react(a, nombre, rig.now())`.
+  hover** (atención, con doble parpadeo) y **al click** (sorpresa o alegría, a suertes),
+  y al pulsar a uno **los vecinos se giran a mirarlo** 900 ms (`lookAtAll`, radio 700 px).
+  Re-sortear un personaje ya no es el click: es el botón ↻ de su celda. El rig no sabe
+  que existe un ratón — el index traduce píxeles a objetivo y llama a
+  `react(a, nombre, rig.now())`.
+- **Reacciones** (`REACTIONS` en `rig.js`): tabla APARTE de la deriva, con envolvente
+  propia (ataque/sostenido/suelta) y canales que la deriva no tiene — `eyeOpen` (el ojo
+  se abre en la sorpresa, se cierra al reír), `cigDrop` (el cigarrillo se despega del
+  labio y la boca puede abrirse) y `bounce` (golpe de escala del dibujo, lo pinta el
+  host desde la barbilla).
 - **Dibujo en dos mitades**: `drawStatic` (capas 0–4) y `drawLive` (5–13); el index
   cachea la primera por personaje. `draw` sigue siendo la cara entera, y es lo que usan
   las previews y los tests. Medido: repintar las capas vivas de los 30 cuesta 10 ms
@@ -104,6 +111,9 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   simulando `advance(a, t)` a mano o en Chrome de verdad. Ese panel además reporta
   `innerWidth: 0`, así que el grid colapsa a una columna y las medidas de posición de
   celda que salgan de ahí no valen para nada.
+- **La deriva y las reacciones NO comparten calibración**: `MOODS` está afinado para que
+  treinta caras hagan muecas de fondo sin cansar; con esos mismos números, contestar a un
+  click no se ve. Si una reacción «no se percibe», mirar `REACTIONS`, no `MOODS`.
 - **Un canal nuevo del rig se declara AL FINAL de su PARAMS**: el orden de declaración es
   el orden de las tiradas del rng (`sample` pide una por entrada, banda cerrada incluida),
   así que meterlo en medio corre la secuencia de todo lo que va detrás y repinta esa parte
