@@ -240,6 +240,39 @@ levanta una ceja para eso no sale nunca de `rig.js`.
 Los objetivos de mirada con caducidad (`gazeHold`) los vence el rig, no el host: el reloj
 es suyo, y el host solo repinta cuando algo cambia — no tiene tic con el que soltarlos.
 
+## Voz
+
+Cada personaje habla en un balbuceo sin idioma que sale de su seed igual que su cara.
+**Cero assets de audio**, como no hay assets de imagen: todo es síntesis por código.
+
+**La frase es un DATO, no un sonido.** `src/parts/voice.js` es una parte más —PARAMS con
+bandas, `randomize`— y su `phrase(voiceParams, rng)` devuelve una lista de sílabas con
+tiempo, duración, tono de entrada y de salida, apertura de boca, ataque y vocal. Ahí no
+hay Web Audio ni DOM. Quien la toca es `src/anim/speech.js`, que es del HOST, como el
+humo, y solo lo importan `index.html` y `previews/voice.html`.
+
+Esa frontera compra tres cosas: dibujar una cara nunca depende de que exista un
+AudioContext (compose no carga audio); el ritmo y la melodía se testean en Node sin audio
+y sin canvas; y el mismo `open` por sílaba es lo que abre la boca en el rig, que sigue sin
+saber que eso suena — le llega una lista de tiempos y podría venir de cualquier sitio.
+
+**Determinismo por (seed, k).** El host pide `makeRng(seed).fork(SALT.voice).fork(k)` con
+`k` el número de frase de ese personaje. La frase 3 de una cara es siempre la misma frase
+3: no depende de cuántos clicks lleve encima ni del orden en que se pidieron. `fork` no
+consume la secuencia de nadie, así que la voz tampoco movió ni un valor de las demás
+partes — el fixture de `0xabc123` sigue siendo byte a byte el de antes, comparado sin la
+clave `voice`.
+
+**El balbuceo no tiene idioma**: son sílabas con vocal y ataque, no fonemas. Lo que da
+carácter es la CURVA de la frase (`afirma` baja al final, `pregunta` sube, `queja`
+arrastra) y el timbre, no las letras. Y en el sintetizador, lo que convierte un zumbido en
+una vocal son **dos bandpass en paralelo** haciendo de formantes: sin ellos suena a
+sintetizador de los 80.
+
+Ningún valor de voz depende de la cara ni del arquetipo. Si algún día queremos
+correlacionarlos —el grave con la cara ancha, pongamos— eso va en `archetypes.js`, que es
+donde vive toda la correlación entre partes.
+
 ## Escala de trabajo
 
 Espacio lógico **800×800** para todo dibujo. `core/canvas.js` escala por `devicePixelRatio`;

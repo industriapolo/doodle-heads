@@ -39,6 +39,10 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   cachea la primera por personaje. `draw` sigue siendo la cara entera, y es lo que usan
   las previews y los tests. Medido: repintar las capas vivas de los 30 cuesta 10 ms
   frente a 52 la cara entera.
+- **Voz** (`src/parts/voice.js` + `src/anim/speech.js`): cada personaje habla en un
+  balbuceo sin idioma sintetizado por código, sin un solo asset de audio. La frase es un
+  dato (sílabas con tono, apertura y ataque); tocarla es del host. En el index, click =
+  reacción + frase, y la boca la sigue. Botón «sonido» en la cabecera.
 - **Estilo global en la paleta**: color paramétrico HSL, grano+viñeta
   (`src/style/finish.js`), trazo `lapiz` opt-in (dash+alpha+repaso, en `stroke.js`).
 - **Configuraciones** (`previews/configs.js`): DIFFS con nombre contra las bandas
@@ -84,6 +88,13 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   juez — fps y caras repintadas por frame.
 - Ciclo de dirección de arte: afinar bandas en compose → «copiar rangos» → pegar a
   Claude con un nombre → queda como configuración en `previews/configs.js`.
+- **Cómo se afina la voz**: `previews/voice.html`. «recorrer» toca las treinta seguidas
+  con 0,4 s de silencio — es la prueba de conjunto: que no se confundan entre sí y que
+  ninguna chirríe de más. «misma frase» clava el turno en 0, así que cada pasada dice
+  exactamente lo mismo que la anterior; sin eso no se sabe si lo que cambió fue el slider
+  o el sorteo. Las bandas se copian con «copiar rangos» como las de cualquier parte.
+  Aquí NO hay test que valga: si suena bien o mal lo dice el oído de Jorge, y Claude solo
+  puede medir duración, RMS y pico con un OfflineAudioContext.
 - Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude.
 - El index en modo «estilo: composer» se sincroniza en vivo con el panel (evento
   storage + focus). OJO: localStorage es por ORIGEN — un solo servidor levantado, o
@@ -123,6 +134,9 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   oscurece — abre un agujero claro. La barba se pinta la primera de `drawMass` y las
   sombras van después, así que hay que descontarla del recorte a mano (ya se hace con la
   sombra proyectada del pelo). Con la barba de rayitas no pasa: ahí debajo hay piel.
+- **El generador no carga Web Audio**: `speech.js` solo lo importan `index.html` y
+  `previews/voice.html`. Dibujar una cara no puede depender de que exista un
+  AudioContext, y un AudioContext no se puede crear fuera de un gesto del usuario.
 - **Blend modes sobre un canvas blitado**: el acabado (grano `overlay`, viñeta `multiply`)
   da unas pocas unidades distintas sobre un canvas que ha recibido un `drawImage` que
   sobre uno pintado del tirón. Invisible, pero es la razón de que el grano del index no

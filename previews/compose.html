@@ -16,6 +16,7 @@ import * as cheeks from '../src/parts/cheeks.js'
 import * as glasses from '../src/parts/glasses.js'
 import * as palettes from '../src/style/palettes.js'
 import * as archetypes from '../src/core/archetypes.js'
+import * as voice from '../src/parts/voice.js'
 
 const without = (params, ...drop) =>
   Object.fromEntries(Object.entries(params).filter(([k]) => !drop.includes(k)))
@@ -60,6 +61,9 @@ mountPreview({
     // `offsetY` no sale: al componer, la altura de la oreja la deriva character.js de
     // la de los ojos. Lo que se ajusta aquí es el margen de desvío.
     { name: 'ears',  label: 'Orejas', params: without(ears.PARAMS, 'lineWeight', 'offsetY') },
+    // La voz va al final porque no se dibuja: aquí solo se dirigen sus bandas. Para OÍRLA
+    // está previews/voice.html — compose no carga Web Audio, y sus celdas no suenan.
+    { name: 'voice', label: 'Voz', params: voice.PARAMS },
   ],
   // Sin desplegable de paletas: el color es paramétrico y los esquemas clásicos viven
   // como configuraciones de solo-color en el desplegable de configuración.
