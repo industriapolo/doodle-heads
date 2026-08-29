@@ -9,7 +9,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { makeActor, advance, startRig, overridesFor, react, MOOD_NAMES } from '../src/anim/rig.js'
+import { makeActor, advance, startRig, overridesFor, react, REACTION_NAMES } from '../src/anim/rig.js'
 
 /** Cola de rAF gobernada por el test: `tick(t)` corre un frame en el instante `t`. */
 function fakeRaf() {
@@ -250,92 +250,176 @@ describe('mirada con objetivo externo', () => {
 
 // ---------------------------------------------------------------------------
 
-describe('react', () => {
-  const enNeutro = (a) => Object.values(a.mood).every((v) => v === 0)
-  /** Corre la animación hasta `hasta`, sin objetivo de mirada. */
-  const hasta = (a, desde, fin) => { for (let t = desde; t <= fin; t += 16) advance(a, t) }
+describe('react: la envolvente', () => {
+  const FRAME = 16
+  /** Corre la animación hasta `fin` y devuelve el actor. */
+  const hasta = (a, desde, fin) => { for (let t = desde; t <= fin; t += FRAME) advance(a, t) }
+  /** Un actor con la deriva congelada: aquí se mide la REACCIÓN, no el ánimo de fondo. */
+  const quieto = (seed = 5, mood = null) => {
+    const a = makeActor(seed)
+    advance(a, 0)
+    a.moodNext = 1e9
+    if (mood) a.mood = { ...a.mood, ...mood }
+    return a
+  }
 
   it('los nombres del mapa del host existen', () => {
-    // Si un ánimo se renombra, esto se pone rojo aquí y no en silencio en el index.
     for (const n of ['atención', 'sorpresa', 'alegría', 'neutro']) {
-      assert.ok(MOOD_NAMES.includes(n), `'${n}' ya no es un ánimo`)
+      assert.ok(REACTION_NAMES.includes(n), `'${n}' ya no es una reacción`)
     }
   })
 
-  it('arranca la excursión en el acto, sin esperar al reloj', () => {
-    const a = makeActor(5)
-    advance(a, 0)
-    assert.ok(enNeutro(a))
-    assert.equal(react(a, 'sorpresa', 1000), true)
-    assert.equal(a.moodAt, 1000)
-    hasta(a, 1016, 1000 + 800) // MOOD_EASE = 700
-    assert.ok(!enNeutro(a), 'la cara no se movió')
-    // sorpresa = cejas arriba (lift negativo) y boca abierta
-    assert.ok(a.mood.lift < 0, `lift=${a.mood.lift}`)
-    assert.ok(a.mood.open > 0.3, `open=${a.mood.open}`)
+  it('al final del ataque la cara está en la amplitud de la reacción', () => {
+    const a = quieto()
+    react(a, 'sorpresa', 1000)
+    hasta(a, 1000, 1000 + 120) // attack de sorpresa
+    for (const k of ['tilt', 'lift', 'curve', 'open', 'eyeOpen']) {
+      const d = Math.abs(a.expr[k] - a.reactTo[k])
+      assert.ok(d < 0.02 * Math.max(1, Math.abs(a.reactTo[k])) + 0.02, `${k}: ${a.expr[k]} vs ${a.reactTo[k]}`)
+    }
   })
 
-  it("'neutro' devuelve la cara a reposo", () => {
-    const a = makeActor(5)
-    advance(a, 0)
+  it('el ataque es rápido: a los 100 ms ya se ha dicho casi todo', () => {
+    // Esto es lo que se estaba perdiendo. Con MOOD_EASE (700 ms) a los 100 ms la cara
+    // llevaba un 4 % del recorrido y la reacción no se veía llegar.
+    const a = quieto()
+    react(a, 'sorpresa', 1000)
+    hasta(a, 1000, 1100)
+    assert.ok(a.reactE > 0.9, `a los 100 ms la envolvente va por ${a.reactE.toFixed(2)}`)
+  })
+
+  it('durante el sostenido se queda ahí', () => {
+    const a = quieto()
     react(a, 'alegría', 1000)
-    hasta(a, 1016, 1800)
-    assert.ok(!enNeutro(a))
-    react(a, 'neutro', 1800)
-    hasta(a, 1816, 2600)
-    assert.ok(enNeutro(a), `se quedó en ${JSON.stringify(a.mood)}`)
+    hasta(a, 1000, 1000 + 180 + 300)
+    assert.ok(Math.abs(a.reactE - 1) < 1e-9, `envolvente ${a.reactE}`)
   })
 
-  it('reaccionar a mitad de otro gesto no da un salto', () => {
-    // Es el caso real: entrar, salir y volver a entrar en una celda más rápido que los
-    // 700 ms de la transición.
-    const a = makeActor(5)
-    advance(a, 0)
-    react(a, 'enfado', 1000)
-    hasta(a, 1016, 1300) // a mitad de camino
-    const medio = { ...a.mood }
-    react(a, 'alegría', 1300)
-    advance(a, 1316)
-    for (const k of Object.keys(medio)) {
-      const d = Math.abs(a.mood[k] - medio[k])
-      assert.ok(d < 0.08, `el canal ${k} saltó ${d.toFixed(3)} al cambiar de ánimo`)
+  it('la suelta cae en el ÁNIMO QUE HABÍA, no en el neutro', () => {
+    // El ánimo de fondo tiene que sobrevivir a la reacción: si la suelta fuera al neutro,
+    // un click le borraría el humor al personaje.
+    const fondo = { tilt: 9, lift: 0.008, curve: -0.4, open: 0, raise: 0 }
+    const a = quieto(5, fondo)
+    react(a, 'sorpresa', 1000)
+    hasta(a, 1000, 1000 + 120 + 500 + 600 + 100)
+    assert.equal(a.reactAt, null, 'la reacción no terminó')
+    for (const k of Object.keys(fondo)) {
+      assert.ok(Math.abs(a.expr[k] - fondo[k]) < 1e-9, `${k}: ${a.expr[k]} en vez de ${fondo[k]}`)
     }
+    assert.equal(a.expr.eyeOpen, 1, 'el ojo no volvió a su apertura de reposo')
   })
 
-  it('tras reaccionar, el personaje vuelve solo al neutro', () => {
-    // Una reacción no puede dejarlo anclado en una mueca: el reloj de ánimo tiene que
-    // seguir corriendo y devolverlo a reposo por su cuenta.
-    const a = makeActor(5)
-    advance(a, 0)
-    react(a, 'susto', 1000)
-    hasta(a, 1016, 1800)
-    assert.ok(!enNeutro(a))
-    // No se le exige estar en reposo en un instante cualquiera —el personaje sigue
-    // haciendo sus propias excursiones, que es lo que se quiere— sino PASAR por él.
-    let volvio = false
-    for (let t = 1816; t <= 60000 && !volvio; t += 16) {
+  it('la atención aguanta hasta que la sueltan', () => {
+    const a = quieto()
+    react(a, 'atención', 1000)
+    hasta(a, 1000, 20000)
+    assert.ok(a.reactE === 1, 'la atención se soltó sola')
+    react(a, 'neutro', 20000)
+    hasta(a, 20016, 20000 + 400 + 50)
+    assert.equal(a.reactAt, null)
+    assert.equal(a.reactE, 0)
+  })
+
+  it('soltar a mitad del ataque no da un tirón hacia arriba', () => {
+    // Un ratón que solo roza la celda: entra y sale antes de que acabe el ataque.
+    const a = quieto()
+    react(a, 'atención', 1000)
+    hasta(a, 1000, 1060) // a mitad del ataque de 160 ms
+    const eMedio = a.reactE
+    assert.ok(eMedio > 0 && eMedio < 1, `envolvente a mitad: ${eMedio}`)
+    react(a, 'neutro', 1060)
+    let previo = eMedio
+    for (let t = 1076; t <= 1500; t += FRAME) {
       advance(a, t)
-      if (enNeutro(a)) volvio = true
+      assert.ok(a.reactE <= previo + 1e-9, `la envolvente subió tras soltar (t=${t})`)
+      previo = a.reactE
     }
-    assert.ok(volvio, 'se quedó anclado en la mueca de la reacción')
+  })
+
+  it('reaccionar encima de otra reacción arranca justo donde estaba la cara', () => {
+    // La costura es el instante del cambio, no el frame siguiente: el ataque es rápido a
+    // propósito (un 35 % del recorrido en el primer frame) y medir ahí solo mediría eso.
+    // Lo que no puede haber es un escalón EN el cambio.
+    const a = quieto()
+    react(a, 'atención', 1000)
+    hasta(a, 1000, 1200)
+    const antes = { ...a.expr }
+    react(a, 'sorpresa', 1200)
+    advance(a, 1200)
+    assert.deepEqual(a.expr, antes, 'la cara se teletransportó al cambiar de reacción')
+
+    // y de ahí en adelante va derecha al objetivo, sin retroceder ni pasarse
+    let previo = a.expr.lift
+    for (let t = 1216; t <= 1320; t += FRAME) {
+      advance(a, t)
+      assert.ok(a.expr.lift <= previo + 1e-9, `la ceja retrocedió en t=${t}`)
+      assert.ok(a.expr.lift >= a.reactTo.lift - 1e-9, `se pasó del objetivo en t=${t}`)
+      previo = a.expr.lift
+    }
+  })
+
+  it('la deriva no arranca excursiones mientras hay reacción', () => {
+    const a = makeActor(5)
+    advance(a, 0)
+    a.moodNext = 1200 // cita de deriva vencida DURANTE la reacción
+    react(a, 'atención', 1000)
+    hasta(a, 1000, 5000)
+    assert.equal(a.moodAt, null, 'la deriva arrancó una excursión por debajo de la reacción')
+    // y al soltar, el reloj se reprograma en vez de dispararse en el mismo frame
+    react(a, 'neutro', 5000)
+    hasta(a, 5016, 5000 + 400 + 32)
+    assert.ok(a.moodNext > 5400, `moodNext quedó en ${a.moodNext}, o sea vencido`)
+    assert.equal(a.moodAt, null, 'la deriva disparó justo al soltar')
+  })
+
+  it('el golpe de escala sube y vuelve, y la atención no lo tiene', () => {
+    const a = quieto()
+    react(a, 'sorpresa', 1000)
+    let pico = 0
+    for (let t = 1000; t <= 1400; t += FRAME) { advance(a, t); pico = Math.max(pico, a.bounce) }
+    assert.ok(Math.abs(pico - 0.06) < 0.006, `pico de bounce ${pico.toFixed(4)}`)
+    hasta(a, 1400, 1500)
+    assert.equal(a.bounce, 0, 'el golpe no volvió a cero')
+
+    const b = quieto()
+    react(b, 'atención', 1000)
+    let max = 0
+    for (let t = 1000; t <= 2000; t += FRAME) { advance(b, t); max = Math.max(max, Math.abs(b.bounce)) }
+    assert.equal(max, 0, 'la atención no puede dar un golpe de escala')
+  })
+
+  it('la alegría rebota: el golpe se pasa de vuelta y se asienta', () => {
+    const a = quieto()
+    react(a, 'alegría', 1000)
+    let min = 0
+    for (let t = 1000; t <= 1400; t += FRAME) { advance(a, t); min = Math.min(min, a.bounce) }
+    assert.ok(min < -0.001, `no hay rebote: el mínimo fue ${min.toFixed(4)}`)
   })
 
   it('un nombre que no existe no toca nada', () => {
-    const a = makeActor(5)
-    advance(a, 0)
+    const a = quieto()
     react(a, 'alegría', 1000)
-    hasta(a, 1016, 1800)
-    const antes = { ...a.mood, moodAt: a.moodAt }
-    assert.equal(react(a, 'euforia', 1800), false)
-    assert.deepEqual({ ...a.mood, moodAt: a.moodAt }, antes)
+    hasta(a, 1000, 1200)
+    const antes = { expr: { ...a.expr }, reactAt: a.reactAt }
+    assert.equal(react(a, 'euforia', 1200), false)
+    assert.deepEqual({ expr: { ...a.expr }, reactAt: a.reactAt }, antes)
   })
 
   it('sin `t`, usa el último instante que vio el actor', () => {
-    // El host tiene rig.now(), pero desde consola es cómodo no pasarlo.
-    const a = makeActor(5)
+    const a = quieto()
     advance(a, 4321)
-    react(a, 'duda')
-    assert.equal(a.moodAt, 4321)
+    react(a, 'sorpresa')
+    assert.equal(a.reactAt, 4321)
+  })
+
+  it('overridesFor manda expr, no el ánimo de fondo', () => {
+    const a = quieto(5, { tilt: 9 })
+    react(a, 'sorpresa', 1000)
+    hasta(a, 1000, 1120)
+    const ov = overridesFor(a)
+    assert.equal(ov.brows.moodTilt, a.expr.tilt)
+    assert.equal(ov.eyes.eyeOpen, a.expr.eyeOpen)
+    assert.notEqual(ov.brows.moodTilt, a.mood.tilt)
   })
 })
 
