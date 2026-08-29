@@ -1,0 +1,112 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+import { mountPreview } from './_template.js'
+import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
+import { makeRng } from '../src/core/prng.js'
+import { SALT } from '../src/core/character.js'
+import { createSpeech } from '../src/anim/speech.js'
+import * as head from '../src/parts/head.js'
+import * as voice from '../src/parts/voice.js'
+
+// Preview de la VOZ. Las caras están porque una voz sin cara no se juzga —hay que ver a
+// quién le pega— pero el panel solo expone Cabeza y Voz: el resto de rasgos sale de sus
+// bandas declaradas, ruido constante y variables bajo control.
+//
+// Cómo se afina, que es lo que hace falta y no se puede automatizar:
+//  · «recorrer» toca las treinta seguidas. Es la prueba de conjunto: lo que se busca es
+//    que no se confundan entre sí y que ninguna chirríe de más.
+//  · «misma frase» clava el número de frase en 0, así que cada pasada dice exactamente lo
+//    mismo que la anterior. Sin eso, cada vuelta trae frases nuevas y no se sabe si lo
+//    que cambió fue el slider o el sorteo.
+const preview = mountPreview({
+  title: 'voice',
+  groups: [
+    { name: 'head', label: 'Cabeza', params: head.PARAMS },
+    { name: 'voice', label: 'Voz', params: voice.PARAMS },
+  ],
+  paletteSelect: false,
+  hint: 'Click en una celda = que hable. «recorrer» las toca las 30 seguidas.',
+  onCell: (entry) => hablar(entry),
+  draw(ctx, frame, bands, fallback, rng, seed) {
+    const character = makeCharacter(seed, bands)
+    const pal = paletteFor(character, fallback)
+    ctx.fillStyle = pal.bg
+    ctx.fillRect(0, 0, 800, 800)
+    draw(ctx, frame, character, pal)
+  },
+  inset: 0.06,
+})
+
+// --- audio ------------------------------------------------------------------
+// El AudioContext se crea en el primer gesto y se reutiliza: los navegadores no dejan
+// sonar uno creado al cargar, y crear uno por frase se queda sin ranuras enseguida.
+let speech = null
+function motor() {
+  if (!speech) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    speech = createSpeech(ctx)
+    speech.ctx = ctx
+  }
+  if (speech.ctx.state === 'suspended') speech.ctx.resume()
+  return speech
+}
+
+// El número de frase por personaje. Es lo que hace que dos clicks seguidos digan cosas
+// distintas y que la misma seed diga siempre lo mismo en el mismo turno.
+const turno = new Map()
+let mismaFrase = false
+
+function hablar(entry) {
+  const s = motor()
+  const ch = makeCharacter(entry.seed, preview.bands)
+  const k = mismaFrase ? 0 : turno.get(entry.seed) ?? 0
+  if (!mismaFrase) turno.set(entry.seed, k + 1)
+  const rng = makeRng(entry.seed).fork(SALT.voice).fork(k)
+  const frase = voice.phrase(ch.voice, rng)
+  s.speak(ch.voice, frase, entry.seed)
+  entry.canvas.style.outline = '2px solid #E5117F'
+  setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
+  return frase
+}
+
+// --- botones ----------------------------------------------------------------
+const cabecera = document.getElementById('head')
+
+const btnRecorrer = document.createElement('button')
+btnRecorrer.textContent = 'recorrer'
+let recorriendo = null
+btnRecorrer.addEventListener('click', () => {
+  if (recorriendo) {
+    clearTimeout(recorriendo)
+    recorriendo = null
+    btnRecorrer.textContent = 'recorrer'
+    return
+  }
+  btnRecorrer.textContent = 'parar'
+  let i = 0
+  const siguiente = () => {
+    if (i >= preview.cells.length) {
+      recorriendo = null
+      btnRecorrer.textContent = 'recorrer'
+      return
+    }
+    const frase = hablar(preview.cells[i++])
+    // 0,4 s de silencio entre una y la siguiente: pegadas no se distinguen dos voces
+    recorriendo = setTimeout(siguiente, Math.round(frase.dur * 1000) + 400)
+  }
+  siguiente()
+})
+
+const btnMisma = document.createElement('button')
+btnMisma.textContent = 'misma frase: no'
+btnMisma.addEventListener('click', () => {
+  mismaFrase = !mismaFrase
+  btnMisma.textContent = `misma frase: ${mismaFrase ? 'sí' : 'no'}`
+})
+
+cabecera.append(btnRecorrer, btnMisma)
+
+// para medir desde consola: ver el comentario de arriba sobre OfflineAudioContext
+window.__voice = { voice, makeCharacter, createSpeech, preview, hablar, SALT, makeRng }
+</script>

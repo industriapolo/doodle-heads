@@ -104,7 +104,7 @@ const CSS = `
  */
 export function mountPreview(opts) {
   try {
-    mount(opts)
+    return mount(opts)
   } catch (err) {
     // Una preview que falla a medias deja la página muda: panel vacío, grid vacío, y a
     // adivinar. Que se vea el error donde se está mirando.
@@ -136,6 +136,10 @@ function mount(opts) {
     inset = 0.08,
     refs = [],
     onPalette = null,
+    // Qué pasa al pulsar una celda. Por defecto, seed nueva solo para ella; una preview
+    // puede quedárselo para otra cosa (voice.html hace hablar al personaje).
+    onCell = null,
+    hint = null,
     configs = null, // { nombre: { label, bands } } — juegos completos de bandas guardados
     // En las previews de partes sueltas el desplegable de paletas ELIGE la paleta con la
     // que se pinta. En las de personaje completo (compose, hair) el color ya es
@@ -165,7 +169,7 @@ function mount(opts) {
       <p class="hint">
         Cada parámetro tiene DOS tiradores: las 30 celdas sortean dentro de esa banda.<br>
         Junta los dos tiradores para fijar un valor.<br>
-        Click en una celda = nueva seed solo para ella.
+        ${hint || 'Click en una celda = nueva seed solo para ella.'}
       </p>
       <textarea id="out" readonly></textarea>
     </div>
@@ -239,7 +243,11 @@ function mount(opts) {
     wrap.append(canvas, seedEl)
     gridEl.append(wrap)
     const entry = { canvas, seedEl, ctx: setupCanvas(canvas, cell), seed: randomSeed() }
-    wrap.addEventListener('click', () => { entry.seed = randomSeed(); renderCell(entry) })
+    wrap.addEventListener('click', () => {
+      if (onCell) return onCell(entry)
+      entry.seed = randomSeed()
+      renderCell(entry)
+    })
     cells.push(entry)
   }
 
@@ -555,6 +563,7 @@ function mount(opts) {
   building = false
   applyLayout()
   window.__preview = { cells, renderAll, bands }
+  return window.__preview
 }
 
 const el = (tag, cls) => {
