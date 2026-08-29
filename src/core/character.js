@@ -15,6 +15,7 @@ import * as mouth from '../parts/mouth.js'
 import * as chin from '../parts/chin.js'
 import * as cheeks from '../parts/cheeks.js'
 import * as glasses from '../parts/glasses.js'
+import * as voice from '../parts/voice.js'
 import { makeRng } from './prng.js'
 import { touchedBands } from './params.js'
 import * as palettes from '../style/palettes.js'
@@ -24,7 +25,7 @@ import { applyFinish } from '../style/finish.js'
 // Carril de PRNG de cada parte. `rng.fork(salt)` es función pura de (seed, salt), así que
 // estos números son parte del formato de las seeds guardadas: cambiar uno cambia esa parte
 // en TODOS los personajes ya guardados. Son intocables — solo se añaden (el siguiente libre
-// es el 15).
+// es el 16).
 //
 // Estaban escritos a mano y por duplicado entre `makeCharacter` y `draw`. Repetir uno por
 // descuido correlaciona el sorteo de una parte con el jitter de dibujo de otra, y nada avisa:
@@ -49,6 +50,7 @@ export const SALT = {
   hairBack: 13,
   hairMass: 8,
   cheeks: 14,
+  voice: 15,
 }
 
 // El PARAMS de cada parte, para poder preguntar qué bandas vienen DIRIGIDAS y cuáles
@@ -70,6 +72,7 @@ const PARAMS_OF = {
   chin: chin.PARAMS,
   cheeks: cheeks.PARAMS,
   glasses: glasses.PARAMS,
+  voice: voice.PARAMS,
 }
 
 /**
@@ -102,6 +105,10 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     cheeks: cheeks.randomize(rng.fork(SALT.cheeks), bandFor('cheeks')),
     glasses: glasses.randomize(rng.fork(SALT.glasses), bandFor('glasses')),
     palette: palettes.randomize(rng.fork(SALT.palette), bands.palette),
+    // La voz no se dibuja: la toca el host (`src/anim/speech.js`). Va aquí porque es del
+    // personaje, no del momento — sale de su seed como su cara, y por su propio carril
+    // del rng, así que añadirla no ha movido ni un valor de las demás partes.
+    voice: voice.randomize(rng.fork(SALT.voice), bandFor('voice')),
   }
 }
 

@@ -60,15 +60,28 @@ describe('determinismo', () => {
     // que las seeds guardadas ya no valen. Regenerar el fixture sin más es tirar el
     // trabajo de dirección de arte de Jorge.
     //
-    // Se ha regenerado dos veces, al añadir `eyes.pupilY` y `eyes.eyeOpen` (ago 2026), y
-    // las dos solo tras comprobar clave a clave que la única diferencia era la clave nueva
-    // con su valor de reposo: ningún valor existente se movió. Ese es el listón para
-    // volver a tocarlo. Se pudo porque los parámetros se declararon AL FINAL de su PARAMS
-    // — el orden de declaración es el orden de las tiradas del rng, así que en medio
-    // habría corrido todo lo que va detrás.
+    // Se compara SIN la voz, y a propósito: así el fichero sigue siendo el de antes de
+    // que existiera, byte a byte, y añadir una parte nueva no da la ocasión de regenerarlo
+    // «porque toca». Una parte nueva con su propio salt no puede mover a las demás; si las
+    // moviera, esto se pone rojo, que es justo lo que se quiere.
     const esperado = readFileSync(join(AQUI, 'fixtures/character-0xabc123.json'), 'utf8')
-    const obtenido = JSON.stringify(makeCharacter(0xabc123), null, 2) + '\n'
+    const { voice, ...resto } = makeCharacter(0xabc123)
+    const obtenido = JSON.stringify(resto, null, 2) + '\n'
     assert.equal(obtenido, esperado)
+  })
+
+  it('...y la voz de 0xabc123 tiene su propio candado', () => {
+    const esperado = readFileSync(join(AQUI, 'fixtures/voice-0xabc123.json'), 'utf8')
+    const obtenido = JSON.stringify(makeCharacter(0xabc123).voice, null, 2) + '\n'
+    assert.equal(obtenido, esperado)
+  })
+
+  it('la voz es la ÚLTIMA clave: quitarla deja el objeto de antes', () => {
+    // Lo que hace válida la comparación de arriba. Si alguien mete una parte nueva en
+    // medio del objeto, el orden de claves cambia y el fixture dejaría de cuadrar por una
+    // razón que no es la que el test dice estar vigilando.
+    const claves = Object.keys(makeCharacter(0xabc123))
+    assert.equal(claves[claves.length - 1], 'voice')
   })
 
   it('cada parte va por su carril: añadir un sorteo a una no mueve a las demás', () => {

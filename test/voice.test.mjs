@@ -1,0 +1,146 @@
+// Tests de la VOZ. Aquí no suena nada y no hace falta: `phrase()` devuelve datos, y el
+// ritmo y la melodía de una frase se comprueban leyendo números. Lo que no se puede
+// testear así es si suena bien — eso es oído de Jorge, en `previews/voice.html`.
+//
+// Lo que sí se puede fijar por escrito:
+//  · determinismo por (seed, k) — es la promesa: la frase 3 de un personaje es siempre
+//    la misma frase 3, no dependa de cuántos clicks lleve encima.
+//  · que las sílabas no se solapen ni se salgan de sus bandas: una `open` fuera de [0, 1]
+//    no da error, da una boca torcida; un tono de 4 kHz no da error, da un pitido.
+
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+
+import { makeRng } from '../src/core/prng.js'
+import { makeCharacter, SALT } from '../src/core/character.js'
+import * as voice from '../src/parts/voice.js'
+
+/** El rng de la frase `k` de un personaje, tal y como lo compone el host. */
+const rngDeFrase = (seed, k) => makeRng(seed).fork(SALT.voice).fork(k)
+const frase = (seed, k) => voice.phrase(makeCharacter(seed).voice, rngDeFrase(seed, k))
+
+const SEEDS = [0, 1, 7, 42, 0xabc123, 0xffffff]
+
+describe('voice: la frase es determinista', () => {
+  it('misma seed y misma k dan la misma frase', () => {
+    for (const s of SEEDS) {
+      assert.deepEqual(frase(s, 0), frase(s, 0), `la seed ${s} no es estable`)
+      assert.deepEqual(frase(s, 5), frase(s, 5))
+    }
+  })
+
+  it('otra k da otra frase', () => {
+    // Si no, un personaje repetiría la misma frase toda la sesión.
+    for (const s of SEEDS) {
+      assert.notDeepEqual(frase(s, 0), frase(s, 1), `la seed ${s} dice siempre lo mismo`)
+    }
+  })
+
+  it('dos personajes no dicen lo mismo', () => {
+    const dichas = new Set(SEEDS.map((s) => JSON.stringify(frase(s, 0))))
+    assert.equal(dichas.size, SEEDS.length)
+  })
+
+  it('pedir la frase no consume nada: el orden de los clicks da igual', () => {
+    // El host pide `fork(k)`, no tira de una secuencia compartida. Pedir la 7 antes que
+    // la 2 tiene que dar exactamente lo mismo que al revés.
+    const enOrden = [0, 1, 2, 3].map((k) => frase(42, k))
+    const desordenado = [3, 1, 0, 2].map((k) => frase(42, k))
+    assert.deepEqual(desordenado, [enOrden[3], enOrden[1], enOrden[0], enOrden[2]])
+  })
+})
+
+describe('voice: la frase está bien formada', () => {
+  const TODAS = []
+  for (const s of SEEDS) for (let k = 0; k < 8; k++) TODAS.push({ s, k, v: makeCharacter(s).voice, f: frase(s, k) })
+
+  it('hay muestra suficiente', () => {
+    assert.equal(TODAS.length, SEEDS.length * 8)
+  })
+
+  it('el número de sílabas es el que pide la voz', () => {
+    for (const { v, f } of TODAS) assert.equal(f.syllables.length, Math.round(v.length))
+  })
+
+  it('las sílabas van en orden y no se solapan', () => {
+    for (const { s, k, f } of TODAS) {
+      let fin = 0
+      for (const sy of f.syllables) {
+        assert.ok(sy.t >= fin - 1e-9, `seed ${s}/k${k}: una sílaba pisa a la anterior`)
+        assert.ok(sy.dur > 0, `seed ${s}/k${k}: sílaba de duración ${sy.dur}`)
+        fin = sy.t + sy.dur
+      }
+    }
+  })
+
+  it('`open` está en [0, 1] y `vowel` también', () => {
+    for (const { f } of TODAS) {
+      for (const sy of f.syllables) {
+        assert.ok(sy.open >= 0 && sy.open <= 1, `open = ${sy.open}`)
+        assert.ok(sy.vowel >= 0 && sy.vowel <= 1, `vowel = ${sy.vowel}`)
+      }
+    }
+  })
+
+  it('el ataque es uno de los tres que entiende el sintetizador', () => {
+    for (const { f } of TODAS) {
+      for (const sy of f.syllables) {
+        assert.ok(['none', 'noise', 'pop'].includes(sy.onset), `onset = ${sy.onset}`)
+      }
+    }
+  })
+
+  it('los tonos se quedan en el rango audible de una voz', () => {
+    for (const { s, k, f } of TODAS) {
+      for (const sy of f.syllables) {
+        for (const hz of [sy.pitch, sy.pitchEnd]) {
+          assert.ok(Number.isFinite(hz), `seed ${s}/k${k}: tono ${hz}`)
+          assert.ok(hz >= 60 && hz <= 1200, `seed ${s}/k${k}: tono ${hz.toFixed(0)} Hz`)
+        }
+      }
+    }
+  })
+
+  it('la duración total cuadra con velocidad y longitud (±30 %)', () => {
+    // Es lo que hace que `rate` signifique algo: si la frase durase el doble de lo que
+    // dicen sus sílabas por segundo, el slider mentiría.
+    for (const { s, k, v, f } of TODAS) {
+      const esperada = v.length / v.rate
+      const razon = f.dur / esperada
+      assert.ok(razon > 0.7 && razon < 1.3, `seed ${s}/k${k}: ${(razon * 100).toFixed(0)} % de lo esperado`)
+    }
+  })
+
+  it('la queja arrastra la última sílaba y la pregunta sube', () => {
+    // Las tres curvas tienen que ser distinguibles por los números, o no lo serán por el
+    // oído. Se comparan con la MISMA voz, cambiando solo el contorno.
+    const base = { ...makeCharacter(42).voice, length: 6, pitchRange: 8 }
+    const de = (contour) => voice.phrase({ ...base, contour }, makeRng(1))
+    const ultima = (f) => f.syllables[f.syllables.length - 1]
+
+    const afirma = de('afirma')
+    const pregunta = de('pregunta')
+    const queja = de('queja')
+
+    assert.ok(ultima(queja).dur > ultima(afirma).dur * 1.6, 'la queja no arrastra')
+    assert.ok(ultima(pregunta).pitchEnd > ultima(pregunta).pitch, 'la pregunta no sube al final')
+    assert.ok(ultima(afirma).pitchEnd < ultima(afirma).pitch, 'la afirmación no baja al final')
+    assert.ok(
+      ultima(queja).pitchEnd / ultima(queja).pitch < ultima(afirma).pitchEnd / ultima(afirma).pitch,
+      'la queja no cae más que la afirmación'
+    )
+  })
+
+  it('una voz de una sola sílaba no revienta', () => {
+    const f = voice.phrase({ ...makeCharacter(7).voice, length: 1 }, makeRng(3))
+    assert.equal(f.syllables.length, 1)
+    assert.ok(f.dur > 0)
+  })
+
+  it('con recorrido melódico cero, la frase es monótona pero válida', () => {
+    const f = voice.phrase({ ...makeCharacter(7).voice, pitchRange: 0 }, makeRng(3))
+    for (const sy of f.syllables) {
+      assert.ok(Math.abs(sy.pitch - sy.pitchEnd) < 1e-9, 'sin recorrido no puede haber glissando')
+    }
+  })
+})
