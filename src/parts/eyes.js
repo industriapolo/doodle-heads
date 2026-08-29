@@ -82,6 +82,11 @@ export const PARAMS = {
   //
   // Como `blink`, es un canal del rig: banda [0, 0], no se sortea. −1 arriba, +1 abajo.
   pupilY: { min: -1, max: 1, range: [0, 0], step: 0.05, label: 'Mirada Y' },
+
+  // Apertura del ojo como MULTIPLICADOR de la flecha del arco: 1 es el reposo, no 0. Otro
+  // canal del rig — lo usan las reacciones (sorpresa abre, la risa cierra) — y por eso va
+  // también al final: el orden de PARAMS es el orden de las tiradas del rng.
+  eyeOpen: { min: 0.3, max: 2, range: [1, 1], step: 0.05, label: 'Apertura (× reposo)' },
 }
 
 // Dónde puede llegar la pupila. En reposo se APOYA en la cuerda — asoma por debajo, con
@@ -196,7 +201,11 @@ function eye(ctx, side, w, sag, p, palette) {
   const t = p.blink
   const m = sag * p.blinkPivot
   const chordY = t * m
-  const sagNow = Math.max(0.6, sag * (1 - t)) // 0 exacto degenera el radio del arco
+  // `eyeOpen` multiplica la flecha, así que el ojo se abre y se cierra por el ARCO, con la
+  // cuerda quieta: la cuerda es el párpado de arriba y moverla desplazaría el ojo entero
+  // por la cara. Los recortes siguen yendo contra la forma en REPOSO, igual que con el
+  // parpadeo — lo que se mueve es lo visible, no el marco.
+  const sagNow = Math.max(0.6, sag * (1 - t) * (p.eyeOpen ?? 1)) // 0 exacto degenera el radio
 
   ctx.save()
   ctx.translate(cx, cy)

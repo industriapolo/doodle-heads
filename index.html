@@ -279,6 +279,29 @@ function blit(ctx, src) {
   ctx.restore()
 }
 
+// El golpe de escala de las reacciones. Escala el DIBUJO dentro del canvas — el DOM no se
+// toca: mover las celdas volvería a la flotación que se quitó por solaparlas entre sí.
+//
+// El centro es la BASE del marco, o sea la barbilla: escalar desde el centro del lienzo
+// hunde y levanta la cabeza a la vez y se lee como un zoom; desde la barbilla, el
+// personaje crece hacia arriba, que es lo que hace un cuerpo que se sobresalta.
+//
+// Se aplica a las dos capas con la MISMA transformación, así que la estática se resamplea
+// (es un bitmap) y la viva se dibuja vectorial ya escalada. Durante los ~250 ms del golpe
+// esa mezcla no se nota; hacerlo al revés —escalar el blit final— emborronaría la cara
+// entera, que es justo lo que se ve.
+const BOUNCE_PIVOT = { x: frame.cx, y: frame.bottom }
+
+function conBounce(ctx, b, dibujar) {
+  if (!b) return dibujar()
+  ctx.save()
+  ctx.translate(BOUNCE_PIVOT.x, BOUNCE_PIVOT.y)
+  ctx.scale(1 + b, 1 + b)
+  ctx.translate(-BOUNCE_PIVOT.x, -BOUNCE_PIVOT.y)
+  dibujar()
+  ctx.restore()
+}
+
 function redraw(a, t = 0, faceChanged = true) {
   ensureLayers(a)
   if (!a.layout) {
@@ -287,13 +310,24 @@ function redraw(a, t = 0, faceChanged = true) {
   }
   if (faceChanged || !a.hasBase) {
     repaints++
-    blit(a.bctx, a.stat)
-    const r = drawLive(a.bctx, frame, a.character, a.palette, overridesFor(a), a.layout)
+    const b = a.bounce
+    // Con el rebote la escala baja de 1 y el dibujo deja de cubrir los bordes: hay que
+    // limpiar antes o se quedan asomando los píxeles del frame anterior.
+    if (b) clear(a.bctx, a.palette.bg)
+    let r
+    conBounce(a.bctx, b, () => {
+      if (b) a.bctx.drawImage(a.stat, 0, 0, LOGICAL, LOGICAL)
+      else blit(a.bctx, a.stat)
+      r = drawLive(a.bctx, frame, a.character, a.palette, overridesFor(a), a.layout)
+    })
     a.smokeTip = r.mouthGeo?.smoke || null
     a.hasBase = true
   }
   blit(a.ctx, a.base)
-  if (a.smokeTip) drawSmoke(a.ctx, a.smokeTip, t, a.palette, a.smokePhase)
+  // El humo va con la misma transformación: `drawLive` devuelve la punta del cigarro en
+  // coordenadas lógicas SIN escalar (la escala es del rasterizado, no de la geometría),
+  // así que sin esto la voluta se despegaría del cigarro durante el golpe.
+  if (a.smokeTip) conBounce(a.ctx, a.bounce, () => drawSmoke(a.ctx, a.smokeTip, t, a.palette, a.smokePhase))
 }
 
 // --- la mirada sigue al puntero --------------------------------------------

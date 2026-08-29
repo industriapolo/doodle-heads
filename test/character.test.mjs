@@ -60,11 +60,12 @@ describe('determinismo', () => {
     // que las seeds guardadas ya no valen. Regenerar el fixture sin más es tirar el
     // trabajo de dirección de arte de Jorge.
     //
-    // Se ha regenerado UNA vez, al añadir `eyes.pupilY` (ago 2026), y solo tras comprobar
-    // clave a clave que la única diferencia era la clave nueva con valor 0: ningún valor
-    // existente se movió. Ese es el listón para volver a tocarlo. Se pudo porque el
-    // parámetro se declaró AL FINAL de su PARAMS — el orden de declaración es el orden de
-    // las tiradas del rng, así que en medio habría corrido todo lo que va detrás.
+    // Se ha regenerado dos veces, al añadir `eyes.pupilY` y `eyes.eyeOpen` (ago 2026), y
+    // las dos solo tras comprobar clave a clave que la única diferencia era la clave nueva
+    // con su valor de reposo: ningún valor existente se movió. Ese es el listón para
+    // volver a tocarlo. Se pudo porque los parámetros se declararon AL FINAL de su PARAMS
+    // — el orden de declaración es el orden de las tiradas del rng, así que en medio
+    // habría corrido todo lo que va detrás.
     const esperado = readFileSync(join(AQUI, 'fixtures/character-0xabc123.json'), 'utf8')
     const obtenido = JSON.stringify(makeCharacter(0xabc123), null, 2) + '\n'
     assert.equal(obtenido, esperado)
