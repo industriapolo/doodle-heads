@@ -60,7 +60,7 @@
 <script type="module">
 import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
 import { randomSeed } from './src/core/prng.js'
-import { makeCharacter, draw, paletteFor } from './src/core/character.js'
+import { makeCharacter, drawStatic, drawLive, paletteFor } from './src/core/character.js'
 import { getPalette } from './src/style/palettes.js'
 import { makeActor, startRig, overridesFor } from './src/anim/rig.js'
 import { drawSmoke } from './src/anim/smoke.js'
@@ -206,40 +206,64 @@ function reseed(a, seed) {
   a.tag.textContent = seed.toString(16)
   if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(seed.toString(16)))
   a.drawn = null // fuerza el repintado en el próximo frame
+  a.layout = null // ...y tira la caché de capas estáticas: son de ESTE personaje
   a.hasBase = false
   a.smokeTip = null
 }
 
 let repaints = 0
 
-// La cara se pinta en un canvas BASE fuera de pantalla y el visible recibe un blit.
-// Es lo que hace barato el humo: en su tic (25fps) no se redibuja la cara — se
-// re-blitea la base cacheada y se traza una línea encima. La base solo se repinta
-// cuando parpadeo/mirada/ánimo cambian de verdad, igual que antes.
-function ensureBase(a) {
+// DOS offscreen por personaje, y cada uno amortiza una cosa distinta:
+//
+//   · `stat` — capas 0–4 (melena, orejas, cabeza, hatching, re-trazo). No dependen de
+//     ningún canal del rig, así que se pintan UNA vez por personaje. Es lo caro del
+//     dibujo: `hatch` crea un canvas, le aplica un blur por `filter` y lee getImageData
+//     en cada llamada, hasta dos por cara — y hasta ahora eso se re-ejecutaba entero en
+//     cada parpadeo (auditoría §4). Se invalida en `reseed`, que es lo único que cambia
+//     el personaje o sus bandas.
+//   · `base` — la cara completa. Es lo que hace barato el humo: en su tic (25fps) no se
+//     redibuja nada, se re-blitea la base y se traza una línea encima.
+//
+// El acabado (grano y viñeta) se pinta con blend modes, y Chrome los resuelve con una
+// diferencia de unas pocas unidades sobre un canvas que ha recibido un blit frente a uno
+// pintado del tirón. Es invisible —es ruido sobre ruido— pero hace que el grano del
+// index no sea byte a byte el de compose. Sin acabado, el blit es exacto.
+function ensureLayers(a) {
   if (a.base) return
-  a.base = document.createElement('canvas')
-  a.base.width = a.canvas.width
-  a.base.height = a.canvas.height
-  a.bctx = a.base.getContext('2d')
   const s = a.ctx._baseScale
-  a.bctx.setTransform(s, 0, 0, s, 0, 0)
-  a.bctx._baseScale = s
+  for (const [nombre, ctxName] of [['stat', 'sctx'], ['base', 'bctx']]) {
+    const c = document.createElement('canvas')
+    c.width = a.canvas.width
+    c.height = a.canvas.height
+    a[nombre] = c
+    a[ctxName] = c.getContext('2d')
+    a[ctxName].setTransform(s, 0, 0, s, 0, 0)
+    a[ctxName]._baseScale = s
+  }
+}
+
+/** Copia un offscreen entero, en píxeles de dispositivo: sin escalar, sin resamplear. */
+function blit(ctx, src) {
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.drawImage(src, 0, 0)
+  ctx.restore()
 }
 
 function redraw(a, t = 0, faceChanged = true) {
-  ensureBase(a)
+  ensureLayers(a)
+  if (!a.layout) {
+    clear(a.sctx, a.palette.bg)
+    a.layout = drawStatic(a.sctx, frame, a.character, a.palette)
+  }
   if (faceChanged || !a.hasBase) {
     repaints++
-    clear(a.bctx, a.palette.bg)
-    const r = draw(a.bctx, frame, a.character, a.palette, overridesFor(a))
+    blit(a.bctx, a.stat)
+    const r = drawLive(a.bctx, frame, a.character, a.palette, overridesFor(a), a.layout)
     a.smokeTip = r.mouthGeo?.smoke || null
     a.hasBase = true
   }
-  a.ctx.save()
-  a.ctx.setTransform(1, 0, 0, 1, 0, 0)
-  a.ctx.drawImage(a.base, 0, 0)
-  a.ctx.restore()
+  blit(a.ctx, a.base)
   if (a.smokeTip) drawSmoke(a.ctx, a.smokeTip, t, a.palette, a.smokePhase)
 }
 

@@ -13,9 +13,11 @@
 //
 // La flotación se quitó: movía las cards y hacía que se solaparan entre sí.
 //
-// Cachear capas estáticas en offscreen seguirá haciendo falta cuando entre el humo, que
-// sí cambia cada frame. Pero mientras el estilo se está afinando sale caro: obligaría a
-// invalidar y regenerar la caché en cada retoque de un parámetro.
+// La caché de capas estáticas ya existe, y es del HOST, no de aquí: `character.js` parte
+// el dibujo en `drawStatic` (capas 0–4, que ningún canal del rig puede mover) y
+// `drawLive`, y el index guarda la primera en un offscreen por personaje. Esta regla
+// sigue mandando igual: la caché abarata lo que sí cambia, no da permiso para repintar
+// lo que no.
 
 import { makeRng } from '../core/prng.js'
 

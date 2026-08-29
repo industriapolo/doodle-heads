@@ -106,15 +106,19 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
 }
 
 /**
- * @param overrides  parches por parte, p.ej. { eyes: { blink: 1 } } para el parpadeo.
- *                   rig.js anima exclusivamente por aquí: no hay estado oculto.
+ * El LAYOUT: dónde cae cada rasgo. Sale del personaje y solo del personaje.
+ *
+ * Se calcula entero antes de pintar nada porque las capas no van en el orden de sus
+ * dependencias: las orejas son la primera capa y cuelgan de los ojos, que son de las
+ * últimas. Y sale del personaje SIN overrides a propósito — es la misma regla que ya
+ * seguía la ceja («si el humor moviera browGeo, levantar una ceja arrastraría ojos,
+ * nariz y tope del pelo»), ahora extendida a todo: los overrides del rig son canales de
+ * DIBUJO, no de composición. Si movieran el layout, la capa estática cacheada y la viva
+ * dejarían de cuadrar y la cara se descosería por la costura.
  */
-export function draw(ctx, frame, character, palette, overrides = {}) {
-  const rng = makeRng(character.seed)
-  const p = (name) => ({ ...character[name], ...(overrides[name] || {}) })
-
-  const headP = p('head')
-  const hairP = p('hair')
+function layout(frame, character) {
+  const headP = character.head
+  const hairP = character.hair
   // El moño crece POR ENCIMA de la coronilla y la cabeza llena el marco casi hasta
   // arriba: sin ceder un poco de fill, moño y palillos se pintarían fuera del lienzo.
   // La geisha de referencia funciona exactamente así — cabeza más pequeña, aire encima.
@@ -122,21 +126,13 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   const geo = head.build(frame, conMono ? { ...headP, fill: headP.fill * 0.86 } : headP)
   const { faceBox } = geo
 
-  // --- alturas, TODAS antes de dibujar ------------------------------------
-  // La coherencia entre partes se resuelve aquí porque ningún módulo ve a los demás.
-  // Y hay que resolverla antes de pintar nada: las orejas van en la primera capa pero
-  // dependen de los ojos, que son de las últimas.
-  // El layout cuelga de las cejas SIN los canales de ánimo del rig: si el humor moviera
-  // browGeo, levantar una ceja arrastraría ojos, nariz y tope del pelo. El ánimo solo
-  // entra en el DIBUJO de la ceja (browsP, más abajo).
-  const browsP = p('brows')
   const browGeo = brows.build(faceBox, character.brows)
   const browBottom = (browGeo.bottom - faceBox.y) / faceBox.h
 
   // Reparto del ANCHO. El par de ojos llega a ocupar el 96% de la cara, así que no queda
   // sitio físico para el pelo lateral y acaban montándose. Ceden primero los laterales,
   // que son decorativos; el ojo solo se estrecha si el lateral ya está en su mínimo.
-  const eyesP0 = p('eyes')
+  const eyesP0 = character.eyes
   // Y si al lateral no le queda sitio decente, no se dibuja: mejor sin patilla que con
   // un hilo de tinta bajando por el borde de la cara.
   const room = 0.5 - eyesP0.spacing / 2 - SIDE_MARGIN
@@ -151,8 +147,10 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // orejas: el borde de ARRIBA a la altura de los ojos, con margen para desviarse.
   // Correlacionar el borde y no el centro hace que la regla aguante con orejas
   // grandes y pequeñas por igual.
-  const earsP = p('ears')
+  const earsP = character.ears
   const earsY = clamp(eyesY + ears.halfHeight(faceBox, earsP) + earsP.eyeAlign, 0.2, 0.72)
+  // la barba de masa vuela por fuera de la silueta y sin tope pintaría sobre el lóbulo
+  const earBottom = faceBox.y + faceBox.h * (earsY + ears.halfHeight(faceBox, earsP))
 
   // La nariz se resuelve aquí, antes de dibujar nada, porque la BARBA necesita saber
   // dónde cae para no crecerle encima.
@@ -161,7 +159,7 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   // no basta con topar el arranque, hay que topar dónde acaba. Se despeja la inclinación
   // que deja la punta dentro del hueco entre los ojos, y se permite la que corrige hacia
   // el centro — de ahí que el rango sea asimétrico.
-  const noseP = p('nose')
+  const noseP = character.nose
   const noseStart = clamp(browBottom, 0.12, 0.5)
   const noseLen = Math.min(noseP.length, NOSE_MAX_END - noseStart)
   const maxDrift = Math.max(0, eyesP.spacing / 2 - 0.015)
@@ -181,59 +179,105 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
     r: Math.max(faceBox.w * 0.055, faceBox.w * noseP.hookWidth * 0.95),
   }
 
+  return {
+    geo,
+    faceBox,
+    browGeo,
+    sideWidth,
+    eyesP,
+    eyesY,
+    earsY,
+    earBottom,
+    nose: { startY: noseStart, length: noseLen, offsetX: offX, tilt: noseTilt },
+    noseKeepOut,
+  }
+}
+
+/**
+ * Capas 0–4: melena, orejas, cabeza, hatching y re-trazo del contorno.
+ *
+ * Ninguna depende de un canal del rig, así que para un personaje dado esto se pinta UNA
+ * vez y se cachea: el host lo guarda en un offscreen y lo blitea antes de cada capa
+ * viva. Es lo caro del dibujo — `hatch` crea un canvas, le aplica un blur por `filter` y
+ * lee `getImageData` en cada llamada, hasta dos por cara— y era lo que se re-ejecutaba
+ * entero en cada parpadeo (auditoría §4).
+ *
+ * NO recibe overrides: lo estático es del personaje, no del momento.
+ *
+ * @returns el layout, que es lo que `drawLive` necesita para colocarse encima.
+ */
+export function drawStatic(ctx, frame, character, palette) {
+  const rng = makeRng(character.seed)
+  const L = layout(frame, character)
+  const headP = character.head
+  const hairP = character.hair
+
   // 0. melena: la masa trasera cae por detrás de TODO — cabeza, orejas y patillas
-  hair.drawBack(ctx, geo, hairP, palette, rng.fork(SALT.hairBack))
+  hair.drawBack(ctx, L.geo, hairP, palette, rng.fork(SALT.hairBack))
 
   // 1. orejas — DETRÁS de la cabeza (pero delante de la melena, como en las refs)
-  ears.draw(ctx, geo, { ...earsP, offsetY: earsY }, palette, rng.fork(SALT.ears))
+  ears.draw(ctx, L.geo, { ...character.ears, offsetY: L.earsY }, palette, rng.fork(SALT.ears))
 
   // 2. cabeza: relleno + sombra plana + contorno
-  head.paint(ctx, geo, headP, palette)
+  head.paint(ctx, L.geo, headP, palette)
 
   // 3. pelo texturado y barba, recortados a la silueta y topados por la ceja
-  hair.draw(ctx, geo, hairP, palette, rng.fork(SALT.hair), { hairBottom: browGeo.top, noseKeepOut })
+  hair.draw(ctx, L.geo, hairP, palette, rng.fork(SALT.hair), {
+    hairBottom: L.browGeo.top,
+    noseKeepOut: L.noseKeepOut,
+  })
 
   // 4. re-trazo del contorno: impide que el hatching se coma la silueta.
   //    Va aquí y no al final porque todo el hatching ya está puesto, y porque la masa
   //    de pelo sobresale del cráneo — si el contorno fuera después, le cruzaría una
   //    línea por encima que en las referencias no existe.
-  head.restroke(ctx, geo, palette, headP.lineWeight)
+  head.restroke(ctx, L.geo, palette, headP.lineWeight)
+
+  return L
+}
+
+/**
+ * Capas 5–13: todo lo que un canal del rig puede mover, y lo que va por encima de ello.
+ *
+ * El acabado (grano y viñeta) se queda aquí aunque no dependa del rig: va sobre el
+ * lienzo entero y encima de todo, así que no puede pintarse antes que las cejas.
+ *
+ * @param overrides  parches por parte, p.ej. { eyes: { blink: 1 } } para el parpadeo.
+ *                   rig.js anima exclusivamente por aquí: no hay estado oculto.
+ * @param L          lo que devolvió `drawStatic` sobre este mismo personaje. Los campos
+ *                   de layout (anchos, alturas) se imponen DESPUÉS de los overrides: un
+ *                   canal del rig no puede descolocar lo que ya está pintado debajo.
+ */
+export function drawLive(ctx, frame, character, palette, overrides = {}, L) {
+  const rng = makeRng(character.seed)
+  const p = (name) => ({ ...character[name], ...(overrides[name] || {}) })
+  const { geo, faceBox } = L
 
   // 5. SOMBRA de las cejas. Está sobre la piel, así que el pelo tiene que taparla —
   //    si no, desborda por los lados de la ceja y se ve encima del pelo.
+  const browsP = p('brows')
   brows.drawShadow(ctx, faceBox, browsP, palette, geo.path)
 
   // 6. masas de pelo y barba: tapan la sombra de la ceja, pero no la ceja. La barba de
-  //    masa necesita la nariz (anatomía) y el borde bajo de la oreja (vuela por fuera
-  //    de la silueta y sin tope pintaría sobre el lóbulo).
-  const earBottom = faceBox.y + faceBox.h * (earsY + ears.halfHeight(faceBox, earsP))
-  hair.drawMass(ctx, geo, { ...hairP, sideWidth }, palette, rng.fork(SALT.hairMass), {
-    hairBottom: browGeo.top,
-    noseKeepOut,
-    earBottom,
+  //    masa necesita la nariz (anatomía) y el borde bajo de la oreja.
+  hair.drawMass(ctx, geo, { ...p('hair'), sideWidth: L.sideWidth }, palette, rng.fork(SALT.hairMass), {
+    hairBottom: L.browGeo.top,
+    noseKeepOut: L.noseKeepOut,
+    earBottom: L.earBottom,
   })
 
   // 7. ojos
-  const eyeGeo = eyes.draw(ctx, faceBox, { ...eyesP, offsetY: eyesY }, palette, rng.fork(SALT.eyes))
+  const eyesP = { ...L.eyesP, ...(overrides.eyes || {}), eyeWidth: L.eyesP.eyeWidth, offsetY: L.eyesY }
+  const eyeGeo = eyes.draw(ctx, faceBox, eyesP, palette, rng.fork(SALT.eyes))
 
-  // 8. nariz, arrancando en el entrecejo.
-  //
-  // Dos topes que no puede poner el módulo, porque dependen de otras partes:
-  //  · el largo se recorta para que la punta no rebase la barbilla — arrancando abajo
-  //    y con el largo al máximo, la nariz se salía del faceBox
-  //  · el desplazamiento lateral se limita al hueco entre los ojos, o la vertical
-  //    aterriza sobre el borde de uno
-  const noseGeo = nose.draw(
-    ctx,
-    faceBox,
-    { ...noseP, startY: noseStart, length: noseLen, offsetX: offX, tilt: noseTilt },
-    palette,
-    rng.fork(SALT.nose)
-  )
+  // 8. nariz, arrancando en el entrecejo. Los dos topes que no puede poner el módulo
+  //    —largo contra la barbilla, desplazamiento contra el hueco entre los ojos— ya
+  //    vienen resueltos en el layout.
+  const noseGeo = nose.draw(ctx, faceBox, { ...p('nose'), ...L.nose }, palette, rng.fork(SALT.nose))
 
   // 8b. mejillas: rubor o pecas, donde acaba la nariz — ahí viven en las referencias.
   //     Antes de la boca (los labios pisan al rubor si se rozan) y de las gafas.
-  cheeks.draw(ctx, faceBox, p('cheeks'), palette, rng.fork(SALT.cheeks), noseKeepOut.y1)
+  cheeks.draw(ctx, faceBox, p('cheeks'), palette, rng.fork(SALT.cheeks), L.noseKeepOut.y1)
 
   // 9. boca, siempre por debajo de donde acaba la nariz (sombra incluida)
   const mouthP = p('mouth')
@@ -265,7 +309,16 @@ export function draw(ctx, frame, character, palette, overrides = {}) {
   //     es textura de papel, no de piel
   applyFinish(ctx, palette)
 
-  return { geo, browGeo, noseGeo, mouthGeo }
+  return { geo, browGeo: L.browGeo, noseGeo, mouthGeo }
+}
+
+/**
+ * La cara entera, de una pasada. Es lo que usan las previews y los tests: ahí no hay
+ * caché que amortizar y partir el dibujo solo estorbaría.
+ */
+export function draw(ctx, frame, character, palette, overrides = {}) {
+  const L = drawStatic(ctx, frame, character, palette)
+  return drawLive(ctx, frame, character, palette, overrides, L)
 }
 
 /**
