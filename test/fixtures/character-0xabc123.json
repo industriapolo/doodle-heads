@@ -116,7 +116,8 @@
     "lashCount": 2,
     "lashLen": 0.08057060528546572,
     "lineWeight": 4.1,
-    "detailWeight": 3.2
+    "detailWeight": 3.2,
+    "pupilY": 0
   },
   "nose": {
     "type": "recta",

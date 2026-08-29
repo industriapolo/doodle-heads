@@ -73,7 +73,26 @@ export const PARAMS = {
 
   lineWeight: { min: 0.5, max: 12, range: [4.1, 4.1], step: 0.1, label: 'Grosor del ojo' },
   detailWeight: { min: 0.5, max: 12, range: [3.2, 3.2], step: 0.1, label: 'Grosor de los arcos' },
+
+  // Mirada vertical. Va AQUÍ ABAJO y no junto a `pupilX`, que es donde pediría el
+  // sentido común, porque el orden de declaración de PARAMS es el orden de las tiradas
+  // del rng: `sample` recorre las entradas en orden y pide una a cada una, banda cerrada
+  // incluida. Meter un parámetro en medio corre la secuencia de todos los que van
+  // detrás y repinta el ojo de TODAS las seeds guardadas. Al final no corre nada.
+  //
+  // Como `blink`, es un canal del rig: banda [0, 0], no se sortea. −1 arriba, +1 abajo.
+  pupilY: { min: -1, max: 1, range: [0, 0], step: 0.05, label: 'Mirada Y' },
 }
+
+// Dónde puede llegar la pupila, medido en radios de pupila:
+//  · en reposo se APOYA en la cuerda — asoma por debajo, con un 27,5 % de su diámetro ya
+//    tapado por el párpado. Eso no es un accidente, es la construcción del ojo.
+//  · hacia abajo, hasta que roza el arco del blanco.
+//  · hacia arriba, hasta esconder `PUPIL_HIDE` de su diámetro bajo el párpado. Se recorta
+//    contra el blanco visible, así que lo que queda es una uña de pupila pegada a la
+//    cuerda: eso es lo que se lee como ojo en blanco.
+const PUPIL_REST = 0.45
+const PUPIL_HIDE = 0.72
 
 export const randomize = randomizerFor(PARAMS)
 
@@ -101,6 +120,24 @@ function outside(path) {
   o.rect(-4000, -4000, 8000, 8000)
   o.addPath(path)
   return o
+}
+
+/**
+ * Altura del centro de la pupila, en el marco de la cuerda (y=0 = cuerda, +y = abajo).
+ *
+ * El tope de abajo se mide contra el blanco EN REPOSO, no contra el que hay al parpadear:
+ * si no, cerrar el ojo arrastraría la pupila hacia arriba y la mirada se movería sola con
+ * cada pestañeo. Lo que se va con el párpado es el recorte, no la posición.
+ *
+ * Y hay que topar ese tope: con el ojo poco abierto y la pupila grande, `sag − pr` cae
+ * por encima del reposo y «mirar abajo» subiría la pupila.
+ */
+function pupilCy(pr, sag, pupilY = 0) {
+  const reposo = pr * PUPIL_REST
+  if (!pupilY) return reposo
+  const abajo = Math.max(reposo, sag - pr)
+  const arriba = pr * (1 - 2 * PUPIL_HIDE)
+  return reposo + (pupilY > 0 ? pupilY * (abajo - reposo) : -pupilY * (arriba - reposo))
 }
 
 /** Geometría de los dos ojos, sin dibujar. rig.js la necesita para la mirada. */
@@ -197,7 +234,7 @@ function eye(ctx, side, w, sag, p, palette) {
   const pr = (w * p.pupilSize) / 2
   ctx.fillStyle = palette.line
   ctx.beginPath()
-  ctx.arc(p.pupilX * (half - pr * 2.2), pr * 0.45, pr, 0, Math.PI * 2)
+  ctx.arc(p.pupilX * (half - pr * 2.2), pupilCy(pr, sag, p.pupilY), pr, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
 
