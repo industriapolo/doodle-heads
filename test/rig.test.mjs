@@ -9,7 +9,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { makeActor, advance, startRig, overridesFor, react, REACTION_NAMES } from '../src/anim/rig.js'
+import { makeActor, advance, startRig, overridesFor, react, lookAtAll, REACTION_NAMES } from '../src/anim/rig.js'
 
 /** Cola de rAF gobernada por el test: `tick(t)` corre un frame en el instante `t`. */
 function fakeRaf() {
@@ -420,6 +420,140 @@ describe('react: la envolvente', () => {
     assert.equal(ov.brows.moodTilt, a.expr.tilt)
     assert.equal(ov.eyes.eyeOpen, a.expr.eyeOpen)
     assert.notEqual(ov.brows.moodTilt, a.mood.tilt)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('el coro', () => {
+  // Rejilla 6×5 como la del index, con el paso elegido para que el radio de 700 recoja
+  // exactamente a los ocho vecinos: ortogonal 400, diagonal 566, y dos celdas ya son 800.
+  const COLS = 6
+  const FILAS = 5
+  const PASO = 400
+  const rejilla = () => {
+    const actores = []
+    const centros = []
+    for (let f = 0; f < FILAS; f++) {
+      for (let c = 0; c < COLS; c++) {
+        actores.push(makeActor(f * COLS + c))
+        centros.push({ x: c * PASO, y: f * PASO })
+      }
+    }
+    return { actores, centros }
+  }
+  const idx = (c, f) => f * COLS + c
+  const vecinos = (c, f) => {
+    const v = []
+    for (let df = -1; df <= 1; df++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dc && !df) continue
+      const x = c + dc, y = f + df
+      if (x >= 0 && x < COLS && y >= 0 && y < FILAS) v.push(idx(x, y))
+    }
+    return v
+  }
+
+  it('miran los vecinos, y hacia el pulsado', () => {
+    const { actores, centros } = rejilla()
+    const pulsado = idx(2, 2)
+    const n = lookAtAll(actores, centros, centros[pulsado], 1000, { except: pulsado, reach: 500, radius: 700 })
+
+    const esperados = new Set(vecinos(2, 2))
+    assert.equal(n, esperados.size, `miraron ${n} y se esperaban ${esperados.size}`)
+    for (let i = 0; i < actores.length; i++) {
+      const mira = actores[i].gazeTarget !== null
+      assert.equal(mira, esperados.has(i), `el actor ${i} ${mira ? 'mira' : 'no mira'} y debería lo contrario`)
+    }
+
+    // y miran HACIA él: el de su izquierda tiene que girar a la derecha, y al revés
+    assert.ok(actores[idx(1, 2)].gazeTarget.x > 0.5, 'el vecino de la izquierda no gira hacia él')
+    assert.ok(actores[idx(3, 2)].gazeTarget.x < -0.5, 'el vecino de la derecha no gira hacia él')
+    assert.ok(actores[idx(2, 1)].gazeTarget.y > 0.5, 'el de arriba no mira hacia abajo')
+    assert.ok(actores[idx(2, 3)].gazeTarget.y < -0.5, 'el de abajo no mira hacia arriba')
+  })
+
+  it('el pulsado no se mira a sí mismo', () => {
+    const { actores, centros } = rejilla()
+    const pulsado = idx(2, 2)
+    lookAtAll(actores, centros, centros[pulsado], 1000, { except: pulsado, reach: 500, radius: 700 })
+    assert.equal(actores[pulsado].gazeTarget, null)
+    assert.equal(actores[pulsado].gazeHold, null)
+  })
+
+  it('las esquinas lejanas ni se enteran', () => {
+    const { actores, centros } = rejilla()
+    const pulsado = idx(2, 2)
+    lookAtAll(actores, centros, centros[pulsado], 1000, { except: pulsado, reach: 500, radius: 700 })
+    for (const [c, f] of [[0, 0], [5, 0], [0, 4], [5, 4]]) {
+      assert.equal(actores[idx(c, f)].gazeTarget, null, `la esquina (${c},${f}) se giró`)
+    }
+  })
+
+  it('a los 900 ms se sueltan todos, solos', () => {
+    const { actores, centros } = rejilla()
+    const pulsado = idx(2, 2)
+    lookAtAll(actores, centros, centros[pulsado], 1000, { except: pulsado, reach: 500, radius: 700 })
+    for (const a of actores) advance(a, 1000)
+    assert.ok(actores[idx(1, 2)].gazeTarget !== null, 'se soltó antes de tiempo')
+    for (let t = 1016; t <= 1899; t += 16) for (const a of actores) advance(a, t)
+    assert.ok(actores[idx(1, 2)].gazeTarget !== null, `se soltó a los ${1899 - 1000} ms`)
+    for (const a of actores) advance(a, 1900)
+    for (const a of actores) {
+      assert.equal(a.gazeTarget, null, 'quedó alguien mirando tras el coro')
+      assert.equal(a.gazeHold, null)
+    }
+  })
+
+  it('mientras dura el coro, el host no puede pisarlo', () => {
+    // El index reparte miradas en cada pointermove. Sin el candado, mover el ratón un
+    // píxel borraría el coro entero antes de que se vea.
+    const { actores, centros } = rejilla()
+    lookAtAll(actores, centros, centros[idx(2, 2)], 1000, { except: idx(2, 2), reach: 500, radius: 700 })
+    const conCandado = actores.filter((a) => a.gazeHold !== null).length
+    assert.equal(conCandado, 8)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('el doble parpadeo de la atención', () => {
+  it('son dos, cortos y seguidos', () => {
+    const a = makeActor(5)
+    advance(a, 0)
+    a.blinkFrom = 1e9 // sin parpadeo ambiental por medio: aquí se mide el doble
+    react(a, 'atención', 1000)
+    const arranques = []
+    let previo = null
+    for (let t = 1000; t <= 1600; t += 8) {
+      advance(a, t)
+      if (a.blinkAt !== null && a.blinkAt !== previo) arranques.push(a.blinkAt)
+      previo = a.blinkAt
+    }
+    assert.equal(arranques.length, 2, `hubo ${arranques.length} parpadeos, no 2`)
+    assert.equal(arranques[0], 1000)
+    assert.equal(arranques[1] - arranques[0], 80 + 120, 'la separación no es la pedida')
+  })
+
+  it('no lo llevan las demás reacciones', () => {
+    for (const n of ['sorpresa', 'alegría']) {
+      const a = makeActor(5)
+      advance(a, 0)
+      a.blinkFrom = 1e9
+      react(a, n, 1000)
+      assert.equal(a.blinkAgainAt, null, `${n} disparó el doble parpadeo`)
+    }
+  })
+
+  it('el parpadeo ambiental se reprograma como siempre', () => {
+    // El doble no puede dejar al actor sin su ciclo: tras el segundo, la cita normal
+    // vuelve a caer dentro de su banda de 2 a 7 segundos.
+    const a = makeActor(5)
+    advance(a, 0)
+    a.blinkFrom = 1e9
+    react(a, 'atención', 1000)
+    for (let t = 1000; t <= 1400; t += 8) advance(a, t)
+    assert.equal(a.blinkAgainAt, null, 'el doble no se cerró')
+    assert.ok(a.blinkFrom > 1200 && a.blinkFrom < 1400 + 7000, `blinkFrom quedó en ${a.blinkFrom}`)
   })
 })
 

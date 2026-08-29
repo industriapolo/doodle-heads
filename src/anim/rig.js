@@ -31,6 +31,13 @@ import { makeRng } from '../core/prng.js'
 
 const BLINK_GAP = [2000, 7000] // entre parpadeos
 const BLINK_DUR = [100, 140] // lo que dura uno
+// El doble parpadeo de la atención: dos rápidos seguidos. Es el gesto de «te he visto»
+// —más corto que un parpadeo normal y en pareja, que es lo que lo hace legible como
+// intención y no como higiene del ojo.
+const BLINK_FAST = 80
+const BLINK_AGAIN = 120
+// Lo que dura el coro: los vecinos miran hacia quien ha recibido el click.
+const CORO_HOLD = 900
 const GAZE_GAP = [3000, 10000]
 const GAZE_EASE = 380
 // Seguir al puntero NO es la transición programada: esa es una sacada, sale y llega. Un
@@ -106,6 +113,7 @@ const REACTIONS = [
     eyeOpen: 1.15,
     // el fumador que solo mira no se despega el cigarro de los labios
     cigDrop: 0,
+    dobleParpadeo: true,
   },
   {
     name: 'sorpresa',
@@ -155,6 +163,7 @@ export function makeActor(seed, extra = {}) {
     blinkFrom: rng.range(0, BLINK_GAP[1]), // el desfase, para que no vayan a coro
     blinkAt: null,
     blinkDur: 0,
+    blinkAgainAt: null, // el segundo del doble parpadeo, si lo hay
     gaze: rng.range(-0.4, 0.4),
     gazeFrom: 0,
     gazeTo: 0,
@@ -166,6 +175,9 @@ export function makeActor(seed, extra = {}) {
     // Dónde mira, en [−1, 1] y coordenadas de la cara. Lo pone el HOST — el rig no sabe
     // que existe un ratón, solo que a veces le dicen dónde mirar.
     gazeTarget: null,
+    // Objetivo con caducidad: mientras dure, el host no lo pisa y al vencer se suelta
+    // solo. Es lo que deja al coro durar 900 ms sin que el host tenga que llevar el reloj.
+    gazeHold: null,
     gazeHeld: false,
     lastT: null,
     mood: { ...NEUTRAL },
@@ -228,6 +240,14 @@ export function advance(a, t) {
   a.lastT = t
 
   // --- parpadeo ---------------------------------------------------------
+  // El segundo del doble va ANTES de la lógica normal: es una cita forzada, no depende de
+  // `blinkFrom`. Su duración tampoco sale del rng — así el doble parpadeo no le mueve la
+  // secuencia al actor por el hecho de que alguien haya pasado el ratón por encima.
+  if (a.blinkAgainAt !== null && a.blinkAt === null && t >= a.blinkAgainAt) {
+    a.blinkAt = t
+    a.blinkDur = BLINK_FAST
+    a.blinkAgainAt = null
+  }
   if (a.blinkAt === null) {
     if (t >= a.blinkFrom) {
       a.blinkAt = t
@@ -248,6 +268,10 @@ export function advance(a, t) {
   // --- mirada -----------------------------------------------------------
   // Dos regímenes, y el paso de uno a otro no puede dar un salto: la mirada es lo que
   // más delata un truco.
+  if (a.gazeHold !== null && t >= a.gazeHold) {
+    a.gazeHold = null
+    a.gazeTarget = null
+  }
   const k = 1 - Math.exp(-dt / GAZE_FOLLOW)
   if (a.gazeTarget) {
     // Persiguiendo un objetivo externo. Se cancela la sacada que hubiera en vuelo: el
@@ -430,6 +454,11 @@ export function react(a, name, t = a.lastT ?? 0) {
   // la cara de AHORA es el punto de partida del ataque, venga del ánimo o de otra reacción
   a.reactBase = { ...a.expr }
   a.reactHoldEnd = d.hold === Infinity ? Infinity : t + d.attack + d.hold
+  if (d.dobleParpadeo) {
+    a.blinkAt = t
+    a.blinkDur = BLINK_FAST
+    a.blinkAgainAt = t + BLINK_FAST + BLINK_AGAIN
+  }
   a.reactTo = {
     tilt: a.rng.range(...(d.tilt || [0, 0])),
     lift: a.rng.range(...(d.lift || [0, 0])),
@@ -440,6 +469,36 @@ export function react(a, name, t = a.lastT ?? 0) {
     cigDrop: d.cigDrop ?? 0,
   }
   return true
+}
+
+/**
+ * El coro: los que están cerca miran hacia un punto durante un rato.
+ *
+ * Vive aquí y no en el host porque es mirada, que es del rig; lo que el rig sigue sin
+ * saber es qué es ese punto. Le entran posiciones y le sale a quién le toca mirar.
+ *
+ * El RADIO es lo que lo hace un coro y no una coreografía: si miraran los treinta, treinta
+ * cabezas girando a la vez se leen como un efecto, no como que alguien ha llamado la
+ * atención. Miran los vecinos, y el resto ni se entera.
+ *
+ * @param centros  centro de la celda de cada actor, en las unidades del host
+ * @param except   índice que NO mira (el pulsado: nadie se mira a sí mismo)
+ * @param reach    distancia de referencia para normalizar a [−1, 1], como el puntero
+ * @param radius   más lejos de esto, ni se giran
+ */
+export function lookAtAll(actors, centros, punto, t, opts = {}) {
+  const { except = -1, reach = 500, radius = 700, hold = CORO_HOLD } = opts
+  let n = 0
+  for (let i = 0; i < actors.length; i++) {
+    if (i === except || !centros[i]) continue
+    const dx = punto.x - centros[i].x
+    const dy = punto.y - centros[i].y
+    if (Math.hypot(dx, dy) > radius) continue
+    actors[i].gazeTarget = { x: clamp1(dx / reach), y: clamp1(dy / reach) }
+    actors[i].gazeHold = t + hold
+    n++
+  }
+  return n
 }
 
 /**

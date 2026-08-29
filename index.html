@@ -71,7 +71,7 @@ import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
 import { randomSeed } from './src/core/prng.js'
 import { makeCharacter, drawStatic, drawLive, paletteFor } from './src/core/character.js'
 import { getPalette } from './src/style/palettes.js'
-import { makeActor, startRig, overridesFor, react } from './src/anim/rig.js'
+import { makeActor, startRig, overridesFor, react, lookAtAll } from './src/anim/rig.js'
 import { drawSmoke } from './src/anim/smoke.js'
 import { CONFIGS } from './previews/configs.js'
 
@@ -208,9 +208,14 @@ for (let i = 0; i < COUNT; i++) {
   cell.addEventListener('pointerenter', () => react(a, 'atención', rig.now()))
   cell.addEventListener('pointerleave', () => react(a, 'neutro', rig.now()))
   cell.addEventListener('click', () => {
+    const t = rig.now()
     // el sorteo va con el rng del actor: dos personajes no reaccionan igual al mismo
     // click, y el mismo personaje no siempre igual
-    react(a, a.rng.next() < 0.5 ? 'sorpresa' : 'alegría', rig.now())
+    react(a, a.rng.next() < 0.5 ? 'sorpresa' : 'alegría', t)
+    // y los vecinos se giran a mirar. La caducidad la lleva el rig (`gazeHold`), que es
+    // quien tiene reloj: el host no tiene tic propio con el que soltarlos.
+    const c = centrosDeCelda()
+    lookAtAll(actors, c, c[i], t, { except: i, reach: GAZE_REACH, radius: CORO_RADIUS })
   })
 
   again.addEventListener('click', (e) => {
@@ -345,6 +350,10 @@ function redraw(a, t = 0, faceChanged = true) {
 // abajo. Recortar la `y` a la mitad encima de eso dejaba el eje vertical en 15 contra 112,
 // y el movimiento no se leía.
 const GAZE_REACH = 500
+// Hasta dónde llega el coro. Es lo que lo hace un coro y no una coreografía: con los
+// treinta girando a la vez se lee como un efecto, no como que alguien ha llamado la
+// atención. Con 700 px se giran los vecinos y el resto sigue a lo suyo.
+const CORO_RADIUS = 700
 const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v)
 
 // Los centros de celda se cachean: `getBoundingClientRect` fuerza layout, y a treinta por
@@ -365,17 +374,18 @@ function centrosDeCelda() {
   return centros
 }
 
+// El coro tiene prioridad sobre el puntero mientras dura: el reparto se hace en cada
+// pointermove, y sin el candado mover el ratón un píxel lo borraría antes de verse.
 function mirarA(puntero) {
-  if (!puntero) {
-    for (const a of actors) a.gazeTarget = null
-    return
-  }
-  const c = centrosDeCelda()
+  const c = puntero && centrosDeCelda()
   for (let i = 0; i < actors.length; i++) {
-    actors[i].gazeTarget = {
-      x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
-      y: clamp1((puntero.y - c[i].y) / GAZE_REACH),
-    }
+    if (actors[i].gazeHold !== null) continue
+    actors[i].gazeTarget = puntero
+      ? {
+          x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
+          y: clamp1((puntero.y - c[i].y) / GAZE_REACH),
+        }
+      : null
   }
 }
 
