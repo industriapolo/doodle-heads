@@ -101,14 +101,62 @@ describe('voice: la frase está bien formada', () => {
     }
   })
 
-  it('la duración total cuadra con velocidad y longitud (±30 %)', () => {
+  it('la duración total cuadra con velocidad y longitud', () => {
     // Es lo que hace que `rate` signifique algo: si la frase durase el doble de lo que
     // dicen sus sílabas por segundo, el slider mentiría.
+    //
+    // La banda es asimétrica y no por descuido: hacia arriba se pueden acumular el acento
+    // (×1.5) y el arrastre de la queja (×2) en la MISMA sílaba, la última. Medido sobre
+    // 1200 frases, el peor caso queda en 1,58.
     for (const { s, k, v, f } of TODAS) {
-      const esperada = v.length / v.rate
-      const razon = f.dur / esperada
-      assert.ok(razon > 0.7 && razon < 1.3, `seed ${s}/k${k}: ${(razon * 100).toFixed(0)} % de lo esperado`)
+      const razon = f.dur / (v.length / v.rate)
+      assert.ok(razon > 0.7 && razon < 1.7, `seed ${s}/k${k}: ${(razon * 100).toFixed(0)} % de lo esperado`)
     }
+  })
+
+  it('hay UNA sílaba acentuada por frase, y no es la primera', () => {
+    // Una frase con todas las sílabas iguales no tiene ritmo, tiene pulso. Y empezar
+    // acentuado suena a orden, no a comentario.
+    for (const { s, k, f } of TODAS) {
+      const acentos = f.syllables.filter((sy) => sy.acento)
+      assert.equal(acentos.length, 1, `seed ${s}/k${k}: ${acentos.length} acentos`)
+      if (f.syllables.length > 2) {
+        assert.notEqual(f.syllables[0].acento, true, `seed ${s}/k${k}: acento en la primera`)
+      }
+    }
+  })
+
+  it('la acentuada dura más, abre más y se sale de la melodía', () => {
+    // Se mide en conjunto y no frase a frase: con el arrastre de la queja, una última
+    // sílaba sin acento puede durar más que la acentuada de su propia frase.
+    let durAc = 0, durOtras = 0, nAc = 0, nOtras = 0
+    let openAc = 0, openOtras = 0
+    for (const { v, f } of TODAS) {
+      const paso = 1 / v.rate
+      for (const sy of f.syllables) {
+        if (sy.acento) { durAc += sy.dur / paso; openAc += sy.open; nAc++ }
+        else { durOtras += sy.dur / paso; openOtras += sy.open; nOtras++ }
+      }
+    }
+    const mediaAc = durAc / nAc
+    const mediaOtras = durOtras / nOtras
+    assert.ok(mediaAc > mediaOtras * 1.25, `acentuada ${mediaAc.toFixed(2)} vs resto ${mediaOtras.toFixed(2)}`)
+    assert.ok(openAc / nAc > openOtras / nOtras + 0.1, 'la acentuada no abre más la boca')
+  })
+
+  it('hay una pausa ANTES del acento', () => {
+    // Un acento no es solo una sílaba más larga: es también el hueco que la anuncia.
+    let hueco = 0, nHueco = 0, otros = 0, nOtros = 0
+    for (const { v, f } of TODAS) {
+      const paso = 1 / v.rate
+      const i = f.syllables.findIndex((sy) => sy.acento)
+      for (let j = 0; j < f.syllables.length - 1; j++) {
+        const g = (f.syllables[j + 1].t - (f.syllables[j].t + f.syllables[j].dur)) / paso
+        if (j === i - 1) { hueco += g; nHueco++ } else { otros += g; nOtros++ }
+      }
+    }
+    assert.ok(nHueco > 20, 'no hay muestra suficiente de pausas antes del acento')
+    assert.ok(hueco / nHueco > (otros / nOtros) * 1.3, `pausa ${(hueco/nHueco).toFixed(3)} vs ${(otros/nOtros).toFixed(3)}`)
   })
 
   it('la queja arrastra la última sílaba y la pregunta sube', () => {

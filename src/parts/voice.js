@@ -63,7 +63,19 @@ const ONSETS = { none: 2, noise: 2, pop: 2, nasal: 1 }
 
 // Lo que ocupa el SONIDO dentro del paso de una sílaba; el resto es silencio. Sin ese
 // silencio las sílabas se sueldan en un zumbido continuo.
-const SONIDO = 0.62
+//
+// `ANTES_DEL_ACENTO` es más corto: la sílaba previa a la acentuada suena menos y calla
+// más, o sea que deja una pausa. Un acento no es solo una sílaba más larga y más fuerte;
+// es también el hueco que la anuncia — sin ese hueco se oye como un tropiezo.
+const SONIDO = 0.7
+const ANTES_DEL_ACENTO = 0.55
+
+// El acento. Una frase con todas las sílabas iguales no tiene ritmo, tiene pulso: suena a
+// metrónomo con vocales. Basta UNA que dure más, abra más y se salga de la melodía para
+// que las demás se reordenen alrededor de ella y la frase tenga forma.
+const ACENTO_DUR = 1.5
+const ACENTO_OPEN = 0.25
+const ACENTO_ST = 2
 
 /** Topes de cordura en Hz: con el recorrido al máximo, el tono se iría de la voz. */
 const HZ_MIN = 60
@@ -86,24 +98,35 @@ export function phrase(v, rng) {
   const syllables = []
   let t = 0
 
+  // Cuál lleva el acento. Se sortea ANTES del bucle para que no dependa de nada de
+  // dentro. Nunca la primera si hay más de dos: una frase que empieza acentuada suena a
+  // orden, no a comentario.
+  const acento = n > 2 ? rng.int(1, n - 1) : rng.int(0, n - 1)
+
   for (let i = 0; i < n; i++) {
     const u = n === 1 ? 1 : i / (n - 1)
     const ultima = i === n - 1
-    const dur = paso * SONIDO * rng.range(0.85, 1.15) * (ultima ? c.drag : 1)
+    const acentuada = i === acento
+    const sonido = i === acento - 1 ? ANTES_DEL_ACENTO : SONIDO
+    const dur =
+      paso * sonido * rng.range(0.8, 1.2) * (ultima ? c.drag : 1) * (acentuada ? ACENTO_DUR : 1)
     // El tono de la sílaba es la curva de la frase MÁS un bandazo propio. Sin el bandazo
-    // la frase es una rampa y suena a sirena; con él, a alguien hablando.
-    const semi = R * (c.from + (c.to - c.from) * u) + rng.range(-0.28, 0.28) * R
+    // la frase es una rampa y suena a sirena; con él, a alguien hablando. La acentuada se
+    // sale además hacia arriba: es lo que la separa de ser solo una sílaba más larga.
+    const semi =
+      R * (c.from + (c.to - c.from) * u) + rng.range(-0.28, 0.28) * R + (acentuada ? ACENTO_ST : 0)
     const glide = (ultima ? c.glide : rng.range(-0.3, 0.3)) * R
     syllables.push({
       t,
       dur,
       pitch: hz(v.pitch, semi),
       pitchEnd: hz(v.pitch, semi + glide),
-      open: rng.range(0.35, 1),
+      open: Math.min(1, rng.range(0.35, 1) + (acentuada ? ACENTO_OPEN : 0)),
       onset: rng.weighted(ONSETS),
       vowel: rng.range(0, 1),
+      acento: acentuada,
     })
-    t += dur + paso * (1 - SONIDO) * rng.range(0.7, 1.3)
+    t += dur + paso * (1 - sonido) * rng.range(0.7, 1.3)
   }
 
   const last = syllables[n - 1]
