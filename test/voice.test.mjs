@@ -179,6 +179,39 @@ describe('voice: la frase está bien formada', () => {
     )
   })
 
+  it('la melodía continua no da escalones entre sílabas', () => {
+    // El tercer eje. Con una nota por sílaba, el tono salta 2,4 semitonos de media al
+    // pasar de una a la siguiente — eso no es hablar, es tocar notas sueltas. Con la curva
+    // continua el salto baja a medio semitono, que es ruido de la propia curva.
+    const st = (a, b) => Math.abs(12 * Math.log2(a / b))
+    const medio = (modo) => {
+      const saltos = []
+      for (const s of SEEDS) {
+        const f = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: modo })
+        for (let i = 0; i < f.syllables.length - 1; i++) {
+          saltos.push(st(f.syllables[i + 1].pitch, f.syllables[i].pitchEnd))
+        }
+      }
+      return saltos.reduce((a, b) => a + b, 0) / saltos.length
+    }
+    const conSaltos = medio('saltos')
+    const continua = medio('continua')
+    assert.ok(continua < conSaltos / 3, `saltos ${conSaltos.toFixed(2)} st vs continua ${continua.toFixed(2)}`)
+    assert.ok(continua < 1.2, `la curva continua salta ${continua.toFixed(2)} st`)
+  })
+
+  it('cambiar de melodía no cambia NADA más', () => {
+    // Es lo que hace que compararlas de oído mida el eje y no otra cosa: el orden de
+    // tiradas del rng es el mismo en los dos modos.
+    for (const s of SEEDS) {
+      const sinTono = (f) => f.syllables.map(({ pitch, pitchEnd, ...r }) => r)
+      const a = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: 'saltos' })
+      const b = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: 'continua' })
+      assert.deepEqual(sinTono(b), sinTono(a), `la seed ${s} cambia algo más que el tono`)
+      assert.equal(b.dur, a.dur)
+    }
+  })
+
   it('una voz de una sola sílaba no revienta', () => {
     const f = voice.phrase({ ...makeCharacter(7).voice, length: 1 }, makeRng(3))
     assert.equal(f.syllables.length, 1)

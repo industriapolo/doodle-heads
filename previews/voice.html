@@ -57,19 +57,33 @@ function audio() {
 // desde fuera ha dado un número que mejoraba mientras el oído decía que no. Así que en vez
 // de una receta y una teoría, varias recetas bien distintas y un oído — el de Jorge — que
 // diga cuál va por buen camino. La que gane se queda y las demás se borran.
+// Tres ejes, y cada receta enciende unos cuantos:
+//   TIMBRE  `glotal`      — fuente de pulso glotal en vez de sierra
+//   RITMO   `articula`    — la sílaba suena el 65 % de lo que ocupa, el resto es cierre
+//   MELODÍA `continua`    — una sola curva de tono para la frase, no una nota por sílaba
+// La base es glotal en todas menos la vieja, porque es por donde Jorge dijo que iba.
 const RECETAS = {
-  vieja: { crear: (c) => createSpeechV1(c) },
-  actual: { crear: (c) => createSpeech(c) },
-  glotal: { crear: (c) => createSpeech(c, { fuente: 'glotal' }) },
-  articulada: { crear: (c) => createSpeech(c, { articula: true }) },
-  'glotal+articulada': { crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }) },
+  vieja: { crear: (c) => createSpeechV1(c), frase: {} },
+  glotal: { crear: (c) => createSpeech(c, { fuente: 'glotal' }), frase: {} },
+  'glotal+articulada': {
+    crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }),
+    frase: {},
+  },
+  'glotal+melodía': {
+    crear: (c) => createSpeech(c, { fuente: 'glotal' }),
+    frase: { melodia: 'continua' },
+  },
+  'glotal+articulada+melodía': {
+    crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }),
+    frase: { melodia: 'continua' },
+  },
 }
 const motores = new Map()
 function motorDe(nombre) {
   if (!motores.has(nombre)) motores.set(nombre, RECETAS[nombre].crear(audio()))
   return motores.get(nombre)
 }
-let receta = 'actual'
+let receta = 'glotal+melodía'
 const motor = () => motorDe(receta)
 const motorV1 = () => motorDe('vieja')
 
@@ -84,7 +98,7 @@ function hablar(entry) {
   const k = mismaFrase ? 0 : turno.get(entry.seed) ?? 0
   if (!mismaFrase) turno.set(entry.seed, k + 1)
   const rng = makeRng(entry.seed).fork(SALT.voice).fork(k)
-  const frase = voice.phrase(ch.voice, rng)
+  const frase = voice.phrase(ch.voice, rng, RECETAS[receta].frase)
   s.speak(ch.voice, frase, entry.seed)
   entry.canvas.style.outline = '2px solid #E5117F'
   setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
@@ -153,18 +167,21 @@ btnAB.title = 'la misma frase con la receta vieja y con la que esté elegida'
 btnAB.addEventListener('click', () => {
   const entry = bajoElRaton || preview.cells[0]
   const ch = makeCharacter(entry.seed, preview.bands)
-  const frase = voice.phrase(ch.voice, makeRng(entry.seed).fork(SALT.voice).fork(0))
-  const espera = Math.round(frase.dur * 1000) + 500
+  const rngDe = () => makeRng(entry.seed).fork(SALT.voice).fork(0)
+  const fraseA = voice.phrase(ch.voice, rngDe(), RECETAS.vieja.frase)
+  const fraseB = voice.phrase(ch.voice, rngDe(), RECETAS[receta].frase)
+  const frase = fraseA
+  const espera = Math.round(Math.max(fraseA.dur, fraseB.dur) * 1000) + 500
   const marcar = (txt) => {
     btnAB.textContent = txt
     entry.canvas.style.outline = '2px solid #E5117F'
     setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
   }
   marcar('A: vieja…')
-  motorV1().speak(ch.voice, frase, entry.seed)
+  motorV1().speak(ch.voice, fraseA, entry.seed)
   setTimeout(() => {
     marcar(`B: ${receta}…`)
-    motor().speak(ch.voice, frase, entry.seed)
+    motor().speak(ch.voice, fraseB, entry.seed)
     setTimeout(() => (btnAB.textContent = 'A/B (vieja → elegida)'), espera)
   }, espera)
 })
