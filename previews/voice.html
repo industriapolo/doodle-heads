@@ -47,21 +47,31 @@ const preview = mountPreview({
 // El AudioContext se crea en el primer gesto y se reutiliza: los navegadores no dejan
 // sonar uno creado al cargar, y crear uno por frase se queda sin ranuras enseguida.
 let ctx = null
-let speech = null
-let speechV1 = null
 function audio() {
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
   if (ctx.state === 'suspended') ctx.resume()
   return ctx
 }
-function motor() {
-  if (!speech) speech = createSpeech(audio())
-  return speech
+
+// Las RECETAS. Existen porque «suena robótico» no se puede medir: cada intento de medirlo
+// desde fuera ha dado un número que mejoraba mientras el oído decía que no. Así que en vez
+// de una receta y una teoría, varias recetas bien distintas y un oído — el de Jorge — que
+// diga cuál va por buen camino. La que gane se queda y las demás se borran.
+const RECETAS = {
+  vieja: { crear: (c) => createSpeechV1(c) },
+  actual: { crear: (c) => createSpeech(c) },
+  glotal: { crear: (c) => createSpeech(c, { fuente: 'glotal' }) },
+  articulada: { crear: (c) => createSpeech(c, { articula: true }) },
+  'glotal+articulada': { crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }) },
 }
-function motorV1() {
-  if (!speechV1) speechV1 = createSpeechV1(audio())
-  return speechV1
+const motores = new Map()
+function motorDe(nombre) {
+  if (!motores.has(nombre)) motores.set(nombre, RECETAS[nombre].crear(audio()))
+  return motores.get(nombre)
 }
+let receta = 'actual'
+const motor = () => motorDe(receta)
+const motorV1 = () => motorDe('vieja')
 
 // El número de frase por personaje. Es lo que hace que dos clicks seguidos digan cosas
 // distintas y que la misma seed diga siempre lo mismo en el mismo turno.
@@ -125,9 +135,21 @@ for (const entry of preview.cells) {
   entry.canvas.addEventListener('pointerenter', () => (bajoElRaton = entry))
 }
 
+const selReceta = document.createElement('select')
+selReceta.title = 'qué receta de síntesis se usa al pulsar una cara y en «recorrer»'
+for (const n of Object.keys(RECETAS)) {
+  const o = document.createElement('option')
+  o.value = n
+  o.textContent = `receta: ${n}`
+  selReceta.append(o)
+}
+selReceta.value = receta
+selReceta.addEventListener('change', () => (receta = selReceta.value))
+cabecera.append(selReceta)
+
 const btnAB = document.createElement('button')
-btnAB.textContent = 'A/B (vieja → nueva)'
-btnAB.title = 'la misma frase con la receta de antes y con la de ahora'
+btnAB.textContent = 'A/B (vieja → elegida)'
+btnAB.title = 'la misma frase con la receta vieja y con la que esté elegida'
 btnAB.addEventListener('click', () => {
   const entry = bajoElRaton || preview.cells[0]
   const ch = makeCharacter(entry.seed, preview.bands)
@@ -141,13 +163,13 @@ btnAB.addEventListener('click', () => {
   marcar('A: vieja…')
   motorV1().speak(ch.voice, frase, entry.seed)
   setTimeout(() => {
-    marcar('B: nueva…')
+    marcar(`B: ${receta}…`)
     motor().speak(ch.voice, frase, entry.seed)
-    setTimeout(() => (btnAB.textContent = 'A/B (vieja → nueva)'), espera)
+    setTimeout(() => (btnAB.textContent = 'A/B (vieja → elegida)'), espera)
   }, espera)
 })
 cabecera.append(btnAB)
 
 // para medir desde consola: ver el comentario de arriba sobre OfflineAudioContext
-window.__voice = { voice, makeCharacter, createSpeech, createSpeechV1, preview, hablar, SALT, makeRng }
+window.__voice = { voice, makeCharacter, createSpeech, createSpeechV1, RECETAS, preview, hablar, SALT, makeRng }
 </script>

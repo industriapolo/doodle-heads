@@ -31,7 +31,16 @@ const MAX_VOCES = 2 // dos a la vez; una tercera corta a la más vieja
 // juguete: nada en una garganta se mueve en línea recta. Son constantes de tiempo: se
 // llega al 95 % en 3τ, así que 3,5 ms de ataque son ~10 ms reales y 16 de caída, ~50.
 const TAU_AT = 0.0035
-const TAU_DE = 0.016
+// La caída tiene que caber en el hueco entre sílabas. Con τ = 16 ms tardaba ~50 ms en
+// apagarse y los huecos duran 33–75: la frase se convertía en un zumbido continuo — medido,
+// el silencio pasó del 31–39 % (v1) al 4–7 %. Un tono sostenido con un filtro barriendo es
+// exactamente lo que se oye como robot, así que la caída vuelve a ser rápida sin dejar de
+// ser curva: 6 ms de constante son ~18 ms de apagado, muy lejos todavía de un click.
+const TAU_DE = 0.006
+// El CIERRE de una plosiva: una /p/ no es un golpe, es un silencio y luego un golpe. Sin
+// callar antes, la ráfaga se superpone a la vocal anterior y se oye como un chasquido
+// encima de un zumbido.
+const CIERRE = 0.05
 // Lo que se le deja a la última sílaba para apagarse antes de parar las fuentes. Cortar
 // una cola exponencial a medias es, literalmente, un click.
 const COLA = 0.12
@@ -68,6 +77,23 @@ const F_MIN = 300
 const F_MAX = 2800
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
+
+/**
+ * El pulso glotal como onda periódica: los armónicos caen como 1/n² en vez del 1/n de una
+ * sierra, que es la diferencia entre un pliegue vocal cerrándose y un oscilador. Una
+ * sierra tiene demasiada energía arriba y por eso zumba.
+ */
+let ondaCache = null
+function ondaGlotal(ctx) {
+  if (ondaCache && ondaCache.ctx === ctx) return ondaCache.onda
+  const N = 40
+  const real = new Float32Array(N)
+  const imag = new Float32Array(N)
+  for (let n = 1; n < N; n++) imag[n] = 1 / (n * n)
+  const onda = ctx.createPeriodicWave(real, imag)
+  ondaCache = { ctx, onda }
+  return onda
+}
 
 /** Formantes de una sílaba, ya colocados por el timbre y topados al rango útil. */
 function formantes(vowel, timbre) {
@@ -131,7 +157,15 @@ function pulso(param, t0, dur, pico) {
  *
  * @param ctx  un AudioContext, o un OfflineAudioContext para medirlo sin altavoces.
  */
-export function createSpeech(ctx) {
+/**
+ * @param opts.fuente   'sierra' (la de siempre) o 'glotal' — un pulso de pliegue vocal,
+ *                      con el espectro cayendo el doble de rápido. Menos zumbido.
+ * @param opts.articula si es true, la voz CALLA de verdad ~50 ms antes de cada sílaba con
+ *                      consonante, en vez de encadenarlas. Un cierre es lo que hace que
+ *                      una plosiva sea una plosiva, y separa las sílabas como el habla.
+ */
+export function createSpeech(ctx, opts = {}) {
+  const { fuente = 'sierra', articula = false } = opts
   const master = ctx.createGain()
   master.gain.value = MASTER
 
@@ -198,6 +232,7 @@ export function createSpeech(ctx) {
       cuerpo.gain.value = 0
       const osc = ctx.createOscillator()
       osc.type = 'sawtooth'
+      if (fuente === 'glotal') osc.setPeriodicWave(ondaGlotal(ctx))
       osc.connect(cuerpo)
       // La segunda es TRIANGULAR, no otra sierra: dos sierras suman armónicos agudos y lo
       // que sale es zumbido. Una triangular desafinada añade batido sin añadir brillo, que
@@ -229,7 +264,9 @@ export function createSpeech(ctx) {
       jitterSrc.loop = true
       const jitterLp = ctx.createBiquadFilter()
       jitterLp.type = 'lowpass'
-      jitterLp.frequency.value = 30
+      // 30 Hz era un vaivén tan lento que se oía como desafinar, no como voz. El jitter de
+      // una garganta es de ciclo a ciclo: rápido y pequeño.
+      jitterLp.frequency.value = 260
       const jitterG = ctx.createGain()
       jitterG.gain.value = 6 + v.rough * 10 // en cents
       jitterSrc.connect(jitterLp)
@@ -319,6 +356,12 @@ export function createSpeech(ctx) {
         desliza(gf2.gain, f.g2, arranque)
         desliza(bp1.frequency, f.f1, a + 0.01, GLIDE)
         desliza(bp2.frequency, f.f2, a + 0.01, GLIDE)
+        // ...y siguen moviéndose HASTA EL FINAL. Que el barrido acabe a los 50 ms dejaba
+        // el resto de la sílaba con el filtro clavado, o sea una nota de sintetizador con
+        // vocal. La boca no se queda quieta mientras suena.
+        const fFin = formantes(s.vowelEnd ?? s.vowel, v.timbre)
+        desliza(bp1.frequency, fFin.f1, a + s.dur * 0.35, s.dur * 0.3)
+        desliza(bp2.frequency, fFin.f2, a + s.dur * 0.35, s.dur * 0.3)
 
         // El tono sí puede saltar: la fase del oscilador sigue siendo continua, así que
         // un escalón de frecuencia no rompe la onda. Lo que no puede saltar es la
@@ -334,6 +377,16 @@ export function createSpeech(ctx) {
         // bajó un 12 % respecto a la v1 para compensar el tercer formante y las colas
         // exponenciales, que rellenan los huecos entre sílabas y suben el RMS.
         const pico = 0.16 + 0.44 * s.open
+        // Con `articula`, la sílaba SUENA menos de lo que ocupa: el resto es cierre. Sin
+        // esto, forzar el silencio antes de la siguiente no hacía nada — la caída ya había
+        // llegado a cero por su cuenta (medido: 0,09 de diferencia, o sea ninguna).
+        const son = articula ? s.dur * 0.65 : s.dur
+        // Cerrar antes de una plosiva. Es lo que la hace plosiva: la presión se acumula
+        // detrás de unos labios cerrados, y lo que se oye es la soltada.
+        if (s.onset === 'pop' || (articula && s.onset !== 'none')) {
+          cuerpo.gain.setTargetAtTime(0, Math.max(0, a - CIERRE), 0.004)
+        }
+
         if (s.onset === 'nasal') {
           // 25 ms de zumbido con el primer formante muy grave antes de abrir: es la /m/.
           // Se recorta contra el final de la sílaba anterior para no montarse encima.
@@ -342,11 +395,11 @@ export function createSpeech(ctx) {
           desliza(bp1.frequency, f.f1, a + 0.01, GLIDE)
           // el zumbido nasal entra bajito y la vocal abre: dos objetivos encadenados
           cuerpo.gain.setTargetAtTime(pico * 0.28, Math.max(0, pre), TAU_AT)
-          envSilaba(cuerpo.gain, a, s.dur, pico)
+          envSilaba(cuerpo.gain, a, son, pico)
         } else {
-          envSilaba(cuerpo.gain, a, s.dur, pico)
+          envSilaba(cuerpo.gain, a, son, pico)
         }
-        envSilaba(rutas.soplo.gain, a, s.dur, v.breath * 0.5)
+        envSilaba(rutas.soplo.gain, a, son, v.breath * 0.5)
 
         // La ráfaga de consonante: más larga y mucho más floja que antes (era 8 ms a 0,9,
         // que no es una consonante, es un martillazo).

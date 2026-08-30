@@ -124,6 +124,10 @@ export function phrase(v, rng) {
       open: Math.min(1, rng.range(0.35, 1) + (acentuada ? ACENTO_OPEN : 0)),
       onset: rng.weighted(ONSETS),
       vowel: rng.range(0, 1),
+      // La vocal DERIVA a lo largo de la sílaba. Una vocal quieta es una nota de
+      // sintetizador con un filtro fijo: el timbre tiene que moverse todo el rato, no
+      // solo en el ataque. Es lo que en un idioma de verdad serían los diptongos.
+      vowelEnd: Math.min(1, Math.max(0, rng.range(0, 1) * 0.45 + 0.55 * rng.range(0, 1))),
       acento: acentuada,
     })
     t += dur + paso * (1 - sonido) * rng.range(0.7, 1.3)
