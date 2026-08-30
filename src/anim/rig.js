@@ -76,9 +76,6 @@ const MOODS = [
 ]
 const NEUTRAL = { tilt: 0, lift: 0, curve: 0, open: 0, raise: 0 }
 
-/** Los ánimos de la DERIVA. `react` no los usa: tiene su propia tabla. */
-export const MOOD_NAMES = MOODS.map((m) => m.name)
-
 // --- reacciones ------------------------------------------------------------
 //
 // Tabla APARTE de MOODS, y no por gusto de duplicar: una reacción y una deriva son cosas

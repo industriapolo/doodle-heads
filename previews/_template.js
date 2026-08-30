@@ -361,21 +361,31 @@ function mount(opts) {
       input.value = bands[groupName][name].p
       dual.append(track, fill, input)
       row.append(dual)
-      const sync = () => {
+      // PINTAR y ESCRIBIR son dos cosas. Al construir el panel solo se pinta: escribir
+      // metería en `bands` el valor que el navegador ha cuadriculado al asignarlo al
+      // slider, y eso es una banda que nadie ha tocado haciéndose pasar por dirección de
+      // arte. Solo el evento `input` —una mano en el tirador— escribe.
+      const pinta = () => {
         const p = parseFloat(input.value)
-        bands[groupName][name] = { p }
         fill.style.left = '0%'
         fill.style.width = p * 100 + '%'
         val.textContent = Math.round(p * 100) + '%'
         markTouched()
+      }
+      const sync = () => {
+        bands[groupName][name] = { p: parseFloat(input.value) }
+        pinta()
         commit()
       }
       input.addEventListener('input', sync)
       undo.addEventListener('click', () => {
-        input.value = declaredOne(groupName, name).p
-        sync()
+        // el ↺ sí escribe: devuelve la banda declarada, exacta, no la que dé el slider
+        bands[groupName][name] = declaredOne(groupName, name)
+        input.value = bands[groupName][name].p
+        pinta()
+        commit()
       })
-      sync()
+      pinta()
       return row
     }
 
@@ -398,6 +408,20 @@ function mount(opts) {
     dual.append(track, fill, lo, hi)
     row.append(dual)
 
+    // Igual que en los booleanos: al construir solo se PINTA. El navegador cuadricula el
+    // valor al asignarlo al `input[type=range]`, así que escribirlo de vuelta metía en
+    // `bands` una banda movida que nadie había tocado — y eso, en `character.js`, apaga
+    // al arquetipo en ese parámetro. Era la razón de ser del epsilon de `touchedBands`.
+    const pinta = () => {
+      const [a, b] = bands[groupName][name]
+      const span = def.max - def.min
+      fill.style.left = ((a - def.min) / span) * 100 + '%'
+      fill.style.width = ((b - a) / span) * 100 + '%'
+      const u = def.unit || ''
+      val.textContent = a === b ? `${fmt(a)}${u}` : `${fmt(a)} – ${fmt(b)}${u}`
+      row.classList.toggle('fixed', a === b)
+      markTouched()
+    }
     const sync = (moved) => {
       let a = parseFloat(lo.value)
       let b = parseFloat(hi.value)
@@ -406,24 +430,20 @@ function mount(opts) {
         if (moved === 'lo') { b = a; hi.value = b } else { a = b; lo.value = a }
       }
       bands[groupName][name] = [a, b]
-      const span = def.max - def.min
-      fill.style.left = ((a - def.min) / span) * 100 + '%'
-      fill.style.width = ((b - a) / span) * 100 + '%'
-      const u = def.unit || ''
-      val.textContent = a === b ? `${fmt(a)}${u}` : `${fmt(a)} – ${fmt(b)}${u}`
-      row.classList.toggle('fixed', a === b)
-      markTouched()
+      pinta()
       commit()
     }
     lo.addEventListener('input', () => sync('lo'))
     hi.addEventListener('input', () => sync('hi'))
     undo.addEventListener('click', () => {
       const d = declaredOne(groupName, name)
+      bands[groupName][name] = d
       lo.value = d[0]
       hi.value = d[1]
-      sync()
+      pinta()
+      commit()
     })
-    sync()
+    pinta()
     return row
   }
 

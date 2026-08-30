@@ -235,6 +235,7 @@ for (let i = 0; i < COUNT; i++) {
 
   const a = makeActor(randomSeed(), { canvas, tag, fav, ctx: setupCanvas(canvas, CELL) })
   a.voiceSeed = a.seed
+  a.idx = i // su sitio en la rejilla, para poder pedir el centro de su celda
   // setupCanvas deja width/height inline en px FIJOS (lo que necesitan las previews);
   // aquí manda la columna del grid: el canvas fluye como una imagen y el cuadrado lo
   // pone su ratio intrínseco. Sin esto, columnas < CELL px = canvases pisándose.
@@ -366,6 +367,7 @@ function conBounce(ctx, b, dibujar) {
 }
 
 function redraw(a, t = 0, faceChanged = true) {
+  repescarMirada(a)
   ensureLayers(a)
   if (!a.layout) {
     clear(a.sctx, a.palette.bg)
@@ -417,6 +419,13 @@ const clamp1 = (v) => (v < -1 ? -1 : v > 1 ? 1 : v)
 // Los centros de celda se cachean: `getBoundingClientRect` fuerza layout, y a treinta por
 // evento de puntero eso es tirar el frame. Solo cambian al redimensionar o al hacer
 // scroll, que es cuando se invalidan.
+// El último sitio donde se vio el puntero. Hace falta porque el reparto de miradas solo
+// ocurre en `pointermove`: sin esto, cuando el coro suelta a un vecino (900 ms mirando a
+// quien recibió el click), ese vecino se iba al vagabundeo aunque el ratón siguiera
+// quieto encima de la página. Un ratón inmóvil dejaba de ser mirado por haber hecho click
+// cerca.
+let ultimoPuntero = null
+
 let centros = null
 const invalidarCentros = () => { centros = null }
 window.addEventListener('resize', invalidarCentros)
@@ -435,16 +444,31 @@ function centrosDeCelda() {
 // El coro tiene prioridad sobre el puntero mientras dura: el reparto se hace en cada
 // pointermove, y sin el candado mover el ratón un píxel lo borraría antes de verse.
 function mirarA(puntero) {
+  ultimoPuntero = puntero
   const c = puntero && centrosDeCelda()
   for (let i = 0; i < actors.length; i++) {
     if (actors[i].gazeHold !== null) continue
-    actors[i].gazeTarget = puntero
-      ? {
-          x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
-          y: clamp1((puntero.y - c[i].y) / GAZE_REACH),
-        }
-      : null
+    actors[i].gazeTarget = puntero ? objetivoDe(i, puntero, c) : null
   }
+}
+
+const objetivoDe = (i, puntero, c = centrosDeCelda()) => ({
+  x: clamp1((puntero.x - c[i].x) / GAZE_REACH),
+  y: clamp1((puntero.y - c[i].y) / GAZE_REACH),
+})
+
+/**
+ * Devolverle el puntero a un actor al que el coro acaba de soltar.
+ *
+ * Va colgado del repintado y no de un temporizador porque el host no tiene tic propio: el
+ * único momento en que ve a un actor concreto es cuando el rig le pide dibujarlo. Y la
+ * caducidad del coro la lleva el rig, en SU reloj — un `setTimeout` se dispararía a
+ * destiempo con la animación pausada. Es barato: solo entra cuando el actor no mira a
+ * ningún sitio, que es justo el frame siguiente al vencimiento.
+ */
+function repescarMirada(a) {
+  if (!ultimoPuntero || a.gazeHold !== null || a.gazeTarget !== null) return
+  a.gazeTarget = objetivoDe(a.idx, ultimoPuntero)
 }
 
 window.addEventListener('pointermove', (e) => mirarA({ x: e.clientX, y: e.clientY }))

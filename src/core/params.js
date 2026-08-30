@@ -44,10 +44,12 @@ export function bandsOf(PARAMS) {
  * banda de fábrica se hiciera pasar por dirección de arte y borrara el arquetipo en
  * silencio.
  *
- * La tolerancia numérica es MEDIO PASO de slider porque el navegador cuadricula el valor
- * del `input[type=range]` al grid de `step` al asignarlo: una banda declarada que no cae
- * en el grid vuelve del panel movida, sin que nadie la haya tocado, y como mucho por medio
- * paso. Por debajo de eso la diferencia no puede venir de una mano.
+ * La tolerancia numérica es MEDIO PASO de slider: es lo más que puede moverse una banda
+ * sin que la haya movido una mano, porque el navegador cuadricula el valor del
+ * `input[type=range]` al grid de `step`. Hoy el panel ya no escribe ese valor cuadriculado
+ * —al construirse solo pinta— así que la tolerancia es cinturón además de tirantes; se
+ * queda porque una banda pegada por otro camino (una config a mano, un almacén viejo) sí
+ * puede traerlo.
  *
  * Las claves que ya no existen en PARAMS se descartan: son restos de un `localStorage`
  * viejo, y colarlas en el sorteo es ruido que nadie puede ver ni corregir desde el panel.
@@ -63,11 +65,6 @@ export function touchedBands(PARAMS, bands) {
   return out
 }
 
-// El `+ EPS` no es holgura, es ruido de coma flotante: hay bandas declaradas que caen
-// EXACTAMENTE en medio paso del grid (`hair.fringeShadow` 0.015 con paso 0.002), y en
-// binario ese medio paso sale un pelo por encima de `step / 2`. Sin el epsilon esas filas
-// nacerían marcadas como tocadas nada más abrir el panel.
-const EPS = 1e-9
 const SIN_STEP = 1e-6 // paso supuesto cuando el parámetro no declara ninguno
 
 function differs(def, b) {
@@ -88,7 +85,7 @@ function differs(def, b) {
   }
   if (!Array.isArray(b) || b.length < 2) return true
   const [lo, hi] = def.range || [def.min, def.max]
-  const tol = (def.step ?? SIN_STEP) / 2 + EPS
+  const tol = (def.step ?? SIN_STEP) / 2
   return Math.abs(b[0] - lo) > tol || Math.abs(b[1] - hi) > tol
 }
 

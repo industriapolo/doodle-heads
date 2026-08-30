@@ -41,8 +41,11 @@ describe('touchedBands', () => {
   })
 
   it('numérico: por debajo de medio paso no es un toque, por encima sí', () => {
-    // Medio paso es lo que el navegador puede mover una banda él solo al cuadricular el
-    // valor del slider. Por debajo de eso la diferencia no la ha puesto una mano.
+    // Medio paso es lo más que puede moverse una banda sin que la haya movido una mano:
+    // es lo que cuadricula el navegador al asignar un valor a un `input[type=range]`. El
+    // panel ya no escribe ese valor cuadriculado —al construirse solo pinta— así que hoy
+    // esto es cinturón además de tirantes: cubre las bandas que llegan por otros caminos,
+    // como una config escrita a mano o un almacén viejo.
     const casi = bandsOf(PARAMS)
     casi.ancho = [0.2 + 0.004, 0.8 - 0.004] // paso 0.01 → medio paso 0.005
     assert.deepEqual(touchedBands(PARAMS, casi), {})
@@ -140,22 +143,21 @@ describe('touchedBands sobre los módulos reales', () => {
       assert.deepEqual(touchedBands(mod.PARAMS, bandsOf(mod.PARAMS)), {})
     })
 
-    it(`${nombre}: tal y como las cuadricula el slider, tampoco`, () => {
-      // Lo que hace el navegador con `input.value = 0.015` cuando `step` es 0.002: la
-      // manda al punto del grid más cercano, empatando hacia arriba. Esa banda vuelve del
-      // panel movida sin que nadie la haya tocado, y es justo lo que absorbe medio paso.
-      const cuadriculada = {}
+    it(`${nombre}: un paso de slider SÍ es un toque`, () => {
+      // La otra mitad del contrato: la tolerancia de medio paso no puede tragarse un
+      // movimiento de verdad. Mover un tirador un paso tiene que verse en todos los
+      // parámetros, incluidos los de paso más fino.
       for (const [name, def] of Object.entries(mod.PARAMS)) {
         const b = bandsOf(mod.PARAMS)[name]
-        if (!Array.isArray(b)) { cuadriculada[name] = b; continue }
-        const snap = (v) => def.min + Math.round((v - def.min) / def.step) * def.step
-        cuadriculada[name] = [snap(b[0]), snap(b[1])]
+        if (!Array.isArray(b)) continue
+        // se mueve hacia donde haya sitio: hay bandas que arrancan pegadas a su tope
+        const cabeArriba = b[0] + def.step <= def.max
+        const movida = { [name]: [b[0] + (cabeArriba ? def.step : -def.step), b[1]] }
+        assert.ok(
+          name in touchedBands(mod.PARAMS, movida),
+          `${name}: un paso entero (${def.step}) no se detecta como toque`
+        )
       }
-      assert.deepEqual(
-        touchedBands(mod.PARAMS, cuadriculada),
-        {},
-        'una banda declarada fuera del grid del slider nace marcada como tocada'
-      )
     })
   }
 })
