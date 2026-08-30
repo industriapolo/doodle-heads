@@ -7,17 +7,34 @@
 //
 // La receta, de arriba abajo:
 //
-//   dos sierras ─┐
-//                ├→ envolvente por sílaba ─┬→ bandpass F1 ─┐
-//                │                          └→ bandpass F2 ─┤
-//   ruido ───────┼→ paso bajo → soplo ────────────────────  ┼→ frase → master → comp
-//                ├→ paso alto → siseo (ataques 'noise')     │
-//                └→ paso bajo → chasquido (ataques 'pop') ──┘
+//   pulso glotal ─┐
+//   triangular ───┤→ envolvente por sílaba ─┬→ bandpass F1 ─┐
+//                 │                         ├→ bandpass F2 ─┼→ paso bajo 3,8 kHz ─┐
+//                 │                         └→ bandpass F3 ─┘                     │
+//   ruido ────────┼→ paso bajo → soplo ────────────────────────────────────────────┤
+//                 ├→ paso alto → siseo (ataques 'noise') ─────────────────────────┤
+//                 └→ bandpass en F2 → plosiva (ataques 'pop') ────────────────────┘
+//                                                    → frase → master → compresor
 //
-// Los dos bandpass en paralelo son los FORMANTES, que es lo que hace que un zumbido se
-// oiga como una vocal. Sin ellos una sierra filtrada suena a sintetizador de los 80; con
+// Los tres bandpass en paralelo son los FORMANTES, que es lo que hace que un zumbido se
+// oiga como una vocal. Sin ellos, una fuente filtrada suena a sintetizador de los 80; con
 // ellos, a alguien diciendo algo. `vowel` mueve la pareja por el espacio vocálico y
 // `timbre` la coloca (nasal, redondo, chillón).
+//
+// Hubo un banco con tres ejes para poder elegir de oído — era la única forma, porque
+// «robótico» no se deja medir desde fuera: cada intento dio un número que mejoraba
+// mientras el oído decía que no. Ganaron los tres, así que ya no son opciones:
+//
+//   FUENTE   pulso glotal en vez de sierra. Una sierra tiene demasiada energía arriba y
+//            zumba; el pulso cae como 1/n², que es un pliegue vocal cerrándose.
+//   RITMO    cada sílaba suena el 65 % de lo que ocupa y calla antes de la siguiente. El
+//            cierre es lo que hace que una plosiva sea plosiva y lo que separa las
+//            sílabas; sin él la frase es un continuo.
+//   MELODÍA  no está aquí sino en `voice.js`: el tono es una curva de frase, no una nota
+//            por sílaba. Una sucesión de notas afinadas es lo que más suena a robot.
+//
+// La receta vieja —sierra, sin cierre, notas sueltas— vive en el commit `d7ca8f6` por si
+// alguna vez hay arqueología que hacer.
 //
 // Todo se programa sobre el reloj del AudioContext con setValueAtTime y rampas: ni un
 // setTimeout. El reloj de JS se va varios milisegundos y eso, en audio, se oye.
@@ -41,6 +58,9 @@ const TAU_DE = 0.006
 // callar antes, la ráfaga se superpone a la vocal anterior y se oye como un chasquido
 // encima de un zumbido.
 const CIERRE = 0.05
+// Lo que SUENA de cada sílaba; el resto es cierre. Es lo que separa una frase articulada de
+// un continuo: con las sílabas tocándose, la frase es un zumbido con un filtro encima.
+const SONANDO = 0.65
 // Lo que se le deja a la última sílaba para apagarse antes de parar las fuentes. Cortar
 // una cola exponencial a medias es, literalmente, un click.
 const COLA = 0.12
@@ -157,15 +177,7 @@ function pulso(param, t0, dur, pico) {
  *
  * @param ctx  un AudioContext, o un OfflineAudioContext para medirlo sin altavoces.
  */
-/**
- * @param opts.fuente   'sierra' (la de siempre) o 'glotal' — un pulso de pliegue vocal,
- *                      con el espectro cayendo el doble de rápido. Menos zumbido.
- * @param opts.articula si es true, la voz CALLA de verdad ~50 ms antes de cada sílaba con
- *                      consonante, en vez de encadenarlas. Un cierre es lo que hace que
- *                      una plosiva sea una plosiva, y separa las sílabas como el habla.
- */
-export function createSpeech(ctx, opts = {}) {
-  const { fuente = 'sierra', articula = false } = opts
+export function createSpeech(ctx) {
   const master = ctx.createGain()
   master.gain.value = MASTER
 
@@ -231,8 +243,7 @@ export function createSpeech(ctx, opts = {}) {
       const cuerpo = ctx.createGain()
       cuerpo.gain.value = 0
       const osc = ctx.createOscillator()
-      osc.type = 'sawtooth'
-      if (fuente === 'glotal') osc.setPeriodicWave(ondaGlotal(ctx))
+      osc.setPeriodicWave(ondaGlotal(ctx))
       osc.connect(cuerpo)
       // La segunda es TRIANGULAR, no otra sierra: dos sierras suman armónicos agudos y lo
       // que sale es zumbido. Una triangular desafinada añade batido sin añadir brillo, que
@@ -377,15 +388,13 @@ export function createSpeech(ctx, opts = {}) {
         // bajó un 12 % respecto a la v1 para compensar el tercer formante y las colas
         // exponenciales, que rellenan los huecos entre sílabas y suben el RMS.
         const pico = 0.16 + 0.44 * s.open
-        // Con `articula`, la sílaba SUENA menos de lo que ocupa: el resto es cierre. Sin
-        // esto, forzar el silencio antes de la siguiente no hacía nada — la caída ya había
-        // llegado a cero por su cuenta (medido: 0,09 de diferencia, o sea ninguna).
-        const son = articula ? s.dur * 0.65 : s.dur
+        // La sílaba SUENA menos de lo que ocupa: el resto es cierre. Sin esto, forzar el
+        // silencio antes de la siguiente no hacía nada — la caída ya llegaba a cero por su
+        // cuenta (medido en su día: 0,09 de diferencia, o sea ninguna).
+        const son = s.dur * SONANDO
         // Cerrar antes de una plosiva. Es lo que la hace plosiva: la presión se acumula
         // detrás de unos labios cerrados, y lo que se oye es la soltada.
-        if (s.onset === 'pop' || (articula && s.onset !== 'none')) {
-          cuerpo.gain.setTargetAtTime(0, Math.max(0, a - CIERRE), 0.004)
-        }
+        if (s.onset !== 'none') cuerpo.gain.setTargetAtTime(0, Math.max(0, a - CIERRE), 0.004)
 
         if (s.onset === 'nasal') {
           // 25 ms de zumbido con el primer formante muy grave antes de abrir: es la /m/.

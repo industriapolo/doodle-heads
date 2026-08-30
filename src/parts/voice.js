@@ -84,11 +84,12 @@ const HZ_MAX = 1200
 /**
  * La curva de tono de toda la frase, evaluable en cualquier instante.
  *
- * Es el tercer eje. Antes cada sílaba elegía su tono por su cuenta y entre una y la
- * siguiente había un escalón de 1,6 a 4,2 semitonos: eso no es hablar, es tocar notas
- * sueltas — y una sucesión de notas afinadas es exactamente lo que se oye como robot.
+ * Antes cada sílaba elegía su tono por su cuenta y entre una y la siguiente había un
+ * escalón de 2,4 semitonos de media: eso no es hablar, es tocar notas sueltas — y una
+ * sucesión de notas afinadas es exactamente lo que se oye como robot. Con la curva, el
+ * salto entre sílabas baja a 0,5 semitonos.
  *
- * Aquí los bandazos de cada sílaba dejan de ser saltos y pasan a ser los PUNTOS DE
+ * Los bandazos de cada sílaba dejan de ser saltos y pasan a ser los PUNTOS DE
  * CONTROL de una sola curva: se suavizan con sus vecinos y se interpola entre los centros
  * de sílaba. Cada sílaba lee su tono de entrada y de salida de esa curva, así que el final
  * de una y el principio de la siguiente caen casi en el mismo sitio, que es lo que hace
@@ -114,15 +115,9 @@ function curvaDeTono(centros, valores, base) {
  * Así la frase 3 de un personaje es siempre la misma frase 3, y no depende de cuántas
  * veces le hayan hecho click antes ni de en qué orden.
  *
- * @param opts.melodia  'saltos' (una nota por sílaba, lo de siempre) o 'continua' (una
- *                       sola curva para toda la frase). El orden de tiradas del rng es el
- *                       MISMO en los dos, así que duraciones, aperturas, ataques y vocales
- *                       salen idénticos y lo único que cambia es el tono: es lo que hace
- *                       que compararlos de oído mida el eje y no otra cosa.
  * @returns {{ syllables: Array, dur: number }} tiempos en SEGUNDOS desde el inicio.
  */
-export function phrase(v, rng, opts = {}) {
-  const continua = opts.melodia === 'continua'
+export function phrase(v, rng) {
   const n = Math.max(1, Math.round(v.length))
   const paso = 1 / v.rate
   const c = CONTOURS[v.contour] || CONTOURS.afirma
@@ -147,15 +142,18 @@ export function phrase(v, rng, opts = {}) {
     // sale además hacia arriba: es lo que la separa de ser solo una sílaba más larga.
     const semi =
       R * (c.from + (c.to - c.from) * u) + rng.range(-0.28, 0.28) * R + (acentuada ? ACENTO_ST : 0)
-    const glide = (ultima ? c.glide : rng.range(-0.3, 0.3)) * R
+    // La tirada del glissando por sílaba se sigue haciendo aunque la curva no la use: es
+    // parte de la secuencia del rng, y saltársela cambiaría la vocal y el ataque de todas
+    // las sílabas siguientes en todas las seeds ya guardadas.
+    if (!ultima) rng.range(-0.3, 0.3)
     syllables.push({
       t,
       dur,
-      // en modo continuo se rellenan después, cuando ya se conoce la frase entera
-      pitch: hz(v.pitch, semi),
-      pitchEnd: hz(v.pitch, semi + glide),
+      // se rellenan al final, cuando ya se conoce la frase entera y se puede trazar la
+      // curva de tono; aquí solo se guarda el material del que sale
+      pitch: 0,
+      pitchEnd: 0,
       semi,
-      glide,
       open: Math.min(1, rng.range(0.35, 1) + (acentuada ? ACENTO_OPEN : 0)),
       onset: rng.weighted(ONSETS),
       vowel: rng.range(0, 1),
@@ -172,30 +170,24 @@ export function phrase(v, rng, opts = {}) {
   // La frase acaba cuando acaba la última sílaba: el silencio de después no es frase.
   const total = last.t + last.dur
 
-  if (continua) {
-    // Los bandazos ya sorteados pasan a ser puntos de control, suavizados con sus vecinos:
-    // el mismo material aleatorio, pero leído como curva en vez de como escalones.
-    const crudo = syllables.map((sy) => sy.semi - R * (c.from + (c.to - c.from) * (sy.t / total)))
-    const suave = crudo.map((x, i) => {
-      const a = crudo[i - 1] ?? x
-      const b = crudo[i + 1] ?? x
-      return (a + 2 * x + b) / 4
-    })
-    // el acento sube como un bulto de la curva, no como un peldaño
-    const centros = syllables.map((sy) => sy.t + sy.dur / 2)
-    const base = (t) => R * (c.from + (c.to - c.from) * Math.min(1, t / total))
-    const tono = curvaDeTono(centros, suave, base)
-    for (let i = 0; i < n; i++) {
-      const sy = syllables[i]
-      const ultima = i === n - 1
-      sy.pitch = hz(v.pitch, tono(sy.t))
-      // el cierre de la frase se le añade al final de la última: es lo que la puntúa
-      sy.pitchEnd = hz(v.pitch, tono(sy.t + sy.dur) + (ultima ? c.glide * R : 0))
-    }
-  }
-  for (const sy of syllables) {
+  // Los bandazos ya sorteados son los PUNTOS DE CONTROL de la curva, suavizados con sus
+  // vecinos: el mismo material aleatorio, leído como curva en vez de como escalones. El
+  // acento sube como un bulto de esa curva, no como un peldaño.
+  const crudo = syllables.map((sy) => sy.semi - R * (c.from + (c.to - c.from) * (sy.t / total)))
+  const suave = crudo.map((x, i) => {
+    const a = crudo[i - 1] ?? x
+    const b = crudo[i + 1] ?? x
+    return (a + 2 * x + b) / 4
+  })
+  const centros = syllables.map((sy) => sy.t + sy.dur / 2)
+  const base = (t) => R * (c.from + (c.to - c.from) * Math.min(1, t / total))
+  const tono = curvaDeTono(centros, suave, base)
+  for (let i = 0; i < n; i++) {
+    const sy = syllables[i]
+    sy.pitch = hz(v.pitch, tono(sy.t))
+    // el cierre de la frase se le añade al final de la última: es lo que la puntúa
+    sy.pitchEnd = hz(v.pitch, tono(sy.t + sy.dur) + (i === n - 1 ? c.glide * R : 0))
     delete sy.semi
-    delete sy.glide
   }
 
   return { syllables, dur: total }

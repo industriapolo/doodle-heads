@@ -179,36 +179,32 @@ describe('voice: la frase está bien formada', () => {
     )
   })
 
-  it('la melodía continua no da escalones entre sílabas', () => {
-    // El tercer eje. Con una nota por sílaba, el tono salta 2,4 semitonos de media al
-    // pasar de una a la siguiente — eso no es hablar, es tocar notas sueltas. Con la curva
-    // continua el salto baja a medio semitono, que es ruido de la propia curva.
+  it('el tono no da escalones entre sílabas', () => {
+    // La melodía es una CURVA de frase, no una nota por sílaba. Con notas sueltas el tono
+    // saltaba 2,4 semitonos de media al pasar de una a la siguiente, y una sucesión de
+    // notas afinadas es lo que más suena a robot. Este número es el que no puede volver a
+    // subir: si alguien devuelve el tono a las sílabas, aquí se ve.
     const st = (a, b) => Math.abs(12 * Math.log2(a / b))
-    const medio = (modo) => {
-      const saltos = []
-      for (const s of SEEDS) {
-        const f = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: modo })
-        for (let i = 0; i < f.syllables.length - 1; i++) {
-          saltos.push(st(f.syllables[i + 1].pitch, f.syllables[i].pitchEnd))
-        }
+    const saltos = []
+    for (const { f } of TODAS) {
+      for (let i = 0; i < f.syllables.length - 1; i++) {
+        saltos.push(st(f.syllables[i + 1].pitch, f.syllables[i].pitchEnd))
       }
-      return saltos.reduce((a, b) => a + b, 0) / saltos.length
     }
-    const conSaltos = medio('saltos')
-    const continua = medio('continua')
-    assert.ok(continua < conSaltos / 3, `saltos ${conSaltos.toFixed(2)} st vs continua ${continua.toFixed(2)}`)
-    assert.ok(continua < 1.2, `la curva continua salta ${continua.toFixed(2)} st`)
+    const medio = saltos.reduce((a, b) => a + b, 0) / saltos.length
+    assert.ok(medio < 1.2, `el tono salta ${medio.toFixed(2)} st entre sílabas`)
   })
 
-  it('cambiar de melodía no cambia NADA más', () => {
-    // Es lo que hace que compararlas de oído mida el eje y no otra cosa: el orden de
-    // tiradas del rng es el mismo en los dos modos.
-    for (const s of SEEDS) {
-      const sinTono = (f) => f.syllables.map(({ pitch, pitchEnd, ...r }) => r)
-      const a = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: 'saltos' })
-      const b = voice.phrase(makeCharacter(s).voice, rngDeFrase(s, 0), { melodia: 'continua' })
-      assert.deepEqual(sinTono(b), sinTono(a), `la seed ${s} cambia algo más que el tono`)
-      assert.equal(b.dur, a.dur)
+  it('la curva pasa por donde dice el contorno', () => {
+    // La curva no puede haberse comido la puntuación de la frase: una pregunta sigue
+    // acabando más arriba de donde empezó, y una afirmación más abajo.
+    const base = { ...makeCharacter(42).voice, length: 6, pitchRange: 8 }
+    const de = (contour) => voice.phrase({ ...base, contour }, makeRng(1))
+    for (const [contour, sube] of [['pregunta', true], ['afirma', false]]) {
+      const f = de(contour)
+      const ini = f.syllables[0].pitch
+      const fin = f.syllables[f.syllables.length - 1].pitchEnd
+      assert.equal(fin > ini, sube, `${contour}: ${ini.toFixed(0)} → ${fin.toFixed(0)} Hz`)
     }
   })
 
@@ -218,10 +214,19 @@ describe('voice: la frase está bien formada', () => {
     assert.ok(f.dur > 0)
   })
 
-  it('con recorrido melódico cero, la frase es monótona pero válida', () => {
-    const f = voice.phrase({ ...makeCharacter(7).voice, pitchRange: 0 }, makeRng(3))
+  it('con recorrido melódico cero, solo se mueve el acento', () => {
+    // `pitchRange` a cero apaga la melodía, pero NO el acento: son dos cosas. El acento
+    // son 2 semitonos absolutos —una sílaba destacada existe también en una voz plana— y
+    // la curva los reparte suavemente entre sus vecinas. Nada más puede moverse.
+    const v = { ...makeCharacter(7).voice, pitchRange: 0 }
+    const f = voice.phrase(v, makeRng(3))
     for (const sy of f.syllables) {
-      assert.ok(Math.abs(sy.pitch - sy.pitchEnd) < 1e-9, 'sin recorrido no puede haber glissando')
+      for (const hz of [sy.pitch, sy.pitchEnd]) {
+        const st = Math.abs(12 * Math.log2(hz / v.pitch))
+        assert.ok(st <= 2.001, `sin recorrido, una sílaba se fue ${st.toFixed(2)} st`)
+      }
     }
+    const conAcento = f.syllables.find((sy) => sy.acento)
+    assert.ok(conAcento.pitch > v.pitch, 'el acento no levanta el tono')
   })
 })

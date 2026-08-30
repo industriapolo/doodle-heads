@@ -2,12 +2,9 @@
 <meta charset="utf-8">
 <script type="module">
 import { mountPreview } from './_template.js'
-import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
+import { makeCharacter, draw, paletteFor, SALT } from '../src/core/character.js'
 import { makeRng } from '../src/core/prng.js'
-import { SALT } from '../src/core/character.js'
 import { createSpeech } from '../src/anim/speech.js'
-// La receta vieja, SOLO aquí: es la referencia del botón A/B. Ver src/anim/_archivo/.
-import { createSpeech as createSpeechV1 } from '../src/anim/_archivo/speech-v1.js'
 import * as head from '../src/parts/head.js'
 import * as voice from '../src/parts/voice.js'
 
@@ -21,9 +18,12 @@ import * as voice from '../src/parts/voice.js'
 //  · «misma frase» clava el número de frase en 0, así que cada pasada dice exactamente lo
 //    mismo que la anterior. Sin eso, cada vuelta trae frases nuevas y no se sabe si lo
 //    que cambió fue el slider o el sorteo.
-//  · «A/B» toca la frase 0 del personaje bajo el ratón dos veces: primero con la receta
-//    vieja y luego con la de ahora. Comparar de memoria no vale — entre una escucha y la
-//    siguiente el oído se acostumbra y todo suena parecido.
+//  · las bandas se copian con «copiar rangos», como las de cualquier otra parte.
+//
+// Aquí hubo un banco de cinco recetas y un A/B contra la síntesis vieja, para poder elegir
+// de oído entre tres ejes — era la única forma, porque «robótico» no se deja medir desde
+// fuera. Ya está elegido (pulso glotal + articulación + melodía de curva), así que el
+// banco se fue: era andamio. Vive en el commit `dfc1636` si hiciera falta rehacerlo.
 const preview = mountPreview({
   title: 'voice',
   groups: [
@@ -46,46 +46,16 @@ const preview = mountPreview({
 // --- audio ------------------------------------------------------------------
 // El AudioContext se crea en el primer gesto y se reutiliza: los navegadores no dejan
 // sonar uno creado al cargar, y crear uno por frase se queda sin ranuras enseguida.
-let ctx = null
-function audio() {
-  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
-  if (ctx.state === 'suspended') ctx.resume()
-  return ctx
+let speech = null
+function motor() {
+  if (!speech) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    speech = createSpeech(ctx)
+    speech.ctx = ctx
+  }
+  if (speech.ctx.state === 'suspended') speech.ctx.resume()
+  return speech
 }
-
-// Las RECETAS. Existen porque «suena robótico» no se puede medir: cada intento de medirlo
-// desde fuera ha dado un número que mejoraba mientras el oído decía que no. Así que en vez
-// de una receta y una teoría, varias recetas bien distintas y un oído — el de Jorge — que
-// diga cuál va por buen camino. La que gane se queda y las demás se borran.
-// Tres ejes, y cada receta enciende unos cuantos:
-//   TIMBRE  `glotal`      — fuente de pulso glotal en vez de sierra
-//   RITMO   `articula`    — la sílaba suena el 65 % de lo que ocupa, el resto es cierre
-//   MELODÍA `continua`    — una sola curva de tono para la frase, no una nota por sílaba
-// La base es glotal en todas menos la vieja, porque es por donde Jorge dijo que iba.
-const RECETAS = {
-  vieja: { crear: (c) => createSpeechV1(c), frase: {} },
-  glotal: { crear: (c) => createSpeech(c, { fuente: 'glotal' }), frase: {} },
-  'glotal+articulada': {
-    crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }),
-    frase: {},
-  },
-  'glotal+melodía': {
-    crear: (c) => createSpeech(c, { fuente: 'glotal' }),
-    frase: { melodia: 'continua' },
-  },
-  'glotal+articulada+melodía': {
-    crear: (c) => createSpeech(c, { fuente: 'glotal', articula: true }),
-    frase: { melodia: 'continua' },
-  },
-}
-const motores = new Map()
-function motorDe(nombre) {
-  if (!motores.has(nombre)) motores.set(nombre, RECETAS[nombre].crear(audio()))
-  return motores.get(nombre)
-}
-let receta = 'glotal+melodía'
-const motor = () => motorDe(receta)
-const motorV1 = () => motorDe('vieja')
 
 // El número de frase por personaje. Es lo que hace que dos clicks seguidos digan cosas
 // distintas y que la misma seed diga siempre lo mismo en el mismo turno.
@@ -97,8 +67,7 @@ function hablar(entry) {
   const ch = makeCharacter(entry.seed, preview.bands)
   const k = mismaFrase ? 0 : turno.get(entry.seed) ?? 0
   if (!mismaFrase) turno.set(entry.seed, k + 1)
-  const rng = makeRng(entry.seed).fork(SALT.voice).fork(k)
-  const frase = voice.phrase(ch.voice, rng, RECETAS[receta].frase)
+  const frase = voice.phrase(ch.voice, makeRng(entry.seed).fork(SALT.voice).fork(k))
   s.speak(ch.voice, frase, entry.seed)
   entry.canvas.style.outline = '2px solid #E5117F'
   setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
@@ -142,51 +111,6 @@ btnMisma.addEventListener('click', () => {
 
 cabecera.append(btnRecorrer, btnMisma)
 
-// --- A/B: la receta vieja y la nueva, seguidas -------------------------------
-// Sobre el personaje que tenga el ratón encima. Si no hay ninguno, la primera celda.
-let bajoElRaton = null
-for (const entry of preview.cells) {
-  entry.canvas.addEventListener('pointerenter', () => (bajoElRaton = entry))
-}
-
-const selReceta = document.createElement('select')
-selReceta.title = 'qué receta de síntesis se usa al pulsar una cara y en «recorrer»'
-for (const n of Object.keys(RECETAS)) {
-  const o = document.createElement('option')
-  o.value = n
-  o.textContent = `receta: ${n}`
-  selReceta.append(o)
-}
-selReceta.value = receta
-selReceta.addEventListener('change', () => (receta = selReceta.value))
-cabecera.append(selReceta)
-
-const btnAB = document.createElement('button')
-btnAB.textContent = 'A/B (vieja → elegida)'
-btnAB.title = 'la misma frase con la receta vieja y con la que esté elegida'
-btnAB.addEventListener('click', () => {
-  const entry = bajoElRaton || preview.cells[0]
-  const ch = makeCharacter(entry.seed, preview.bands)
-  const rngDe = () => makeRng(entry.seed).fork(SALT.voice).fork(0)
-  const fraseA = voice.phrase(ch.voice, rngDe(), RECETAS.vieja.frase)
-  const fraseB = voice.phrase(ch.voice, rngDe(), RECETAS[receta].frase)
-  const frase = fraseA
-  const espera = Math.round(Math.max(fraseA.dur, fraseB.dur) * 1000) + 500
-  const marcar = (txt) => {
-    btnAB.textContent = txt
-    entry.canvas.style.outline = '2px solid #E5117F'
-    setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
-  }
-  marcar('A: vieja…')
-  motorV1().speak(ch.voice, fraseA, entry.seed)
-  setTimeout(() => {
-    marcar(`B: ${receta}…`)
-    motor().speak(ch.voice, fraseB, entry.seed)
-    setTimeout(() => (btnAB.textContent = 'A/B (vieja → elegida)'), espera)
-  }, espera)
-})
-cabecera.append(btnAB)
-
-// para medir desde consola: ver el comentario de arriba sobre OfflineAudioContext
-window.__voice = { voice, makeCharacter, createSpeech, createSpeechV1, RECETAS, preview, hablar, SALT, makeRng }
+// para medir desde consola con un OfflineAudioContext: duración, RMS y pico
+window.__voice = { voice, makeCharacter, createSpeech, preview, hablar, SALT, makeRng }
 </script>

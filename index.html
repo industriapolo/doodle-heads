@@ -465,10 +465,7 @@ let speech = null
 function motor() {
   if (!speech) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    // `glotal` de forma provisional: es por donde Jorge dijo que iba la cosa al comparar
-    // recetas en voice.html. Cuando elija una, esto deja de ser una opción y pasa a ser
-    // la única receta que hay.
-    speech = createSpeech(ctx, { fuente: 'glotal' })
+    speech = createSpeech(ctx)
     speech.ctx = ctx
   }
   if (speech.ctx.state === 'suspended') speech.ctx.resume()
