@@ -92,10 +92,21 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   con 0,4 s de silencio — es la prueba de conjunto: que no se confundan entre sí y que
   ninguna chirríe de más. «misma frase» clava el turno en 0, así que cada pasada dice
   exactamente lo mismo que la anterior; sin eso no se sabe si lo que cambió fue el slider
-  o el sorteo. Las bandas se copian con «copiar rangos» como las de cualquier parte.
-  Aquí NO hay test que valga: si suena bien o mal lo dice el oído de Jorge, y Claude solo
-  puede medir duración, RMS y pico con un OfflineAudioContext.
-- Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude.
+  o el sorteo. **«A/B»** toca la frase 0 del personaje bajo el ratón con la receta vieja
+  (`src/anim/_archivo/speech-v1.js`) y luego con la de ahora: comparar de memoria no vale,
+  entre una escucha y la siguiente el oído se acostumbra. Las bandas se copian con
+  «copiar rangos» como las de cualquier parte.
+  Aquí NO hay test que valga: si suena bien o mal lo dice el oído de Jorge. Claude solo
+  puede medir con un OfflineAudioContext, y con cuidado — la derivada de la onda está
+  dominada por el propio diente de sierra, y un salto de amplitud medido en un ataque de
+  ruido solo mide el ruido. Lo que sí distingue un click: el salto de un seguidor de picos
+  EXCLUYENDO los ataques.
+- **Otra voz sin tocar la cara**: el botón ♪ de cada celda del index re-sortea solo
+  `voiceSeed`. La cara no se mueve y la caché de capas estáticas no se tira.
+- Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude. El formato es
+  `seed` a secas, o `seed:voiceSeed` (hex) cuando la voz se ha re-sorteado con ♪. Se leen
+  los dos, y solo se escribe el largo cuando hace falta: una lista de caras sin tocar la
+  voz sigue siendo lo que era.
 - El index en modo «estilo: composer» se sincroniza en vivo con el panel (evento
   storage + focus). OJO: localStorage es por ORIGEN — un solo servidor levantado, o
   composer e index pueden mirar almacenes distintos.
@@ -134,6 +145,10 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   oscurece — abre un agujero claro. La barba se pinta la primera de `drawMass` y las
   sombras van después, así que hay que descontarla del recorte a mano (ya se hace con la
   sombra proyectada del pelo). Con la barba de rayitas no pasa: ahí debajo hay piel.
+- **El ruido del sintetizador es determinista** (mulberry32, no `Math.random`). Con ruido
+  aleatorio la misma frase sonaba distinta en cada recarga: inofensivo al oído, pero hace
+  imposible saber si un cambio mejoró algo o solo cambió el ruido. Costó dos medidas
+  contradictorias descubrirlo.
 - **El generador no carga Web Audio**: `speech.js` solo lo importan `index.html` y
   `previews/voice.html`. Dibujar una cara no puede depender de que exista un
   AudioContext, y un AudioContext no se puede crear fuera de un gesto del usuario.

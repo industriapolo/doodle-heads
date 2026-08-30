@@ -273,6 +273,25 @@ Ningún valor de voz depende de la cara ni del arquetipo. Si algún día queremo
 correlacionarlos —el grave con la cara ancha, pongamos— eso va en `archetypes.js`, que es
 donde vive toda la correlación entre partes.
 
+**`voiceSeed`: la voz se re-sortea sola.** `makeCharacter(seed, bands, paletteName,
+{ voiceSeed })` saca la voz de otra seed. Es lo único del personaje que se puede volver a
+tirar sin que cambie la cara, y hace falta: con una sola seed, buscarle voz a alguien
+obliga a tirar la cara que ya te gustaba. Por defecto `voiceSeed === seed` y el resultado
+es idéntico al de antes de que existiera la opción — `fork` no depende del estado
+consumido del rng, solo de la seed. El host la guarda por su cuenta: NO es una clave del
+personaje, para que el JSON de referencia siga siendo el que era.
+
+**Lo que suena y lo que se dibuja se calibran distinto.** Un click no es un pico, es
+amplitud que aparece en una muestra; y lo robótico no es un parámetro, es que dentro de
+cada sílaba no se mueva nada. Las dos reglas del sintetizador:
+
+  · **nada salta**. Ni la ganancia ni la frecuencia de un filtro resonante — a un bandpass
+    con Q alta le cambias la frecuencia de golpe y suena un «tuc» él solo, sin que ningún
+    nodo de ruido tenga la culpa. Todo se desliza con `setTargetAtTime`.
+  · **nada se está quieto**. Envolventes exponenciales, jitter de tono sin periodo (que no
+    es el vibrato: el vibrato es regular y se oye como canto), formantes que barren de la
+    consonante a la vocal. Lo que se oye como «ba» no es el golpe, es ese barrido.
+
 ## Escala de trabajo
 
 Espacio lógico **800×800** para todo dibujo. `core/canvas.js` escala por `devicePixelRatio`;

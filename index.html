@@ -50,6 +50,12 @@
     border: 0; cursor: pointer; opacity: 0; transition: opacity .12s;
   }
   .cell:hover .again { opacity: 1; }
+  .cell .voz {
+    position: absolute; right: 61px; top: 5px; font-size: 13px; line-height: 1;
+    color: #fff; background: rgba(0,0,0,.5); padding: 3px 6px; border-radius: 2px;
+    border: 0; cursor: pointer; opacity: 0; transition: opacity .12s;
+  }
+  .cell:hover .voz { opacity: 1; }
   .hint { color: #6d7379; font-size: 11px; margin: 14px 0 0; }
 </style>
 
@@ -64,8 +70,9 @@
 </header>
 <div id="grid"></div>
 <p class="hint">Los treinta miran al puntero. Pasa el ratón por encima de uno y te presta
-  atención; haz click y te contesta, con su propia voz. ↻ le sortea una seed nueva,
-  ★ lo guarda — «guardados · copiar» pone la lista en el portapapeles.</p>
+  atención; haz click y te contesta, con su propia voz. ♪ le busca otra voz sin tocarle la
+  cara, ↻ le sortea una seed nueva, ★ lo guarda — «guardados · copiar» pone la lista en el
+  portapapeles.</p>
 
 <script type="module">
 import { setupCanvas, clear, box, LOGICAL } from './src/core/canvas.js'
@@ -163,12 +170,33 @@ const gridEl = document.getElementById('grid')
 const actors = []
 
 // --- seeds guardados: la lista vive en localStorage, «copiar» la exporta ----
+//
+// Formato: "seed" a secas, o "seed:voiceSeed" cuando la voz se ha re-sorteado aparte.
+// Las dos se leen; solo se escribe la larga cuando hace falta, para que una lista de
+// caras sin tocar la voz siga siendo lo que era y se pueda seguir pegando a mano.
 const SAVED_KEY = 'doodle-seeds:saved'
 let savedSeeds = []
 try {
-  savedSeeds = JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') || []
+  // Se normaliza al leer: una lista vieja (solo caras) y una nueva (con voz) conviven, y
+  // `leerClave` deja las dos en la misma forma para lo que venga después.
+  savedSeeds = (JSON.parse(localStorage.getItem(SAVED_KEY) || '[]') || [])
+    .map((x) => String(x))
+    .filter((x) => Number.isFinite(leerClave(x).seed))
 } catch {}
 const savedBtn = document.getElementById('saved')
+
+/** Cómo se guarda este personaje. */
+const clave = (a) =>
+  a.voiceSeed === a.seed
+    ? a.seed.toString(16)
+    : `${a.seed.toString(16)}:${a.voiceSeed.toString(16)}`
+
+/** Lo contrario: "1f2:9ab" → { seed, voiceSeed }. Una clave sin `:` es voz = cara. */
+function leerClave(txt) {
+  const [s, v] = String(txt).split(':')
+  const seed = parseInt(s, 16)
+  return { seed, voiceSeed: v === undefined ? seed : parseInt(v, 16) }
+}
 
 function syncSaved() {
   localStorage.setItem(SAVED_KEY, JSON.stringify(savedSeeds))
@@ -196,10 +224,17 @@ for (let i = 0; i < COUNT; i++) {
   again.className = 'again'
   again.textContent = '↻'
   again.title = 'otra seed para este'
-  cell.append(canvas, tag, again, fav)
+  // La voz se re-sortea SOLA, sin tocar la cara. Con una sola seed, buscarle voz a un
+  // personaje obligaba a tirar la cara que ya te gustaba.
+  const voz = document.createElement('button')
+  voz.className = 'voz'
+  voz.textContent = '♪'
+  voz.title = 'otra voz para esta cara'
+  cell.append(canvas, tag, voz, again, fav)
   gridEl.append(cell)
 
   const a = makeActor(randomSeed(), { canvas, tag, fav, ctx: setupCanvas(canvas, CELL) })
+  a.voiceSeed = a.seed
   // setupCanvas deja width/height inline en px FIJOS (lo que necesitan las previews);
   // aquí manda la columna del grid: el canvas fluye como una imagen y el cuadrado lo
   // pone su ratio intrínseco. Sin esto, columnas < CELL px = canvases pisándose.
@@ -226,11 +261,15 @@ for (let i = 0; i < COUNT; i++) {
     e.stopPropagation() // re-sortear no es reaccionar
     reseed(a, randomSeed())
   })
+  voz.addEventListener('click', (e) => {
+    e.stopPropagation()
+    revoice(a, randomSeed())
+  })
   fav.addEventListener('click', (e) => {
     e.stopPropagation() // que guardar no dispare la reacción del click
-    const hex = a.seed.toString(16)
-    savedSeeds = savedSeeds.includes(hex) ? savedSeeds.filter((s) => s !== hex) : [...savedSeeds, hex]
-    fav.classList.toggle('on', savedSeeds.includes(hex))
+    const c = clave(a)
+    savedSeeds = savedSeeds.includes(c) ? savedSeeds.filter((s) => s !== c) : [...savedSeeds, c]
+    fav.classList.toggle('on', savedSeeds.includes(c))
     syncSaved()
   })
   actors.push(a)
@@ -239,15 +278,29 @@ syncSaved()
 
 function reseed(a, seed) {
   a.seed = seed
-  a.character = makeCharacter(seed, bands)
+  a.voiceSeed = seed
+  a.character = makeCharacter(seed, bands, null, { voiceSeed: seed })
   a.palette = paletteFor(a.character, fallback)
   a.tag.textContent = seed.toString(16)
-  if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(seed.toString(16)))
+  if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(clave(a)))
   a.drawn = null // fuerza el repintado en el próximo frame
   a.layout = null // ...y tira la caché de capas estáticas: son de ESTE personaje
   a.hasBase = false
   a.smokeTip = null
   a.speech = null // y deja de mover la boca: esa frase era del anterior
+}
+
+/**
+ * Otra voz para la misma cara. NO se tira la caché de capas estáticas ni se marca el
+ * repintado: con la misma seed y las mismas bandas, todo lo que se dibuja sale igual —
+ * `voice` es la única clave del personaje que cambia.
+ */
+function revoice(a, voiceSeed) {
+  a.voiceSeed = voiceSeed
+  a.character = makeCharacter(a.seed, bands, null, { voiceSeed })
+  turnos.delete(clave(a)) // otra voz, otro turno: se empieza por la frase 0
+  if (a.fav) a.fav.classList.toggle('on', savedSeeds.includes(clave(a)))
+  hablar(a)
 }
 
 let repaints = 0
@@ -425,13 +478,16 @@ function motor() {
 const turnos = new Map()
 
 function hablar(a) {
-  const k = turnos.get(a.seed) ?? 0
-  turnos.set(a.seed, k + 1)
-  const frase = phrase(a.character.voice, makeRng(a.seed).fork(SALT.voice).fork(k))
+  const c = clave(a)
+  const k = turnos.get(c) ?? 0
+  turnos.set(c, k + 1)
+  // La frase cuelga de la seed de VOZ, no de la de la cara: si no, cambiar de voz
+  // dejaría al personaje diciendo exactamente lo mismo con otro timbre.
+  const frase = phrase(a.character.voice, makeRng(a.voiceSeed).fork(SALT.voice).fork(k))
   // La boca va aunque no se oiga: silenciar es bajar el volumen, no dejar de hablar.
   a.speech = { t0: rig.now(), phrase: frase }
   if (silencio && !speech) return
-  motor().speak(a.character.voice, frase, a.seed)
+  motor().speak(a.character.voice, frase, a.voiceSeed)
 }
 
 const sonidoBtn = document.getElementById('sonido')

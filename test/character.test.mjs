@@ -76,6 +76,33 @@ describe('determinismo', () => {
     assert.equal(obtenido, esperado)
   })
 
+  it('con voiceSeed = seed, el personaje es exactamente el de siempre', () => {
+    // Es la promesa de que añadir la seed de voz no ha cambiado nada: `fork` no depende
+    // del estado consumido del rng, solo de la seed, así que pedirle el carril de la voz
+    // a un generador recién hecho da el mismo generador que pedírselo al de la cara.
+    assert.deepEqual(makeCharacter(0xabc123, {}, null, { voiceSeed: 0xabc123 }), makeCharacter(0xabc123))
+    for (const s of [0, 7, 42]) {
+      assert.deepEqual(makeCharacter(s, {}, null, { voiceSeed: s }), makeCharacter(s))
+    }
+  })
+
+  it('otra voiceSeed cambia la VOZ y nada más', () => {
+    const cara = makeCharacter(42)
+    const otra = makeCharacter(42, {}, null, { voiceSeed: 1234 })
+    const { voice: v1, ...resto1 } = cara
+    const { voice: v2, ...resto2 } = otra
+    assert.deepEqual(resto2, resto1, 'la cara se movió al re-sortear la voz')
+    assert.notDeepEqual(v2, v1, 'la voz no cambió')
+  })
+
+  it('la misma voiceSeed en dos caras distintas da la misma voz', () => {
+    // Es lo que hace que «♪» sea un sorteo de VOZ y no de personaje: la voz depende de
+    // su seed y de nada más.
+    const a = makeCharacter(7, {}, null, { voiceSeed: 999 })
+    const b = makeCharacter(42, {}, null, { voiceSeed: 999 })
+    assert.deepEqual(a.voice, b.voice)
+  })
+
   it('la voz es la ÚLTIMA clave: quitarla deja el objeto de antes', () => {
     // Lo que hace válida la comparación de arriba. Si alguien mete una parte nueva en
     // medio del objeto, el orden de claves cambia y el fixture dejaría de cuadrar por una

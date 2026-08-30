@@ -81,8 +81,14 @@ const PARAMS_OF = {
  * Cada parte recibe un `fork` propio del PRNG en vez de consumir la secuencia compartida:
  * así añadir un parámetro a la boca no cambia la cara de todos los personajes ya guardados.
  */
-export function makeCharacter(seed, bands = {}, paletteName = null) {
+export function makeCharacter(seed, bands = {}, paletteName = null, opts = {}) {
   const rng = makeRng(seed)
+  // La VOZ puede ir por otra seed. Es lo único del personaje que se puede re-sortear sin
+  // que cambie la cara, y hace falta: con una sola seed, buscar una voz que pegue obliga
+  // a tirar la cara que ya te gustaba. Por defecto es la misma, y entonces esto da
+  // exactamente lo mismo que antes — `fork` no depende del estado consumido del rng, solo
+  // de la seed, así que `makeRng(seed).fork(x)` y `rng.fork(x)` son el mismo generador.
+  const voiceRng = makeRng(opts.voiceSeed ?? seed).fork(SALT.voice)
   // El arquetipo pone bandas por parte DEBAJO de las del panel: correlaciona rasgos
   // (melena + ceja fina + sin barba llegan juntos) sin quitarle el mando a los sliders.
   // «Debajo» significa: una banda del panel solo pisa al arquetipo si difiere de la
@@ -108,7 +114,7 @@ export function makeCharacter(seed, bands = {}, paletteName = null) {
     // La voz no se dibuja: la toca el host (`src/anim/speech.js`). Va aquí porque es del
     // personaje, no del momento — sale de su seed como su cara, y por su propio carril
     // del rng, así que añadirla no ha movido ni un valor de las demás partes.
-    voice: voice.randomize(rng.fork(SALT.voice), bandFor('voice')),
+    voice: voice.randomize(voiceRng, bandFor('voice')),
   }
 }
 
