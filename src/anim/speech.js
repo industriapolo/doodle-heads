@@ -22,10 +22,19 @@
 // Todo se programa sobre el reloj del AudioContext con setValueAtTime y rampas: ni un
 // setTimeout. El reloj de JS se va varios milisegundos y eso, en audio, se oye.
 
+import { mulberry32 } from '../core/prng.js'
+
 const MASTER = 0.5
 const MAX_VOCES = 2 // dos a la vez; una tercera corta a la más vieja
-const ATTACK = 0.015
-const DECAY = 0.04
+// Las envolventes son EXPONENCIALES (setTargetAtTime), no rectas. Una rampa lineal a una
+// meseta plana y otra recta de vuelta es lo que hace que una sílaba suene a órgano de
+// juguete: nada en una garganta se mueve en línea recta. Son constantes de tiempo: se
+// llega al 95 % en 3τ, así que 3,5 ms de ataque son ~10 ms reales y 16 de caída, ~50.
+const TAU_AT = 0.0035
+const TAU_DE = 0.016
+// Lo que se le deja a la última sílaba para apagarse antes de parar las fuentes. Cortar
+// una cola exponencial a medias es, literalmente, un click.
+const COLA = 0.12
 // Margen antes de la primera sílaba. Tiene que ser mayor que el pre-ataque más largo
 // (60 ms, el del plosivo) o la consonante de la primera sílaba caería en tiempo negativo
 // — que en un AudioContext vivo no pasa nunca, porque su reloj lleva rato corriendo, pero
@@ -43,10 +52,16 @@ const VOCALES = [
 
 // La colocación. Multiplican los formantes y deciden lo estrecha que es la resonancia:
 // una Q alta es una voz más «apretada», más de dibujo animado.
+// La Q baja de 12–14 a 4–8: con la resonancia tan estrecha, barrer los formantes de una
+// sílaba a otra hacía surgir la amplitud de golpe a mitad de la vocal — medido, el mayor
+// salto de envolvente caía 25 ms DENTRO de la sílaba, no en su ataque.
+//
+// `f3` es un tercer formante fijo, de garganta. No canta ninguna vocal: solo pone cuerpo,
+// que es lo que separa una voz de dos filtros sonando a la vez.
 const TIMBRES = {
-  nasal: { f1: 0.9, f2: 0.85, q: 12, g2: 0.8 },
-  redondo: { f1: 1, f2: 0.95, q: 7, g2: 0.55 },
-  chillón: { f1: 1.15, f2: 1.3, q: 14, g2: 1 },
+  nasal: { f1: 0.9, f2: 0.85, q: 8, g2: 0.8, f3: 2500 },
+  redondo: { f1: 1, f2: 0.95, q: 5, g2: 0.55, f3: 2600 },
+  chillón: { f1: 1.15, f2: 1.3, q: 7, g2: 1, f3: 2900 },
 }
 
 const F_MIN = 300
@@ -67,6 +82,7 @@ function formantes(vowel, timbre) {
     f2: clamp(f2 * t.f2, F_MIN, F_MAX),
     q: t.q,
     g2: t.g2,
+    f3: t.f3,
   }
 }
 
@@ -76,13 +92,12 @@ function formantes(vowel, timbre) {
  * `desde` es el nivel al que arranca — lo usa la nasal, que empieza sonando bajito con el
  * formante grave y luego abre.
  */
-function envSilaba(param, t0, dur, pico, desde = 0) {
-  const at = Math.min(ATTACK, dur * 0.4)
-  const de = Math.min(DECAY, dur - at)
-  param.setValueAtTime(desde, t0)
-  param.linearRampToValueAtTime(pico, t0 + at)
-  param.setValueAtTime(pico, t0 + dur - de)
-  param.linearRampToValueAtTime(0, t0 + dur)
+function envSilaba(param, t0, dur, pico) {
+  // Sin `setValueAtTime`: el valor de partida es DONDE ESTÉ. Fijarlo sería el escalón que
+  // toda esta función existe para evitar — y encadenar setTargetAtTime sale gratis,
+  // porque cada uno arranca de lo que dejó el anterior.
+  param.setTargetAtTime(pico, Math.max(0, t0), TAU_AT)
+  param.setTargetAtTime(0, Math.max(0, t0 + dur), TAU_DE)
 }
 
 /** Mueve un parámetro SIN saltos. τ pequeño = llega rápido, pero llega deslizándose. */
@@ -133,9 +148,16 @@ export function createSpeech(ctx) {
 
   // Un solo buffer de ruido para toda la página: los AudioBufferSourceNode son de usar y
   // tirar, pero el buffer se comparte.
+  //
+  // El ruido sale de `mulberry32`, no de `Math.random()`, por la misma razón que todo lo
+  // demás en este proyecto: para que dos ejecuciones den lo mismo. Con `Math.random()`
+  // cada motor tenía su propio ruido y la misma frase sonaba distinta cada vez que se
+  // recargaba la página — inofensivo al oído, pero hacía imposible medir si un cambio
+  // había mejorado algo o solo había cambiado el ruido.
   const ruido = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 2), ctx.sampleRate)
   const datos = ruido.getChannelData(0)
-  for (let i = 0; i < datos.length; i++) datos[i] = Math.random() * 2 - 1
+  const rnd = mulberry32(0x5eed)
+  for (let i = 0; i < datos.length; i++) datos[i] = rnd() * 2 - 1
 
   const vivas = []
 
@@ -177,8 +199,11 @@ export function createSpeech(ctx) {
       const osc = ctx.createOscillator()
       osc.type = 'sawtooth'
       osc.connect(cuerpo)
+      // La segunda es TRIANGULAR, no otra sierra: dos sierras suman armónicos agudos y lo
+      // que sale es zumbido. Una triangular desafinada añade batido sin añadir brillo, que
+      // es lo que se busca en `rough` — aspereza de garganta, no más filo.
       const osc2 = ctx.createOscillator()
-      osc2.type = 'sawtooth'
+      osc2.type = 'triangle'
       osc2.detune.value = 8 + v.rough * 30
       const g2 = ctx.createGain()
       g2.gain.value = v.rough
@@ -195,16 +220,52 @@ export function createSpeech(ctx) {
       lfoG.connect(osc.detune)
       lfoG.connect(osc2.detune)
 
+      // JITTER de tono: ruido pasado por un filtro a 30 Hz, o sea un vaivén lento y sin
+      // periodo. Una nota perfectamente afinada es lo más robótico que hay; ninguna voz
+      // sostiene un tono exacto ni siquiera cuando lo intenta. El vibrato es un temblor
+      // REGULAR y se oye como canto — esto es lo otro, y es lo que hace que suene vivo.
+      const jitterSrc = ctx.createBufferSource()
+      jitterSrc.buffer = ruido
+      jitterSrc.loop = true
+      const jitterLp = ctx.createBiquadFilter()
+      jitterLp.type = 'lowpass'
+      jitterLp.frequency.value = 30
+      const jitterG = ctx.createGain()
+      jitterG.gain.value = 6 + v.rough * 10 // en cents
+      jitterSrc.connect(jitterLp)
+      jitterLp.connect(jitterG)
+      jitterG.connect(osc.detune)
+      jitterG.connect(osc2.detune)
+
       // --- formantes ----------------------------------------------------------
       const bp1 = ctx.createBiquadFilter()
       const bp2 = ctx.createBiquadFilter()
+      const bp3 = ctx.createBiquadFilter()
       const gf2 = ctx.createGain()
-      for (const f of [bp1, bp2]) f.type = 'bandpass'
+      const gf3 = ctx.createGain()
+      gf3.gain.value = 0.15
+      for (const f of [bp1, bp2, bp3]) f.type = 'bandpass'
+      bp3.Q.value = 6
+
+      // Los tres formantes se suman y pasan por un paso bajo antes de salir. Ese filtro es
+      // lo que quita el zumbido de sierra: por encima de 3,8 kHz una voz no tiene nada que
+      // decir, y lo que había ahí era el diente de sierra asomando entre las resonancias.
+      // Va SOLO en la voz: el siseo de las consonantes vive por encima de 3 kHz y pasarlo
+      // por aquí lo dejaría mudo.
+      const mezclaVoz = ctx.createGain()
+      const lpVoz = ctx.createBiquadFilter()
+      lpVoz.type = 'lowpass'
+      lpVoz.frequency.value = 3800
       cuerpo.connect(bp1)
       cuerpo.connect(bp2)
-      bp1.connect(gain)
+      cuerpo.connect(bp3)
+      bp1.connect(mezclaVoz)
       bp2.connect(gf2)
-      gf2.connect(gain)
+      gf2.connect(mezclaVoz)
+      bp3.connect(gf3)
+      gf3.connect(mezclaVoz)
+      mezclaVoz.connect(lpVoz)
+      lpVoz.connect(gain)
 
       // --- ruido: soplo, siseo y chasquidos ------------------------------------
       const nz = ctx.createBufferSource()
@@ -232,6 +293,8 @@ export function createSpeech(ctx) {
         rutas[nombre] = g
         filtros[nombre] = f
       }
+
+      bp3.frequency.value = formantes(0.5, v.timbre).f3
 
       // --- programación por sílaba ---------------------------------------------
       let finPrevia = 0
@@ -267,15 +330,19 @@ export function createSpeech(ctx) {
           o.frequency.exponentialRampToValueAtTime(s.pitchEnd, a + s.dur)
         }
 
-        // la boca abierta suena más fuerte: `open` es amplitud además de dibujo
-        const pico = 0.18 + 0.5 * s.open
+        // La boca abierta suena más fuerte: `open` es amplitud además de dibujo. El nivel
+        // bajó un 12 % respecto a la v1 para compensar el tercer formante y las colas
+        // exponenciales, que rellenan los huecos entre sílabas y suben el RMS.
+        const pico = 0.16 + 0.44 * s.open
         if (s.onset === 'nasal') {
           // 25 ms de zumbido con el primer formante muy grave antes de abrir: es la /m/.
           // Se recorta contra el final de la sílaba anterior para no montarse encima.
           const pre = Math.max(finPrevia, a - 0.025)
           desliza(bp1.frequency, 250, pre)
           desliza(bp1.frequency, f.f1, a + 0.01, GLIDE)
-          envSilaba(cuerpo.gain, pre, s.dur + (a - pre), pico, pico * 0.28)
+          // el zumbido nasal entra bajito y la vocal abre: dos objetivos encadenados
+          cuerpo.gain.setTargetAtTime(pico * 0.28, Math.max(0, pre), TAU_AT)
+          envSilaba(cuerpo.gain, a, s.dur, pico)
         } else {
           envSilaba(cuerpo.gain, a, s.dur, pico)
         }
@@ -293,10 +360,14 @@ export function createSpeech(ctx) {
         finPrevia = a + s.dur
       }
 
-      const fin = t0 + frase.dur + FADE
-      const fuentes = [osc, osc2, lfo, nz]
+      // La cola exponencial de la última sílaba necesita sitio, y el corte final tiene que
+      // ser un fundido: parar una fuente con señal distinta de cero es un click de manual.
+      const fin = t0 + frase.dur + COLA
+      gain.gain.setValueAtTime(1, fin - 0.02)
+      gain.gain.linearRampToValueAtTime(0, fin)
+      const fuentes = [osc, osc2, lfo, nz, jitterSrc]
       for (const s of fuentes) {
-        s.start(t0)
+        s.start(Math.max(0, t0 - 0.05)) // arrancan antes, pero con todas las ganancias a 0
         s.stop(fin)
       }
 
