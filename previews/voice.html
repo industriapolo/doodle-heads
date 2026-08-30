@@ -6,6 +6,8 @@ import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
 import { makeRng } from '../src/core/prng.js'
 import { SALT } from '../src/core/character.js'
 import { createSpeech } from '../src/anim/speech.js'
+// La receta vieja, SOLO aquí: es la referencia del botón A/B. Ver src/anim/_archivo/.
+import { createSpeech as createSpeechV1 } from '../src/anim/_archivo/speech-v1.js'
 import * as head from '../src/parts/head.js'
 import * as voice from '../src/parts/voice.js'
 
@@ -19,6 +21,9 @@ import * as voice from '../src/parts/voice.js'
 //  · «misma frase» clava el número de frase en 0, así que cada pasada dice exactamente lo
 //    mismo que la anterior. Sin eso, cada vuelta trae frases nuevas y no se sabe si lo
 //    que cambió fue el slider o el sorteo.
+//  · «A/B» toca la frase 0 del personaje bajo el ratón dos veces: primero con la receta
+//    vieja y luego con la de ahora. Comparar de memoria no vale — entre una escucha y la
+//    siguiente el oído se acostumbra y todo suena parecido.
 const preview = mountPreview({
   title: 'voice',
   groups: [
@@ -41,15 +46,21 @@ const preview = mountPreview({
 // --- audio ------------------------------------------------------------------
 // El AudioContext se crea en el primer gesto y se reutiliza: los navegadores no dejan
 // sonar uno creado al cargar, y crear uno por frase se queda sin ranuras enseguida.
+let ctx = null
 let speech = null
+let speechV1 = null
+function audio() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)()
+  if (ctx.state === 'suspended') ctx.resume()
+  return ctx
+}
 function motor() {
-  if (!speech) {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    speech = createSpeech(ctx)
-    speech.ctx = ctx
-  }
-  if (speech.ctx.state === 'suspended') speech.ctx.resume()
+  if (!speech) speech = createSpeech(audio())
   return speech
+}
+function motorV1() {
+  if (!speechV1) speechV1 = createSpeechV1(audio())
+  return speechV1
 }
 
 // El número de frase por personaje. Es lo que hace que dos clicks seguidos digan cosas
@@ -107,6 +118,36 @@ btnMisma.addEventListener('click', () => {
 
 cabecera.append(btnRecorrer, btnMisma)
 
+// --- A/B: la receta vieja y la nueva, seguidas -------------------------------
+// Sobre el personaje que tenga el ratón encima. Si no hay ninguno, la primera celda.
+let bajoElRaton = null
+for (const entry of preview.cells) {
+  entry.canvas.addEventListener('pointerenter', () => (bajoElRaton = entry))
+}
+
+const btnAB = document.createElement('button')
+btnAB.textContent = 'A/B (vieja → nueva)'
+btnAB.title = 'la misma frase con la receta de antes y con la de ahora'
+btnAB.addEventListener('click', () => {
+  const entry = bajoElRaton || preview.cells[0]
+  const ch = makeCharacter(entry.seed, preview.bands)
+  const frase = voice.phrase(ch.voice, makeRng(entry.seed).fork(SALT.voice).fork(0))
+  const espera = Math.round(frase.dur * 1000) + 500
+  const marcar = (txt) => {
+    btnAB.textContent = txt
+    entry.canvas.style.outline = '2px solid #E5117F'
+    setTimeout(() => (entry.canvas.style.outline = ''), Math.round(frase.dur * 1000))
+  }
+  marcar('A: vieja…')
+  motorV1().speak(ch.voice, frase, entry.seed)
+  setTimeout(() => {
+    marcar('B: nueva…')
+    motor().speak(ch.voice, frase, entry.seed)
+    setTimeout(() => (btnAB.textContent = 'A/B (vieja → nueva)'), espera)
+  }, espera)
+})
+cabecera.append(btnAB)
+
 // para medir desde consola: ver el comentario de arriba sobre OfflineAudioContext
-window.__voice = { voice, makeCharacter, createSpeech, preview, hablar, SALT, makeRng }
+window.__voice = { voice, makeCharacter, createSpeech, createSpeechV1, preview, hablar, SALT, makeRng }
 </script>
