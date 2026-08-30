@@ -8,7 +8,7 @@ La salud del proyecto es mejor que hace dos días, y no solo porque haya más: l
 
 ## Hallazgos
 
-### 1. La voz está en un compás de espera que solo tú puedes cerrar (la prioridad)
+### 1. La voz está en un compás de espera que solo tú puedes cerrar (la prioridad) — CERRADO (30 ago 2026)
 
 El banco de recetas de `voice.html` es, por declaración propia del commit, «andamio, no arquitectura»: cinco recetas sobre tres ejes (fuente glotal, articulación, melodía continua), la v1 archivada como referencia del A/B, y `createSpeech`/`phrase` con opciones que solo existen para poder comparar. Todo eso debe desaparecer cuando elijas.
 
@@ -18,25 +18,36 @@ Mientras tanto hay una **incoherencia real**: el index toca `glotal` a secas (me
 
 La sesión de cierre, cuando tengas la receta elegida: fijarla como única (sin `opts` en `createSpeech` ni `melodia` en `phrase`), borrar el banco, `speech-v1.js` y el A/B, y dejar `voice.html` como preview de afinado normal (bandas + recorrer + misma frase). Es una sesión corta y deja el módulo en el estado del resto del proyecto.
 
-### 2. Los documentos de estado se han quedado atrás (media)
+**Cerrado.** Jorge eligió `glotal+articulada+melodía`. `createSpeech(ctx)` y `phrase(v, rng)` se quedaron sin opciones; se fueron el camino de sierra, el condicional de articulación y el modo de melodía por saltos. `voice.html` vuelve a ser una preview normal —panel Cabeza+Voz, click, recorrer, misma frase— y `speech-v1.js` se borró: la síntesis vieja vive en el commit `d7ca8f6` y el banco de cinco recetas en `dfc1636`. La incoherencia index/preview desaparece con los ejes. Los fixtures de 0xabc123 (cara y voz) no se movieron: la tirada del glissando por sílaba se sigue haciendo aunque la curva ya no la use, porque saltársela habría corrido la secuencia del rng.
+
+### 2. Los documentos de estado se han quedado atrás (media) — CERRADO (30 ago 2026)
 
 `HANDOFF.md` está actualizado en «Qué hay» pero su «Qué queda» es el de hace una semana: no menciona la decisión de la voz (que es EL pendiente real), y sigue listando «integración con el juego» dentro de Fase 2 cuando decidiste que este proyecto es independiente del juego musical y no debe orientarse ahí. El kickoff arrastra la misma frase. Es el tipo de deriva que la primera auditoría encontró en pequeño y que conviene cortar pronto: el HANDOFF es lo que arranca cada sesión nueva, y un pendiente equivocado ahí acaba en trabajo equivocado.
+
+**Cerrado.** «Qué queda» reescrito y ordenado por lo que bloquea a lo demás: sacar el script del index a módulos de host (antes de la siguiente capa), personalidades como datos, busto, y el trabajo de ojo que sigue esperando desde Fase 1. La «integración con el juego» sale del HANDOFF y del kickoff, con la razón escrita en los dos sitios: el generador es independiente y atarlo a una experiencia concreta decidiría hoy cosas que no hay que decidir.
 
 ### 3. `index.html` está llegando a su techo como fichero único (media)
 
 539 líneas de las cuales ~460 son script: formato de seeds guardados con voz (`seed:voiceSeed`), turnos de frase, doble caché de capas, transformación del bounce, coro, audio perezoso, tres fuentes de estilo. Sigue siendo legible porque está bien comentado, pero es el host de todo y cada capa nueva cae aquí. Antes de la siguiente que lo toque (murmullo de fondo, personalidades), vale la pena sacar el script a módulos de host — `src/host/` o simplemente `index.js` — sin cambiar ni una responsabilidad. `rig.js`, con 644 líneas, no tiene el mismo problema: es largo pero es una sola cosa (el tiempo de la cara), y partirlo hoy separaría cosas que se leen juntas.
 
-### 4. Detalles menores, ninguno urgente
+### 4. Detalles menores, ninguno urgente — tres de cinco hechos (30 ago 2026)
 
-- Cuando el coro termina (los 900 ms de mirar al pulsado), los vecinos vuelven al vagabundeo aunque el puntero siga quieto encima de la página: `mirarA` solo se re-aplica en `pointermove`. Un ratón inmóvil deja de ser mirado tras un click cercano. Arreglo de tres líneas (recordar el último puntero y re-aplicarlo al vencer un `gazeHold`), pero decidir si el gesto actual ya te gusta es previo.
+- ~~Cuando el coro termina, los vecinos vuelven al vagabundeo aunque el puntero siga quieto encima.~~ **HECHO**: el host recuerda el último puntero y lo devuelve al actor que el coro suelta, colgado del repintado y no de un temporizador — el host no tiene tic propio, y la caducidad la lleva el rig en su reloj, así que un `setTimeout` se dispararía a destiempo con la animación pausada. Verificado: 6/6 vecinos recuperan el puntero al primer repintado tras el vencimiento, y ninguno si el puntero salió de la ventana.
 - El doble parpadeo de la atención resetea un parpadeo normal que esté a medias (`react` pisa `blinkAt`). Cosmético e invisible en la práctica.
-- `MOOD_NAMES` se exporta y nadie lo importa. La primera auditoría purgó seis de estos; este nació después.
-- El `+1e-9` de `params.js` (EPS del panel) sigue pendiente de su arreglo de raíz: que el `sync` inicial del panel no escriba en `bands`. Anotado desde la sesión 2.
+- ~~`MOOD_NAMES` se exporta y nadie lo importa.~~ **HECHO**: fuera.
+- ~~El `+1e-9` de `params.js` sigue pendiente de su arreglo de raíz.~~ **HECHO**: `_template.js` separa pintar de escribir — al construir el panel, cada control solo pinta; escriben el evento `input` y el ↺. El epsilon se fue. Nota: el test que cuadriculaba las bandas de los módulos reales NO podía seguir en verde, porque sintetizaba él mismo el cuadriculado y hay tres bandas declaradas exactamente a medio paso del grid (`hair.fringeShadow` en sus dos extremos, `glasses.bridgeDrop`); con el arreglo de raíz ese escenario ya no existe, así que se sustituyó por su complementario: mover un tirador un paso tiene que detectarse como toque en todos los parámetros de todos los módulos.
 - `eyes.js` va por 337 líneas y es el candidato a fichero denso de la próxima tanda de crecimiento (blink, pivot, eyeOpen, pestañas, sombra, comisuras). Nada que hacer aún; vigilarlo.
 
 ## Verificado en esta auditoría
 
 Determinismo intacto: `voiceSeed` ausente o igual al seed produce exactamente el personaje de antes; un `voiceSeed` distinto cambia `voice` y nada más. El material de la frase (duraciones, vocales, ataques, aperturas) es idéntico entre los dos modos de melodía, que es lo que hace honesto el A/B. Los topes de Hz no se alcanzan en 500 seeds con bandas de fábrica. Los 339→ tests actuales pasan en 0,6 s.
+
+## Estado (30 ago 2026)
+
+Cerrados el mismo día de la auditoría: **1** (voz consolidada), **2** (documentos) y tres
+de los cinco menores del **4** (coro, `MOOD_NAMES`, epsilon). Siguen abiertos el **3**
+(sacar el script del index a módulos de host, que es de su propia sesión) y dos menores: el
+doble parpadeo que resetea un parpadeo a medias, y vigilar el crecimiento de `eyes.js`.
 
 ## Orden sugerido
 

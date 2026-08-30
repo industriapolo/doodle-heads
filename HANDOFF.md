@@ -42,7 +42,9 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 - **Voz** (`src/parts/voice.js` + `src/anim/speech.js`): cada personaje habla en un
   balbuceo sin idioma sintetizado por código, sin un solo asset de audio. La frase es un
   dato (sílabas con tono, apertura y ataque); tocarla es del host. En el index, click =
-  reacción + frase, y la boca la sigue. Botón «sonido» en la cabecera.
+  reacción + frase, y la boca la sigue. Botón «sonido» en la cabecera, y ♪ por celda para
+  re-sortear solo la voz. La receta de síntesis está **elegida y cerrada** (pulso glotal,
+  articulación con cierre, melodía de curva): ya no hay ejes ni banco de comparación.
 - **Estilo global en la paleta**: color paramétrico HSL, grano+viñeta
   (`src/style/finish.js`), trazo `lapiz` opt-in (dash+alpha+repaso, en `stroke.js`).
 - **Configuraciones** (`previews/configs.js`): DIFFS con nombre contra las bandas
@@ -55,13 +57,31 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
 
 ## Qué queda
 
-1. **Calibración fina contra las referencias** — el «test del tercero» (criterio §8
-   del kickoff). Trabajo de ojo de Jorge: compose con las refs abajo, forzar
-   arquetipos, guardar seeds ★ y capturar bandas buenas como configuraciones.
-2. **Fase 2 del kickoff** (sin empezar): export PNG por seed desde el index; props
-   sobre la cabeza (nubes, árboles, skyline — la frente bajo la cúpula alta está
-   reservada para esto); escena con viñeta circular; cuerpo completo; integración
-   con el juego.
+Ordenado por lo que bloquea a lo demás, no por tamaño.
+
+1. **Sacar el script del index a módulos de host.** Son ~460 líneas de script en un
+   solo fichero, y es el host de TODO: formato de seeds, turnos de frase, doble
+   caché de capas, bounce, coro, audio perezoso, tres fuentes de estilo. Cada capa
+   nueva cae ahí. Toca hacerlo justo ANTES de la siguiente capa que lo engorde, sin
+   mover ni una responsabilidad de sitio. (`rig.js`, con 644 líneas, no tiene el
+   mismo problema: es largo pero es una sola cosa, el tiempo de la cara.)
+2. **Personalidades como datos.** Hoy la deriva (`MOODS`) y las reacciones
+   (`REACTIONS`) son iguales para los treinta. Que un personaje sea más nervioso o
+   más plácido debería ser un juego de bandas suyo, como su cara y su voz — y por
+   tanto salir de su seed. Es la continuación natural de `voiceSeed`.
+3. **Busto.** Cuello y hombros: es lo que convierte una cabeza flotante en alguien.
+   El esqueleto de la referencia 4 (brazos de línea, camiseta con gráfico) es el
+   modelo.
+4. **Trabajo de ojo de Jorge**, que no bloquea a nadie pero lleva esperando desde
+   Fase 1: el «test del tercero» contra las referencias (criterio §8 del kickoff), y
+   capturar como configuraciones las bandas que salgan buenas. Compose con las refs
+   abajo, forzar arquetipos, guardar seeds con ★.
+
+Del backlog de Fase 2 siguen en pie el export PNG por seed, los props sobre la cabeza
+(la frente bajo la cúpula alta está reservada para eso) y la escena con viñeta
+circular. Lo que **no** está en pie es «integración con el juego»: el generador es
+independiente y no se orienta a ninguna experiencia concreta — puede acabar en
+cualquiera, y atarlo a una decidiría hoy cosas que no hay que decidir.
 
 ## Cómo se trabaja
 
@@ -98,9 +118,11 @@ Documento para arrancar sesión nueva. La arquitectura y las reglas viven en
   «copiar rangos» como las de cualquier parte.
   Aquí NO hay test que valga: si suena bien o mal lo dice el oído de Jorge. Claude solo
   puede medir con un OfflineAudioContext, y con cuidado — la derivada de la onda está
-  dominada por el propio diente de sierra, y un salto de amplitud medido en un ataque de
-  ruido solo mide el ruido. Lo que sí distingue un click: el salto de un seguidor de picos
-  EXCLUYENDO los ataques.
+  dominada por la propia fuente, y un salto de amplitud medido en un ataque de ruido solo
+  mide el ruido. Lo que sí distingue un click: el salto de un seguidor de picos EXCLUYENDO
+  los ataques. Y la lección que costó dos rondas: para cambiar la receta hay que poder
+  comparar A/B **el mismo material**, o no se está midiendo ningún eje. El banco que se
+  usó para elegirla está en el commit `dfc1636` por si hay que rehacerlo.
 - **Otra voz sin tocar la cara**: el botón ♪ de cada celda del index re-sortea solo
   `voiceSeed`. La cara no se mueve y la caché de capas estáticas no se tira.
 - Seeds buenos: ★ en el index → «guardados · copiar» → pegar a Claude. El formato es

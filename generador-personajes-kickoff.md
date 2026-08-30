@@ -176,4 +176,8 @@ Cada paso = un prompt. No avanzar al siguiente sin validar la preview en navegad
 - Escena: viñeta circular con degradado, estrellitas ×/+, luna.
 - Cuerpo completo (esqueleto de la imagen 4: brazos de línea, camiseta con gráfico).
 - Export a PNG/SVG por personaje; export de spritesheet.
-- Conexión con Harmonices/juego .io: personajes como unidades, estados de animación por acción.
+- (Retirado, ago 2026) «Conexión con Harmonices/juego .io: personajes como unidades». El
+  generador es INDEPENDIENTE y no se orienta a ninguna experiencia concreta: puede acabar
+  en cualquiera, y atarlo a una decidiría por adelantado cosas que hoy no hay que decidir.
+  Lo que sí queda de aquella idea es que el personaje sea un dato serializable y que el
+  rig se gobierne desde fuera — y las dos cosas ya están hechas.

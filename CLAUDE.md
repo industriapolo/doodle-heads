@@ -292,6 +292,27 @@ cada sílaba no se mueva nada. Las dos reglas del sintetizador:
     es el vibrato: el vibrato es regular y se oye como canto), formantes que barren de la
     consonante a la vocal. Lo que se oye como «ba» no es el golpe, es ese barrido.
 
+**La receta es UNA**, elegida de oído y sin opciones. Tres decisiones, y cada una ganó por
+un motivo distinto:
+
+  · **fuente: pulso glotal**, no sierra. Una sierra tiene demasiada energía en los agudos
+    y zumba; el pulso cae como 1/n², que es lo que hace un pliegue vocal al cerrarse.
+  · **ritmo: articulación con cierre**. Cada sílaba suena el 65 % de lo que ocupa y calla
+    antes de la siguiente. El cierre es lo que hace que una plosiva sea plosiva; sin él la
+    frase es un continuo, y un tono sostenido con un filtro barriendo encima ES la voz
+    robótica de manual.
+  · **melodía: una curva de frase**, no una nota por sílaba. Con el tono elegido sílaba a
+    sílaba, entre una y otra había un escalón de 2,4 semitonos de media; con la curva son
+    0,5. Una sucesión de notas afinadas es lo que más suena a robot, por buena que sea la
+    fuente.
+
+Y una advertencia que costó dos rondas: **«robótico» no se deja medir desde fuera**. Cada
+métrica que se intentó daba un número que mejoraba mientras el oído decía que no — y una
+de esas rondas metió una regresión (colas exponenciales que llenaron los silencios) que
+los números aplaudieron. Para cambiar la receta hay que comparar A/B el MISMO material,
+cambiando un solo eje, y decidir con el oído. El banco que se usó para elegirla está en el
+commit `dfc1636`.
+
 ## Escala de trabajo
 
 Espacio lógico **800×800** para todo dibujo. `core/canvas.js` escala por `devicePixelRatio`;
