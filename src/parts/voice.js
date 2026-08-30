@@ -53,9 +53,13 @@ const CONTOURS = {
   queja: { from: 0.45, to: -0.25, glide: -0.9, drag: 2 },
 }
 
-// Cómo empieza cada sílaba. Los plosivos pesan más que el resto porque son lo que hace
-// que un balbuceo se lea como habla y no como un theremín: el habla tiene bordes.
-const ONSETS = { none: 2, noise: 2, pop: 3 }
+// Cómo empieza cada sílaba. Los bordes son lo que hace que un balbuceo se lea como habla
+// y no como un theremín — pero un borde no es un golpe: lo que se oye como consonante es
+// la TRANSICIÓN de formantes que viene detrás, y eso lo pone `speech.js`.
+//
+// `pop` bajó de peso 3 a 2 y entró `nasal`: con tres de cada siete sílabas empezando en
+// plosiva, la frase sonaba a percusión.
+const ONSETS = { none: 2, noise: 2, pop: 2, nasal: 1 }
 
 // Lo que ocupa el SONIDO dentro del paso de una sílaba; el resto es silencio. Sin ese
 // silencio las sílabas se sueldan en un zumbido continuo.

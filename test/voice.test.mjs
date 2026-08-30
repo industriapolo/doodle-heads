@@ -85,7 +85,7 @@ describe('voice: la frase está bien formada', () => {
   it('el ataque es uno de los tres que entiende el sintetizador', () => {
     for (const { f } of TODAS) {
       for (const sy of f.syllables) {
-        assert.ok(['none', 'noise', 'pop'].includes(sy.onset), `onset = ${sy.onset}`)
+        assert.ok(['none', 'noise', 'pop', 'nasal'].includes(sy.onset), `onset = ${sy.onset}`)
       }
     }
   })

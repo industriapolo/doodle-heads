@@ -26,6 +26,11 @@ const MASTER = 0.5
 const MAX_VOCES = 2 // dos a la vez; una tercera corta a la más vieja
 const ATTACK = 0.015
 const DECAY = 0.04
+// Margen antes de la primera sílaba. Tiene que ser mayor que el pre-ataque más largo
+// (60 ms, el del plosivo) o la consonante de la primera sílaba caería en tiempo negativo
+// — que en un AudioContext vivo no pasa nunca, porque su reloj lleva rato corriendo, pero
+// en un OfflineAudioContext el reloj empieza en cero y ahí se ve.
+const MARGEN = 0.07
 const FADE = 0.03 // lo que tarda en callarse una frase cortada, para que no dé un chasquido
 
 // El espacio vocálico, en tres anclas. `vowel` recorre /i/ → /a/ → /u/, que es el
@@ -65,21 +70,45 @@ function formantes(vowel, timbre) {
   }
 }
 
-/** La envolvente de una sílaba: ataque corto, meseta y caída. */
-function envSilaba(param, t0, dur, pico) {
+/**
+ * La envolvente de una sílaba: ataque corto, meseta y caída.
+ *
+ * `desde` es el nivel al que arranca — lo usa la nasal, que empieza sonando bajito con el
+ * formante grave y luego abre.
+ */
+function envSilaba(param, t0, dur, pico, desde = 0) {
   const at = Math.min(ATTACK, dur * 0.4)
   const de = Math.min(DECAY, dur - at)
-  param.setValueAtTime(0, t0)
+  param.setValueAtTime(desde, t0)
   param.linearRampToValueAtTime(pico, t0 + at)
   param.setValueAtTime(pico, t0 + dur - de)
   param.linearRampToValueAtTime(0, t0 + dur)
 }
 
+/** Mueve un parámetro SIN saltos. τ pequeño = llega rápido, pero llega deslizándose. */
+const desliza = (param, valor, cuando, tau = 0.012) =>
+  param.setTargetAtTime(valor, Math.max(0, cuando), tau)
+
+// La constante del barrido consonante→vocal: con τ = 18 ms está al 95 % a los 54 ms, que
+// es donde vive esa transición en el habla.
+const GLIDE = 0.018
+
+// Dónde arrancan los formantes de cada sílaba, en múltiplos de los de su vocal. El primer
+// formante siempre parte de abajo (la boca está más cerrada al empezar); el segundo sube
+// en las fricativas y baja en las plosivas, que es lo que separa una «s» de una «b».
+const DESVIO = {
+  none: { f1: 0.85, f2: 1 },
+  noise: { f1: 0.6, f2: 1.25 },
+  pop: { f1: 0.6, f2: 0.75 },
+  nasal: { f1: 0.6, f2: 0.9 },
+}
+
 /** Un pulso corto, para los ataques. */
 function pulso(param, t0, dur, pico) {
-  param.setValueAtTime(0, t0)
-  param.linearRampToValueAtTime(pico, t0 + dur * 0.25)
-  param.linearRampToValueAtTime(0, t0 + dur)
+  const a = Math.max(0, t0) // el reloj no tiene pasado
+  param.setValueAtTime(0, a)
+  param.linearRampToValueAtTime(pico, a + dur * 0.25)
+  param.linearRampToValueAtTime(0, a + dur)
 }
 
 /**
@@ -132,7 +161,7 @@ export function createSpeech(ctx) {
      *            personaje no puede solaparse consigo mismo, se interrumpe.
      */
     speak(v, frase, id = null) {
-      const t0 = ctx.currentTime + 0.02 // un pelo de margen: programar en el pasado se pierde
+      const t0 = ctx.currentTime + MARGEN // programar en el pasado se pierde
       if (id !== null) for (const otra of vivas.filter((x) => x.id === id)) parar(otra)
       while (vivas.length >= MAX_VOCES) parar(vivas[0])
 
@@ -182,43 +211,86 @@ export function createSpeech(ctx) {
       nz.buffer = ruido
       nz.loop = true
       const rutas = {}
+      const filtros = {}
       for (const [nombre, tipo, freq] of [
         ['soplo', 'lowpass', 1500],
         ['siseo', 'highpass', 3000],
-        ['pop', 'lowpass', 700],
+        // El plosivo va por un BANDPASS que se centra en el F2 de cada sílaba, no por un
+        // lowpass fijo a 700: un golpe grave de banda ancha suena a madera, y una ráfaga
+        // centrada donde va a estar la vocal suena a la boca abriéndose para decirla.
+        ['pop', 'bandpass', 1200],
       ]) {
         const f = ctx.createBiquadFilter()
         f.type = tipo
         f.frequency.value = freq
+        if (tipo === 'bandpass') f.Q.value = 1.5
         const g = ctx.createGain()
         g.gain.value = 0
         nz.connect(f)
         f.connect(g)
         g.connect(gain)
         rutas[nombre] = g
+        filtros[nombre] = f
       }
 
       // --- programación por sílaba ---------------------------------------------
+      let finPrevia = 0
       for (const s of frase.syllables) {
         const a = t0 + s.t
         const f = formantes(s.vowel, v.timbre)
-        bp1.frequency.setValueAtTime(f.f1, a)
-        bp2.frequency.setValueAtTime(f.f2, a)
-        bp1.Q.setValueAtTime(f.q, a)
-        bp2.Q.setValueAtTime(f.q, a)
-        gf2.gain.setValueAtTime(f.g2, a)
+        const d = DESVIO[s.onset] || DESVIO.none
 
-        osc.frequency.setValueAtTime(s.pitch, a)
-        osc.frequency.exponentialRampToValueAtTime(s.pitchEnd, a + s.dur)
-        osc2.frequency.setValueAtTime(s.pitch, a)
-        osc2.frequency.exponentialRampToValueAtTime(s.pitchEnd, a + s.dur)
+        // Los formantes se DESLIZAN, nunca saltan. A un bandpass resonante le cambias la
+        // frecuencia de golpe y suena un «tuc» él solo, sin que nadie le mande nada: era
+        // la mitad del chasquido, y la que costaba más de encontrar porque no venía de
+        // ningún nodo de ruido.
+        //
+        // Y arrancan DESPLAZADOS, deslizándose a la vocal en ~50 ms. Esa transición es lo
+        // que se oye como consonante: lo que distingue «ba» de un golpe no es el golpe,
+        // es el barrido de formantes que viene detrás.
+        const arranque = Math.max(t0, a - 0.03)
+        desliza(bp1.frequency, f.f1 * d.f1, arranque)
+        desliza(bp2.frequency, f.f2 * d.f2, arranque)
+        desliza(bp1.Q, f.q, arranque)
+        desliza(bp2.Q, f.q, arranque)
+        desliza(gf2.gain, f.g2, arranque)
+        desliza(bp1.frequency, f.f1, a + 0.01, GLIDE)
+        desliza(bp2.frequency, f.f2, a + 0.01, GLIDE)
+
+        // El tono sí puede saltar: la fase del oscilador sigue siendo continua, así que
+        // un escalón de frecuencia no rompe la onda. Lo que no puede saltar es la
+        // amplitud, y de eso se encarga la envolvente.
+        const dip = s.onset === 'pop' ? 0.92 : 1
+        for (const o of [osc, osc2]) {
+          o.frequency.setValueAtTime(s.pitch * dip, a)
+          if (dip !== 1) o.frequency.linearRampToValueAtTime(s.pitch, a + 0.03)
+          o.frequency.exponentialRampToValueAtTime(s.pitchEnd, a + s.dur)
+        }
 
         // la boca abierta suena más fuerte: `open` es amplitud además de dibujo
-        envSilaba(cuerpo.gain, a, s.dur, 0.18 + 0.5 * s.open)
+        const pico = 0.18 + 0.5 * s.open
+        if (s.onset === 'nasal') {
+          // 25 ms de zumbido con el primer formante muy grave antes de abrir: es la /m/.
+          // Se recorta contra el final de la sílaba anterior para no montarse encima.
+          const pre = Math.max(finPrevia, a - 0.025)
+          desliza(bp1.frequency, 250, pre)
+          desliza(bp1.frequency, f.f1, a + 0.01, GLIDE)
+          envSilaba(cuerpo.gain, pre, s.dur + (a - pre), pico, pico * 0.28)
+        } else {
+          envSilaba(cuerpo.gain, a, s.dur, pico)
+        }
         envSilaba(rutas.soplo.gain, a, s.dur, v.breath * 0.5)
 
-        if (s.onset === 'noise') pulso(rutas.siseo.gain, a - 0.02, 0.02, 0.35)
-        else if (s.onset === 'pop') pulso(rutas.pop.gain, a - 0.008, 0.008, 0.9)
+        // La ráfaga de consonante: más larga y mucho más floja que antes (era 8 ms a 0,9,
+        // que no es una consonante, es un martillazo).
+        if (s.onset === 'noise') pulso(rutas.siseo.gain, a - 0.03, 0.03, 0.25)
+        else if (s.onset === 'pop') {
+          // el bandpass del plosivo se coloca en el F2 de ESTA sílaba. Puede saltar sin
+          // que se oiga: su ganancia está a cero mientras tanto.
+          filtros.pop.frequency.setValueAtTime(f.f2, Math.max(0, a - 0.06))
+          pulso(rutas.pop.gain, a - 0.025, 0.025, 0.32)
+        }
+        finPrevia = a + s.dur
       }
 
       const fin = t0 + frase.dur + FADE
