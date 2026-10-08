@@ -37,7 +37,7 @@ Audio — no audio assets either.
   its own forked lane, so adding a parameter to the mouth doesn't repaint every saved face.
 - **Style is centralised** in `src/style/`. No part hardcodes a colour or a line weight.
 - **Tests run with `node --test`** — 347 of them, no test framework. They cover the draw
-  (determinism, parameter contracts, archetype statistics over 2.000 seeds) and the timing
+  (determinism, parameter contracts, archetype statistics over 2,000 seeds) and the timing
   of the animation rig, both headless. The drawing itself is judged by eye in the previews.
 
 Everything draws in a logical 800×800 space; `src/core/canvas.js` handles the device pixel
@@ -69,21 +69,15 @@ documents are in the repo and they are the actual trail:
 
 ## The hard part
 
-<!--
-  Jorge: esta sección es tuya. Es la que diferencia un README de portfolio de un README
-  de librería — lo que cuenta no es qué hace, sino qué costó. Algunas preguntas por si
-  ayudan a arrancar (bórralas al escribir):
+Claude could write any of this code. What it couldn't do was tell me whether a nose looked like one of mine. Most of the work was building the loop that lets me judge that, and four problems took most of the time.
 
-  · ¿Qué fue lo más difícil de verdad: que las caras parecieran DIBUJADAS POR TI y no
-    genéricas, la voz, o el rendimiento con treinta caras animadas a la vez?
-  · Lo de las caras: ¿en qué momento dejaron de parecer "un generador" y empezaron a
-    parecer tuyas? ¿Qué parámetro o qué decisión lo cambió?
-  · La voz pasó por tres intentos y dos diagnósticos fallidos antes de sonar bien. ¿Qué
-    aprendiste de eso sobre medir lo que no se puede medir?
-  · Sobre dirigir a Claude con referencias visuales: ¿qué funcionó y qué no? ¿Cuándo fue
-    más útil enseñar una imagen que describirla?
-  · ¿Qué harías distinto si empezaras otro generador mañana?
--->
+**Making it look drawn, not generated.** Describing a face in words got me generic faces. What worked was one preview per feature, thirty variants at once, sliders, and looking. The nose took four rounds to stop being a bump stuck on top of the line and become a curl of the stroke itself. Hair was worse. The first version approximated the skull with an ellipse and patched the gaps, and in 53% of faces the scalp showed through somewhere; every patch added new breaks in the silhouette. The fix was to stop approximating: hair and beard masses now inherit the head's real contour. Zero failures in 190 faces.
+
+**A voice with no audio files.** Each character babbles with a voice synthesised in Web Audio. It went through several recipes and two diagnoses that turned out wrong. The worst problem wasn't in the sound: the noise was random, so the same phrase sounded different on every reload, and I couldn't tell whether a change had improved anything or just rerolled the noise. Making the noise deterministic, then putting recipes side by side and letting the ear decide, is what got it there. I had been fixing what I knew how to measure, not what sounded wrong.
+
+**A tuning bug nobody could see.** The panel compared every setting exactly against its default, so a rounding error or half a slider step was enough to override an archetype. Long hair in women dropped from 85% to 10% without anyone touching it. An audit found it. Now the panel stores only what was actually changed, with a tolerance, and a test guards it.
+
+**Thirty at once.** Every face repaints when the mouse moves. Splitting each one into a cached static layer and a live layer cut the cost of a repaint by 77%.
 
 ## References
 
