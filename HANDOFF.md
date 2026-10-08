@@ -188,6 +188,35 @@ cualquiera, y atarlo a una decidiría hoy cosas que no hay que decidir.
 
 ## Estado de git
 
+- **Público desde el 8 oct 2026**: `origin` =
+  [github.com/industriapolo/doodle-heads](https://github.com/industriapolo/doodle-heads),
+  con el historial entero (102 commits, sin aplastar ni reescribir fechas).
+- **Demo**: <https://industriapolo.github.io/doodle-heads/> — Pages desde `main` / root.
 - `main` = todo lo anterior fusionado (fast-forward desde la rama de trabajo
   `claude/stoic-chandrasekhar-23b928`, ago 2026).
 - La versión pre-rediseño del pelo quedó en `390037a` por si hay arqueología.
+
+### Lo que cambió al publicar
+
+- El index distingue **taller** (`localhost`, o `?dev`/`?debug` desde donde sea) de
+  **demo**. En la demo arranca en Póster granulado, y no salen ni el selector de estilo
+  «automático» ni el contador de fps. `127.0.0.1` es a propósito vista de demo: es como se
+  previsualiza en local sin tocar el localStorage del taller.
+- Para medir rendimiento hace falta abrir `localhost:8137/index.html?dev`; sin el
+  parámetro el contador ya ni existe.
+- `og.png` y `docs/demo.png` los genera `node scripts/og.mjs` con `serve.py` levantado.
+  Conduce el Chrome instalado en headless — nada de Playwright, que traería
+  `node_modules` a un repo que presume de no tener ninguno.
+
+### Pendientes que salieron de la publicación
+
+- **En móvil la rejilla cae a UNA columna** (375 px: celdas de 335, y `auto-fill` con
+  `minmax(180px, 1fr)` necesita 360 para dos). No desborda y al tocar una cara reacciona y
+  habla, así que funciona — pero se ve un personaje por pantalla y lo que tiene gracia del
+  proyecto es la variedad de los treinta juntos. Bajar el `minmax` a ~140 px daría dos
+  columnas. No se tocó en la sesión de publicar, a propósito.
+- **Sin probar en un iPhone de verdad**: lo anterior es el viewport emulado. Queda por ver
+  que el audio arranque con el primer toque en iOS, que es donde más estricta es la
+  política de gesto de usuario.
+- **La tarjeta al compartir no está validada en LinkedIn**: `og.png` se sirve bien y las
+  metas llevan URL absoluta, pero el post-inspector hay que pasarlo a mano.
