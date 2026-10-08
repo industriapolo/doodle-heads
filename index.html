@@ -100,6 +100,21 @@ const CELL = 320 // resolución de dibujo; el CSS lo escala al hueco del grid
 const ESTILO_KEY = 'doodle-estilo:index'
 const estiloEl = document.getElementById('estilo')
 
+// TALLER o DEMO. No es lo mismo abrir esto para trabajar que para mirarlo:
+//
+//  · el estilo «automático» (composer / por defecto) sale de lo que se haya afinado en
+//    `compose.html`, que vive en localStorage y por tanto en ESTA máquina. A un visitante
+//    no le dice nada y además le enseña la cara de fábrica en vez de la dirigida.
+//  · el contador de fps es el juez de rendimiento mientras se trabaja; a quien solo mira,
+//    un «0 fps» en reposo le parece que algo se ha roto.
+//
+// El taller es `localhost`; `127.0.0.1` es a propósito la vista de visitante, que es como
+// se previsualiza en local (otro origen = otro localStorage, vacío). `?dev` fuerza taller
+// desde donde sea, y `?debug` es su alias.
+const PARAMS_URL = new URLSearchParams(location.search)
+const DEV = PARAMS_URL.has('dev') || PARAMS_URL.has('debug')
+const TALLER = location.hostname === 'localhost' || DEV
+
 function composerBands() {
   try {
     return JSON.parse(localStorage.getItem('doodle-bands:compose') || '{}') || {}
@@ -113,10 +128,14 @@ function resolveBands(choice) {
   return composerBands()
 }
 
+const ESTILO_DEMO = 'poster-granulado'
+
 {
-  const auto = document.createElement('option')
-  auto.value = ''
-  estiloEl.append(auto)
+  if (TALLER) {
+    const auto = document.createElement('option')
+    auto.value = ''
+    estiloEl.append(auto)
+  }
   for (const [n, c] of Object.entries(CONFIGS)) {
     const o = document.createElement('option')
     o.value = n
@@ -124,11 +143,17 @@ function resolveBands(choice) {
     estiloEl.append(o)
   }
   const saved = localStorage.getItem(ESTILO_KEY)
-  if (saved && CONFIGS[saved]) estiloEl.value = saved
+  // Sin elección guardada, el visitante ve la dirección de arte, no las bandas de
+  // fábrica. En el taller se respeta lo de siempre: el automático primero, que es lo que
+  // engancha el index con lo que se esté afinando en compose.
+  if (saved !== null && (CONFIGS[saved] || (TALLER && saved === ''))) estiloEl.value = saved
+  else if (!TALLER) estiloEl.value = ESTILO_DEMO
 }
 
 function syncAutoLabel() {
-  estiloEl.options[0].textContent =
+  const auto = estiloEl.options[0]
+  if (!auto || auto.value !== '') return
+  auto.textContent =
     Object.keys(composerBands()).length > 0 ? 'estilo: composer' : 'estilo: por defecto'
 }
 syncAutoLabel()
