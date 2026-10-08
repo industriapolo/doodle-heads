@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<title>og — doodle-heads</title>
+<!--
+  Página de CAPTURA, no de la app. Solo existe para que `scripts/og.mjs` le haga una foto
+  de 1200×630 y salga `og.png`, la vista previa al compartir. Nadie la enlaza.
+
+  No reusa `index.html` por dos razones, y las dos son que una foto no es una demo:
+  el index sortea seeds nuevas en cada carga (la foto no sería repetible) y arranca el
+  rig, el audio y la doble caché de capas (nada de eso sale en una imagen fija). Aquí se
+  pide `draw` a secas, con seeds escritas a mano, y lo que se ve es exactamente el mismo
+  dibujo que haría el index con esas seeds.
+-->
+<style>
+  html, body { margin: 0; background: #17191c; }
+  /* El tamaño es el del formato de tarjeta, y manda: la rejilla se calcula a partir de él. */
+  #hoja { width: 1200px; height: 630px; display: grid; overflow: hidden; }
+  /* `cover` y no `100% 100%`: el canvas es CUADRADO y la celda no. Estirándolo las caras
+     salen achatadas — se nota enseguida en una cabeza. Con 6×3 la celda es 200×210, así
+     que cubrir recorta un 5 % a los lados y no se come ni la cúpula ni la barbilla. */
+  canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+</style>
+<div id="hoja"></div>
+
+<script type="module">
+import { setupCanvas, clear, box, LOGICAL } from '../src/core/canvas.js'
+import { makeCharacter, draw, paletteFor } from '../src/core/character.js'
+import { getPalette } from '../src/style/palettes.js'
+import { CONFIGS } from '../previews/configs.js'
+
+// Las seeds de la foto. Escritas a mano y a dedo: son las que se ven bien juntas —
+// variedad de pelo, de color y de arquetipo, con fumadores repartidos. Cambiarlas cambia
+// la vista previa al compartir, así que se cambian a sabiendas.
+const SEEDS = [
+  0x1f3a2b, 0x7c1904, 0x2b8f51, 0xa34d17, 0x0d62c8, 0x913ae0, 0x44b2a1, 0xe07722,
+  0x5a1d93, 0x18c4d6, 0xbb3f5e, 0x6e8a12, 0x2f5bd4, 0xd91a7c, 0x3c9e40, 0x8742aa,
+  0x1b7fe3, 0xc45b08, 0x55d2b9, 0x9a2e61,
+]
+const COLS = 6
+const FILAS = 3
+const CELDA = 320 // resolución de dibujo, como en el index; el CSS la escala a la celda
+
+const bands = CONFIGS['poster-granulado'].bands
+const fallback = getPalette('magenta')
+// Mismo marco que el index: 7 % de aire por lado, dentro del dibujo y no en el CSS.
+const frame = box(LOGICAL * 0.07, LOGICAL * 0.07, LOGICAL * 0.86, LOGICAL * 0.86)
+
+const hoja = document.getElementById('hoja')
+hoja.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`
+hoja.style.gridTemplateRows = `repeat(${FILAS}, ${630 / FILAS}px)`
+
+for (const seed of SEEDS.slice(0, COLS * FILAS)) {
+  const canvas = document.createElement('canvas')
+  hoja.append(canvas)
+  const ctx = setupCanvas(canvas, CELDA)
+  canvas.style.width = '100%'
+  canvas.style.height = '100%'
+  const character = makeCharacter(seed, bands)
+  const palette = paletteFor(character, fallback)
+  clear(ctx, palette.bg)
+  draw(ctx, frame, character, palette)
+}
+
+// Bandera para que el capturador sepa que ya está todo pintado y no adivine con un sleep.
+document.documentElement.dataset.listo = '1'
+</script>

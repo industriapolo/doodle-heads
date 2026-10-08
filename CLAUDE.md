@@ -8,6 +8,13 @@ Spec completa: `generador-personajes-kickoff.md`. Referencias visuales: `referen
 **Cero assets de imagen.** Todo se dibuja por código en canvas 2D. Las 4 ilustraciones de
 `referencias/` sirven solo para dirigir el estilo — nunca se cargan en runtime.
 
+`og.png` en la raíz **no es una excepción**: es la vista previa al compartir, la nombra la
+cabecera de `index.html` y la leen LinkedIn o Slack desde fuera. La app no la carga nunca.
+Se regenera con `node scripts/og.mjs` (necesita `serve.py` levantado) a partir de
+`scripts/og.html`, que dibuja seeds fijas con el mismo `draw` de siempre — así la foto es
+repetible y no hay que guardar nada a mano. Si algún día la app carga un `.png`, eso sí
+rompe la regla.
+
 ## Stack
 
 ES modules nativos, sin bundler ni dependencias. Canvas 2D puro — **three.js está descartado

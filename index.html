@@ -1,7 +1,28 @@
 <!doctype html>
+<html lang="es">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>doodle-heads</title>
+<title>Doodle heads · Jorge Polo</title>
+<meta name="description" content="Personajes procedurales en el estilo de ilustración de Jorge Polo, dibujados enteramente con código y sin una sola imagen. Te miran, reaccionan y hablan.">
+
+<!-- Vista previa al compartir. La URL tiene que ser ABSOLUTA: quien lee la tarjeta
+     (LinkedIn, Slack, X) no resuelve rutas relativas. `og.png` lo genera
+     `scripts/og.mjs` y NO lo carga la app — solo lo referencia esta cabecera. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Doodle heads · Jorge Polo">
+<meta property="og:description" content="Personajes procedurales en mi estilo de ilustración, dibujados enteramente con código, sin una sola imagen.">
+<meta property="og:url" content="https://industriapolo.github.io/doodle-heads/">
+<meta property="og:image" content="https://industriapolo.github.io/doodle-heads/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Doodle heads · Jorge Polo">
+<meta name="twitter:description" content="Personajes procedurales en mi estilo de ilustración, dibujados enteramente con código, sin una sola imagen.">
+<meta name="twitter:image" content="https://industriapolo.github.io/doodle-heads/og.png">
+
+<!-- Favicon en línea: una cabeza con la cúpula alta del generador, en el magenta de la
+     casa. SVG en un data: URI para no añadir un fichero que mantener ni una petición. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2317191c'/%3E%3Cpath d='M8 15a8 8 0 0116 0v10a2 2 0 01-2 2H10a2 2 0 01-2-2z' fill='%23E5117F'/%3E%3Crect x='11' y='16' width='4' height='2.5' fill='%2317191c'/%3E%3Crect x='17' y='16' width='4' height='2.5' fill='%2317191c'/%3E%3C/svg%3E">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
