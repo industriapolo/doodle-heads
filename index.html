@@ -572,14 +572,20 @@ pauseBtn.addEventListener('click', () => {
 // El segundo número es el que importa: si sube a 30, el ahorro de no repintar lo
 // que no cambia se ha perdido.
 const fpsEl = document.getElementById('fps')
-let frames = 0
-setInterval(() => {
-  fpsEl.textContent = `${frames} fps · ${(repaints / Math.max(1, frames)).toFixed(1)} caras repintadas por frame`
-  frames = 0
-  repaints = 0
-}, 1000)
-;(function tickFps() {
-  frames++
-  requestAnimationFrame(tickFps)
-})()
+if (DEV) {
+  let frames = 0
+  setInterval(() => {
+    fpsEl.textContent = `${frames} fps · ${(repaints / Math.max(1, frames)).toFixed(1)} caras repintadas por frame`
+    frames = 0
+    repaints = 0
+  }, 1000)
+  ;(function tickFps() {
+    frames++
+    requestAnimationFrame(tickFps)
+  })()
+} else {
+  // Fuera del taller no es que se esconda: es que no existe. Dejarlo contando sería un
+  // segundo rAF corriendo para siempre a cambio de escribir en un nodo que nadie ve.
+  fpsEl.remove()
+}
 </script>
