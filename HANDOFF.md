@@ -171,6 +171,11 @@ cualquiera, y atarlo a una decidiría hoy cosas que no hay que decidir.
   aleatorio la misma frase sonaba distinta en cada recarga: inofensivo al oído, pero hace
   imposible saber si un cambio mejoró algo o solo cambió el ruido. Costó dos medidas
   contradictorias descubrirlo.
+- **`.nojekyll` en la raíz es imprescindible**, y está vacío a propósito (GitHub Pages
+  solo mira que exista). Sin él, Pages pasa el repo por Jekyll, que ignora todo lo que
+  empieza por `_`: desaparecerían `previews/_template.js`, `previews/_scene.js` y
+  `previews/_archivo/`, y las previews publicadas se romperían sin que el repo local diera
+  ninguna señal. Si alguna vez las previews fallan solo en la URL publicada, mirar eso.
 - **El generador no carga Web Audio**: `speech.js` solo lo importan `index.html` y
   `previews/voice.html`. Dibujar una cara no puede depender de que exista un
   AudioContext, y un AudioContext no se puede crear fuera de un gesto del usuario.

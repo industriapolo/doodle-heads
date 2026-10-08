@@ -1,4 +1,5 @@
-// Genera `og.png` (1200×630), la vista previa al compartir, a partir de `scripts/og.html`.
+// Genera las dos fotos del repo: `og.png` (la vista previa al compartir, 1200×630, desde
+// `scripts/og.html`) y `docs/demo.png` (la del README, el index de verdad).
 //
 //     python3 serve.py          # en otra terminal
 //     node scripts/og.mjs
@@ -13,17 +14,25 @@
 // («cero assets de imagen») sigue intacta.
 
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const ejecutar = promisify(execFile)
 
-const URL_PAGINA = process.env.OG_URL || 'http://127.0.0.1:8137/scripts/og.html'
-const SALIDA = new URL('../og.png', import.meta.url).pathname
-const ANCHO = 1200
-const ALTO = 630
+const BASE = process.env.OG_BASE || 'http://127.0.0.1:8137'
+
+// Dos fotos, y hacen cosas distintas:
+//  · `og.png` es la TARJETA: solo caras, tamaño fijo de formato, seeds a dedo para que
+//    salga siempre igual. La leen LinkedIn y compañía desde fuera.
+//  · `docs/demo.png` es la foto del README: el index de verdad, con su cabecera y su
+//    línea de contexto, para que se vea la página y no solo el dibujo. Esa sí sortea
+//    seeds nuevas en cada captura, y da igual — es ilustrativa, no una referencia.
+const FOTOS = [
+  { url: `${BASE}/scripts/og.html`, salida: '../og.png', ancho: 1200, alto: 630, exacto: true },
+  { url: `${BASE}/index.html`, salida: '../docs/demo.png', ancho: 1280, alto: 860, exacto: false },
+]
 
 // Dónde suele estar Chrome. Si no está en ninguno, se puede pasar a mano:
 //     CHROME="/ruta/al/navegador" node scripts/og.mjs
@@ -61,39 +70,45 @@ async function vivo(url) {
 }
 
 const chrome = await buscarChrome()
-if (!(await vivo(URL_PAGINA))) {
-  console.error(`No responde ${URL_PAGINA}. Levanta el servidor:  python3 serve.py`)
+if (!(await vivo(`${BASE}/index.html`))) {
+  console.error(`No responde ${BASE}. Levanta el servidor:  python3 serve.py`)
   process.exit(1)
 }
 
 const dir = await mkdtemp(join(tmpdir(), 'doodle-og-'))
 try {
-  // `--virtual-time-budget` adelanta el reloj de la página hasta que se queda quieta, así
-  // que no hay que adivinar un `sleep`: los módulos se cargan, se dibujan las caras y
-  // entonces dispara. Y `--force-device-scale-factor=1` para que 1200×630 sean 1200×630.
-  await ejecutar(chrome, [
-    '--headless',
-    '--disable-gpu',
-    '--hide-scrollbars',
-    '--force-device-scale-factor=1',
-    `--window-size=${ANCHO},${ALTO}`,
-    '--virtual-time-budget=8000',
-    `--screenshot=${join(dir, 'og.png')}`,
-    URL_PAGINA,
-  ])
-  const png = await readFile(join(dir, 'og.png'))
+  for (const foto of FOTOS) {
+    const tmp = join(dir, 'shot.png')
+    // `--virtual-time-budget` adelanta el reloj de la página hasta que se queda quieta,
+    // así que no hay que adivinar un `sleep`: los módulos se cargan, se dibujan las caras
+    // y entonces dispara. Y `--force-device-scale-factor=1` para que los píxeles pedidos
+    // sean los píxeles que salen.
+    await ejecutar(chrome, [
+      '--headless',
+      '--disable-gpu',
+      '--hide-scrollbars',
+      '--force-device-scale-factor=1',
+      `--window-size=${foto.ancho},${foto.alto}`,
+      '--virtual-time-budget=8000',
+      `--screenshot=${tmp}`,
+      foto.url,
+    ])
+    const png = await readFile(tmp)
 
-  // Las dimensiones salen de la cabecera IHDR del PNG: bytes 16–23, big-endian. Se
-  // comprueban porque una captura del tamaño equivocado no se nota hasta que la tarjeta
-  // sale recortada en LinkedIn, y para entonces ya está publicada.
-  const ancho = png.readUInt32BE(16)
-  const alto = png.readUInt32BE(20)
-  if (ancho !== ANCHO || alto !== ALTO) {
-    throw new Error(`La captura salió ${ancho}×${alto} y tenía que ser ${ANCHO}×${ALTO}`)
+    // Las dimensiones salen de la cabecera IHDR del PNG: bytes 16–23, big-endian. Se
+    // comprueban porque una captura del tamaño equivocado no se nota hasta que la tarjeta
+    // sale recortada en LinkedIn, y para entonces ya está publicada.
+    const ancho = png.readUInt32BE(16)
+    const alto = png.readUInt32BE(20)
+    if (foto.exacto && (ancho !== foto.ancho || alto !== foto.alto)) {
+      throw new Error(`${foto.salida} salió ${ancho}×${alto} y tenía que ser ${foto.ancho}×${foto.alto}`)
+    }
+
+    const destino = new URL(foto.salida, import.meta.url).pathname
+    await mkdir(dirname(destino), { recursive: true })
+    await writeFile(destino, png)
+    console.log(`${foto.salida.replace('../', '')} · ${ancho}×${alto} · ${(png.length / 1024).toFixed(0)} KB`)
   }
-
-  await writeFile(SALIDA, png)
-  console.log(`og.png · ${ancho}×${alto} · ${(png.length / 1024).toFixed(0)} KB`)
 } finally {
   await rm(dir, { recursive: true, force: true })
 }

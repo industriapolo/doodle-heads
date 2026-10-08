@@ -1,2 +1,4 @@
 .DS_Store
 node_modules/
+# Estado local del agente (worktrees, ajustes de sesión). No es del proyecto.
+.claude/
